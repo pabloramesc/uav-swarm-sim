@@ -1,0 +1,23 @@
+"""
+ Copyright (c) 2025 Pablo Ramirez Escudero
+ 
+ This software is released under the MIT License.
+ https://opensource.org/licenses/MIT
+"""
+
+from simulator.multidrone_simulator import MultiDroneSimulator
+from simulator.multidrone_viewer import MultiDroneViewer
+
+dt = 0.01
+num_drones = 100
+field_size = 1000.0
+
+sim = MultiDroneSimulator(num_drones)
+gui = MultiDroneViewer(num_drones, field_size)
+
+sim.initialize_grid_positions()
+
+while True:
+    sim.update()
+    gui.update(sim.links_matrix, sim.drone_states, sim.time, verbose=True)
+
