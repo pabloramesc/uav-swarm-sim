@@ -9,7 +9,7 @@ from simulator.multidrone_simulator import MultiDroneSimulator
 from simulator.multidrone_viewer import MultiDroneViewer
 
 dt = 0.01
-num_drones = 100
+num_drones = 20
 field_size = 1000.0
 
 sim = MultiDroneSimulator(num_drones)

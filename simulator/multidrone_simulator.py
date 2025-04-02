@@ -35,13 +35,13 @@ class MultiDroneSimulator:
 
     def _get_drone_states(self) -> None:
         for i, drone in enumerate(self.drones):
-            self.drone_states[i, 0:2] = drone.position
-            self.drone_states[i, 2:4] = drone.velocity
+            self.drone_states[i, 0:2] = drone.position[0:2]
+            self.drone_states[i, 2:4] = drone.velocity[0:2]
 
     def _set_drone_states(self) -> None:
         for i, drone in enumerate(self.drones):
-            drone.position = self.drone_states[i, 0:2]
-            drone.velocity = self.drone_states[i, 2:4]
+            drone.state[0:2] = self.drone_states[i, 0:2]
+            drone.state[3:5] = self.drone_states[i, 2:4]
 
     def initialize_random_positions(
         self, origin: np.ndarray = np.zeros(2), space: float = 1.0

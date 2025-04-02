@@ -23,23 +23,15 @@ class Drone(Agent):
         self.id = self._counter
         self._counter += 1
 
-        self.position = np.zeros(2)
-        self.velocity = np.zeros(2)
-        self.links: list[int] = []
-        
-        self.neighbor_ids: list[int] = []
-        self.neighbor_positions: np.ndarray = None
-        
+        self.state = np.zeros(6) # px, py, pz, vx, vy, vz
+    
     @property
-    def state(self) -> np.ndarray:
-        "Return a 4-size numpy array with drone state: [px, py, vx, vy]"
-        return np.concatenate((self.position, self.velocity))
+    def position(self) -> np.ndarray:
+        return self.state[0:3]
     
-    def set_neighbors(self, positions: np.ndarray, ids: list[int] = None):
-        self.neighbor_positions = positions
-        if ids is not None:
-            self.neighbor_ids = ids
-    
+    @property
+    def velocity(self) -> np.ndarray:
+        return self.state[3:6]
 
 class User(Agent):
     pass
