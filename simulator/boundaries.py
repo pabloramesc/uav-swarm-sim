@@ -55,6 +55,10 @@ class RectangularBoundary(Boundary):
         return np.linalg.norm(closest - pos)
 
     def direction_to(self, pos: np.ndarray) -> np.ndarray:
+        if not self.is_inside(pos):
+            delta = pos - self.center
+            norm = np.linalg.norm(delta)
+            return delta / norm if norm > 0.0 else np.zeros(2)
         closest = self._get_closest(pos)
         delta = closest - pos
         norm = np.linalg.norm(delta)
@@ -93,20 +97,20 @@ class PolygonalBoundary(Boundary):
         return inside
 
     def distance_to(self, pos: np.ndarray) -> float:
-        if self.is_inside(pos):
+        if not self.is_inside(pos):
             return 0.0
         return self._get_closest_distance_segment(pos)[0]
 
     def direction_to(self, pos: np.ndarray) -> np.ndarray:
         if self.is_inside(pos):
-            direction = self.center - pos
+            direction = pos - self.center
             dir_norm = np.linalg.norm(direction)
             return direction / dir_norm if dir_norm > 0.0 else np.zeros(2)
         closest_seg = self._get_closest_distance_segment(pos)[1]
         seg_vec = closest_seg[1] - closest_seg[0]
         seg_len = np.linalg.norm(seg_vec)
         seg_normal = np.array([seg_vec[1], -seg_vec[0]]) / seg_len
-        return -seg_normal
+        return seg_normal
 
     def _distance_to_segment(
         self, pos: np.ndarray, p1: np.ndarray, p2: np.ndarray
