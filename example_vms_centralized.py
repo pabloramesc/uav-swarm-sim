@@ -12,12 +12,12 @@ dt = 0.01
 num_drones = 20
 field_size = 1000.0
 
-sim = MultiDroneSimulator(num_drones)
+sim = MultiDroneSimulator(num_drones, dt)
 gui = MultiDroneViewer(num_drones, field_size)
 
 sim.initialize_grid_positions()
 
 while True:
-    sim.update()
-    gui.update(sim.links_matrix, sim.drone_states, sim.time, verbose=True)
+    sim.update_central()
+    gui.update(sim.drone_states, sim.links_matrix, sim.time, verbose=True)
 

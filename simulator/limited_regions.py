@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
+from numpy.typing import ArrayLike
 from shapely import Point, shortest_line, box, Polygon
 from matplotlib import pyplot as plt
 
@@ -10,22 +11,22 @@ class LimitedRegion(ABC):
         self.shape = shape
         self.centroid = np.array(self.shape.centroid.coords[0])
 
-    def is_inside(self, pos: np.ndarray) -> bool:
+    def is_inside(self, pos: ArrayLike) -> bool:
         return self.shape.contains(Point(pos))
 
-    def distance(self, pos: np.ndarray) -> float:
+    def distance(self, pos: ArrayLike) -> float:
         return self.shape.boundary.distance(Point(pos))
 
-    def direction(self, pos: np.ndarray) -> np.ndarray:
+    def direction(self, pos: ArrayLike) -> np.ndarray:
         closest, distance = self.get_closest_distance(pos)
         direction = (closest - pos) / distance if distance > 0.0 else np.zeros(2)
         return direction
 
-    def closest_point(self, pos: np.ndarray) -> np.ndarray:
+    def closest_point(self, pos: ArrayLike) -> np.ndarray:
         closest = shortest_line(self.shape.boundary, Point(pos)).coords[0]
         return np.array(closest)
 
-    def get_closest_distance(self, pos: np.ndarray) -> tuple[np.ndarray, float]:
+    def get_closest_distance(self, pos: ArrayLike) -> tuple[np.ndarray, float]:
         line = shortest_line(self.shape.boundary, Point(pos))
         closest = np.array(line.coords[0])
         distance = line.length
@@ -33,15 +34,15 @@ class LimitedRegion(ABC):
 
 
 class Obstacle(LimitedRegion):
-    def __init__(self, shape):
+    def __init__(self, shape) -> None:
         super().__init__(shape)
 
-    def distance(self, pos):
+    def distance(self, pos: ArrayLike) -> float:
         if self.is_inside(pos):
             return 0.0
         return super().distance(pos)
 
-    def direction(self, pos):
+    def direction(self, pos: ArrayLike) -> np.ndarray:
         direction = super().direction(pos)
         if self.is_inside(pos):
             return -direction
@@ -49,34 +50,34 @@ class Obstacle(LimitedRegion):
 
 
 class CircularObstacle(Obstacle):
-    def __init__(self, center: np.ndarray, radius: float) -> None:
+    def __init__(self, center: ArrayLike, radius: float) -> None:
         self.center = np.array(center)
         self.radius = float(radius)
         super().__init__(Point(self.center).buffer(self.radius))
 
-    def is_inside(self, pos: np.ndarray) -> bool:
+    def is_inside(self, pos: ArrayLike) -> bool:
         delta = self.center - pos
         return np.linalg.norm(delta) < self.radius
 
-    def distance(self, pos: np.ndarray) -> float:
+    def distance(self, pos: ArrayLike) -> float:
         delta = self.center - pos
         return max(0.0, np.linalg.norm(delta) - self.radius)
 
-    def direction(self, pos: np.ndarray) -> np.ndarray:
+    def direction(self, pos: ArrayLike) -> np.ndarray:
         delta = self.center - pos
         norm = np.linalg.norm(delta)
         return delta / norm if norm > 0.0 else np.zeros(2)
 
 
 class RectangularObstacle(Obstacle):
-    def __init__(self, bottom_left: np.ndarray, top_right: np.ndarray) -> None:
+    def __init__(self, bottom_left: ArrayLike, top_right: ArrayLike) -> None:
         self.bottom_left = np.array(bottom_left)
         self.top_right = np.array(top_right)
         super().__init__(box(*self.bottom_left, *self.top_right))
 
 
 class PolygonalObstacle(Obstacle):
-    def __init__(self, vertices: np.ndarray):
+    def __init__(self, vertices: ArrayLike):
         self.vertices = np.array(vertices)
         super().__init__(Polygon(self.vertices))
 
@@ -98,34 +99,34 @@ class Boundary(LimitedRegion):
 
 
 class CircularBoundary(Boundary):
-    def __init__(self, center: np.ndarray, radius: float) -> None:
+    def __init__(self, center: ArrayLike, radius: float) -> None:
         self.center = np.array(center)
         self.radius = float(radius)
         super().__init__(Point(self.center).buffer(self.radius))
 
-    def is_inside(self, pos: np.ndarray) -> bool:
+    def is_inside(self, pos: ArrayLike) -> bool:
         delta = self.center - pos
         return np.linalg.norm(delta) < self.radius
 
-    def distance(self, pos: np.ndarray) -> float:
+    def distance(self, pos: ArrayLike) -> float:
         delta = self.center - pos
         return max(0.0, self.radius - np.linalg.norm(delta))
 
-    def direction(self, pos: np.ndarray) -> np.ndarray:
+    def direction(self, pos: ArrayLike) -> np.ndarray:
         delta = pos - self.center
         norm = np.linalg.norm(delta)
         return delta / norm if norm > 0.0 else np.zeros(2)
 
 
 class RectangularBoundary(Boundary):
-    def __init__(self, bottom_left: np.ndarray, top_right: np.ndarray) -> None:
+    def __init__(self, bottom_left: ArrayLike, top_right: ArrayLike) -> None:
         self.bottom_left = np.array(bottom_left)
         self.top_right = np.array(top_right)
         super().__init__(box(*self.bottom_left, *self.top_right))
 
 
 class PolygonalBoundary(Boundary):
-    def __init__(self, vertices: np.ndarray):
+    def __init__(self, vertices: ArrayLike):
         self.vertices = np.array(vertices)
         super().__init__(Polygon(self.vertices))
 
