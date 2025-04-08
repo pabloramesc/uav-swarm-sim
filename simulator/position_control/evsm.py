@@ -1,11 +1,13 @@
-from abc import ABC, abstractmethod
 import numpy as np
 
-from simulator.limited_regions import LimitedRegion
+from simulator.environment.limited_regions import LimitedRegion
 from simulator.math.angles import vector_angle, is_angle_between, diff_angle_2pi
-from shapely import Point, Polygon
-
-from numba import njit
+from simulator.position_control.evsm_numba import (
+    calculate_links,
+    calculate_control_force,
+    calculate_damping_force,
+    calculate_sweep_angle
+)
 
 
 class EVSM:
@@ -16,7 +18,7 @@ class EVSM:
         d_obs: float = 10.0,
     ) -> None:
         self.ln = ln
-        self.ks = 0.2 #1.0 / ln
+        self.ks = 0.2  # 1.0 / ln
         self.kd = mass / 1.0  # 1 second damping (k_d = m / tau)
         self.d_obs = d_obs
         self.k_obs = 1.0 / d_obs
@@ -25,7 +27,7 @@ class EVSM:
         self.state = np.zeros(4)  # px, py, vx, vy
 
         self.neighbors = np.zeros((0, 2))  # (px, py)
-        self.links = np.zeros((0,), dtype=np.bool)
+        self.links_mask = np.zeros((0,), dtype=np.bool)
 
         self.limited_regions: list[LimitedRegion] = []
 
@@ -51,13 +53,19 @@ class EVSM:
         return self.update_from_internal()
 
     def update_from_internal(self) -> np.ndarray:
-        self.links = self.calculate_links()
+        # self.links_mask = self.calculate_links()
+        self.links_mask = calculate_links(self.position, self.neighbors)
 
-        control_force = self.calculate_control_force()
+        # control_force = self.calculate_control_force()
+        control_force = calculate_control_force(
+            self.position, self.neighbors[self.links_mask], ln=self.ln, ks=self.ks
+        )
 
-        damping_force = self.calculate_damping_force()
+        # damping_force = self.calculate_damping_force()
+        damping_force = calculate_damping_force(self.velocity, kd=self.kd)
 
-        self.sweep_angles = self.check_edge_robot()
+        # self.sweep_angles = self.calculate_sweep_angle()
+        self.sweep_angles = calculate_sweep_angle(self.position, self.neighbors)
 
         exploration_force = np.zeros(2)
         if self.is_edge_robot():
@@ -91,7 +99,7 @@ class EVSM:
         return links
 
     def calculate_control_force(self) -> np.ndarray:
-        deltas = self.neighbors[self.links] - self.position
+        deltas = self.neighbors[self.links_mask] - self.position
         distances = np.linalg.norm(deltas, axis=1)[:, np.newaxis]
         directions = np.where(
             distances > 0.0, deltas / distances, np.zeros_like(deltas)
@@ -132,8 +140,10 @@ class EVSM:
             obstacle_force += (self.d_obs / distance) ** 2 * (-direction)
         return obstacle_force * self.k_obs
 
-    def check_edge_robot(self) -> tuple[float, float]:
+    def calculate_sweep_angle(self) -> tuple[float, float]:
         num_neighbors = self.neighbors.shape[0]
+        if num_neighbors == 0:
+            return (0.0, 0.0)
         vectors = self.neighbors - self.position
         angles = vector_angle(vectors)
         angles.sort()

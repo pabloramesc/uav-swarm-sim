@@ -5,12 +5,11 @@ This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
 
-
 import numpy as np
 from numpy.typing import ArrayLike
 
-from simulator.drone import Drone
-from simulator.limited_regions import (
+from simulator.agents.drone import Drone
+from simulator.environment.limited_regions import (
     LimitedRegion,
     Boundary,
     Obstacle,
@@ -19,13 +18,6 @@ from simulator.limited_regions import (
     CircularObstacle,
     RectangularObstacle,
 )
-
-from simulator.virtual_spring_mesh import (
-    calculate_links,
-    calculate_forces,
-    update_states,
-)
-
 
 
 class MultiDroneSimulator:
@@ -50,11 +42,11 @@ class MultiDroneSimulator:
 
         self.boundary: Boundary = None
         self.obstacles: list[Obstacle] = []
-        
+
     @property
     def drone_positions(self) -> np.ndarray:
         return self.drone_states[:, 0:3]
-    
+
     @property
     def drone_velocities(self) -> np.ndarray:
         return self.drone_states[:, 3:6]
@@ -62,7 +54,6 @@ class MultiDroneSimulator:
     @property
     def limited_regions(self) -> list[LimitedRegion]:
         return [self.boundary] + self.obstacles
-    
 
     def set_rectangular_boundary(
         self, bottom_left: ArrayLike, top_right: ArrayLike
@@ -91,7 +82,7 @@ class MultiDroneSimulator:
         rect = RectangularObstacle(bottom_left, top_right)
         self.obstacles.append(rect)
         self._update_limited_regions_info()
-    
+
     def _update_limited_regions_info(self) -> None:
         for drone in self.drones:
             drone.position_control.limited_regions = self.limited_regions
@@ -138,16 +129,6 @@ class MultiDroneSimulator:
                     self._set_drone_states()
                     return
 
-    def update_central(self, dt: float = None) -> None:
-        dt = dt or self.dt
-        self._get_drone_states()
-        self.links_matrix = calculate_links(self.drone_states[:, 0:2])
-        forces = calculate_forces(self.drone_states, self.links_matrix, ln=100.0)
-        self.drone_states = update_states(self.drone_states, forces, dt)
-        self._set_drone_states()
-        self.time += dt
-        self.step += 1
-
     def update(self, dt: float = None) -> None:
         self.update_visible_neighbors(100.0)
         self.update_drones(dt)
@@ -178,7 +159,7 @@ class MultiDroneSimulator:
         )
         for drone in self.drones:
             neighbor_indexes = drone.visible_neighbors_ids - 1
-            links_mask = drone.position_control.links
+            links_mask = drone.position_control.links_mask
             drone_links = np.zeros((self.num_drones,), dtype=bool)
             drone_links[neighbor_indexes] = links_mask
             self.links_matrix[drone.id - 1, :] = drone_links

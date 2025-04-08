@@ -7,7 +7,7 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from simulator.extended_vsm import EVSM
+from simulator.position_control.evsm import EVSM
 
 
 class Drone:
@@ -53,8 +53,8 @@ class Drone:
         self.state = self.state + x_dot * dt
 
     def set_visible_neighbors(self, ids: np.ndarray, positions: np.ndarray) -> None:
-        self.visible_neighbors_ids = ids
-        self.visible_neighbors_positions = positions
+        self.visible_neighbors_ids = np.asarray(ids)
+        self.visible_neighbors_positions = np.asarray(positions)
         
     def limit_acceleration(self, acc: np.ndarray) -> np.ndarray:
         if self.max_acc is None:

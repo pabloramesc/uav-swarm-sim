@@ -8,7 +8,7 @@ https://opensource.org/licenses/MIT
 import numpy as np
 
 from simulator.multidrone_simulator import MultiDroneSimulator
-from simulator.multidrone_viewer import MultiDroneViewer
+from simulator.gui.multidrone_viewer import MultiDroneViewer
 
 dt = 0.1
 num_drones = 64
