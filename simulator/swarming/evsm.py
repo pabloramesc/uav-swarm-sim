@@ -1,6 +1,6 @@
 import numpy as np
 
-from simulator.environment.limited_regions import LimitedRegion
+from simulator.environment.avoid_regions import AvoidRegion
 from simulator.math.angles import (
     SweepAngle,
     diff_angle_2pi,
@@ -38,7 +38,7 @@ class EVSM:
         self.neighbors = np.zeros((0, 2))  # (px, py)
         self.links_mask = np.zeros((0,), dtype=bool)
 
-        self.avoid_regions: list[LimitedRegion] = []
+        self.avoid_regions: list[AvoidRegion] = []
 
         self.sweep_angle: SweepAngle = None
         

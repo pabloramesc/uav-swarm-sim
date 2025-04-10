@@ -6,7 +6,7 @@ from shapely import Point, shortest_line, box, Polygon
 from matplotlib import pyplot as plt
 
 
-class LimitedRegion(ABC):
+class AvoidRegion(ABC):
     def __init__(self, shape: Polygon) -> None:
         self.shape = shape
         self.centroid = np.array(self.shape.centroid.coords[0])
@@ -33,7 +33,7 @@ class LimitedRegion(ABC):
         return closest, distance
 
 
-class Obstacle(LimitedRegion):
+class Obstacle(AvoidRegion):
     def __init__(self, shape) -> None:
         super().__init__(shape)
 
@@ -82,7 +82,7 @@ class PolygonalObstacle(Obstacle):
         super().__init__(Polygon(self.vertices))
 
 
-class Boundary(LimitedRegion):
+class Boundary(AvoidRegion):
     def __init__(self, shape):
         super().__init__(shape)
 
@@ -132,7 +132,7 @@ class PolygonalBoundary(Boundary):
 
 
 def plot_limited_region(
-    region: LimitedRegion, x_range=(-20, 20), y_range=(-20, 20), resolution=100
+    region: AvoidRegion, x_range=(-20, 20), y_range=(-20, 20), resolution=100
 ):
     x_dense = np.linspace(*x_range, resolution)
     y_dense = np.linspace(*y_range, resolution)

@@ -10,8 +10,8 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from simulator.agents.drone import Drone
-from simulator.environment.limited_regions import (
-    LimitedRegion,
+from simulator.environment.avoid_regions import (
+    AvoidRegion,
     Boundary,
     Obstacle,
     RectangularBoundary,
@@ -34,7 +34,7 @@ def drone_process(
     shared_dict: dict,
     dt: float = 0.01,
     initial_state: np.ndarray = np.zeros(6),
-    limited_regions: list[LimitedRegion] = [],
+    limited_regions: list[AvoidRegion] = [],
 ):
     local_time = 0.0
     drone = Drone()
@@ -121,7 +121,7 @@ class MultiDroneSimulator:
         return self.drone_states[:, 3:6]
 
     @property
-    def limited_regions(self) -> list[LimitedRegion]:
+    def limited_regions(self) -> list[AvoidRegion]:
         return [self.boundary] + self.obstacles
 
     def set_rectangular_boundary(
