@@ -19,9 +19,29 @@ class MultiDroneViewer:
         min_render_freq: float = 1.0,
     ):
         self.sim = sim
+        self.xlim = xlim
+        self.ylim = ylim
+        self.fig_size = fig_size
+        
+        self.min_render_steps = min_render_steps
+        self.min_render_freq = min_render_freq
+        self.min_render_period = 1.0 / min_render_freq
+
+        self.t0: float = None
+        self.last_render_time: float = None
+        self.non_render_steps: int = None
 
         self.fig = plt.figure(figsize=fig_size)
         self.ax = self.fig.add_subplot()
+        
+        self.reset()
+        
+    def reset(self) -> None:
+        self.t0 = time.time()
+        self.last_render_time = 0.0
+        self.non_render_steps = self.min_render_steps + 1
+        
+        self.ax.clear()
 
         (self.link_lines,) = self.ax.plot([], [], "b-", lw=0.5)
         (self.drone_points,) = self.ax.plot([], [], "ro", ms=2.0)
@@ -34,20 +54,12 @@ class MultiDroneViewer:
                 *obs.shape.exterior.coords.xy, edgecolor="black", facecolor="grey"
             )
 
-        self.ax.set_xlim(*xlim)
-        self.ax.set_ylim(*ylim)
+        self.ax.set_xlim(*self.xlim)
+        self.ax.set_ylim(*self.ylim)
         self.ax.grid(True)
         self.ax.set_aspect("equal")
 
         plt.pause(0.01)
-
-        self.min_render_steps = min_render_steps
-        self.min_render_freq = min_render_freq
-        self.min_render_period = 1.0 / min_render_freq
-
-        self.t0 = time.time()
-        self.last_render_time = 0.0
-        self.non_render_steps = min_render_steps + 1
 
     def update(
         self,

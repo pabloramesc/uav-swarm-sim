@@ -18,15 +18,15 @@ class LimitedRegion(ABC):
         return self.shape.boundary.distance(Point(pos))
 
     def direction(self, pos: ArrayLike) -> np.ndarray:
-        closest, distance = self.get_closest_distance(pos)
+        closest, distance = self._get_closest_and_distance(pos)
         direction = (closest - pos) / distance if distance > 0.0 else np.zeros(2)
         return direction
 
     def closest_point(self, pos: ArrayLike) -> np.ndarray:
-        closest = shortest_line(self.shape.boundary, Point(pos)).coords[0]
+        closest, _ = self._get_closest_and_distance(pos)
         return np.array(closest)
 
-    def get_closest_distance(self, pos: ArrayLike) -> tuple[np.ndarray, float]:
+    def _get_closest_and_distance(self, pos: ArrayLike) -> tuple[np.ndarray, float]:
         line = shortest_line(self.shape.boundary, Point(pos))
         closest = np.array(line.coords[0])
         distance = line.length

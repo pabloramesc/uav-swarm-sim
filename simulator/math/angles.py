@@ -2,6 +2,8 @@ import numpy as np
 from numpy.typing import ArrayLike
 from typing import Union
 
+from dataclasses import dataclass
+
 
 def vector_angle(v: ArrayLike) -> Union[float, np.ndarray]:
     """
@@ -131,6 +133,26 @@ def is_angle_between(
     diff1 = diff_angle_2pi(angle, angle1)
     sweep = diff_angle_2pi(angle2, angle1)
     return (diff1 >= 0) & (diff1 <= sweep)
+
+
+@dataclass
+class SweepAngle:
+    start: float
+    stop: float
+
+    @property
+    def sweep(self) -> float:
+        if self.start == self.stop:
+            return 2 * np.pi
+        diff_angle_2pi(self.stop, self.start)
+
+    def contains(self, angle: float) -> bool:
+        if self.start == self.stop:
+            return angle != self.start
+        return is_angle_between(angle, self.start, self.stop)
+    
+    def to_tuple(self) -> tuple[float, float]:
+        return (self.start, self.stop)
 
 
 if __name__ == "__main__":

@@ -40,7 +40,7 @@ def drone_process(
     drone = Drone()
     drone.id = drone_id
     drone.state = initial_state
-    drone.position_control.limited_regions = limited_regions
+    drone.position_control.avoid_regions = limited_regions
 
     num_drones = shared_dict["num_drones"]
 

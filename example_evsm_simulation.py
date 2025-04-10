@@ -11,7 +11,7 @@ from simulator.multidrone_simulator import MultiDroneSimulator
 from simulator.gui.multidrone_viewer import MultiDroneViewer
 
 dt = 0.1
-num_drones = 64
+num_drones = 30
 xlim = np.array([-200.0, +200.0])
 ylim = np.array([-100.0, +100.0])
 
@@ -26,6 +26,10 @@ gui = MultiDroneViewer(sim, xlim * 1.1, ylim * 1.1)
 
 while True:
     sim.update()
+    
+    if sim.time <= dt:
+        gui.reset()
+        
     gui.update(force_render=False, verbose=True)
 
     if gui.non_render_steps == 0:

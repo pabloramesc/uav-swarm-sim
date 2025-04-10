@@ -19,6 +19,8 @@ from simulator.environment.limited_regions import (
     RectangularObstacle,
 )
 
+from simulator.position_control.evsm_numba import compile_all
+
 
 class MultiDroneSimulator:
 
@@ -28,6 +30,9 @@ class MultiDroneSimulator:
 
         self.time = 0.0
         self.step = 0
+        
+        self.space = 0.0
+        self.max_space = 100.0
 
         self.drones: list[Drone] = []
         self.drone_ids = np.zeros((num_drones,), dtype=np.int32)
@@ -42,6 +47,10 @@ class MultiDroneSimulator:
 
         self.boundary: Boundary = None
         self.obstacles: list[Obstacle] = []
+        
+        # print("Compiling EVSM numba functions ...")
+        # compile_all()
+        # print("✅ EVSM numba functions compiled.")
 
     @property
     def drone_positions(self) -> np.ndarray:
@@ -85,7 +94,7 @@ class MultiDroneSimulator:
 
     def _update_limited_regions_info(self) -> None:
         for drone in self.drones:
-            drone.position_control.limited_regions = self.limited_regions
+            drone.position_control.avoid_regions = self.limited_regions
 
     def _get_drone_states(self) -> None:
         for i, drone in enumerate(self.drones):
@@ -109,6 +118,7 @@ class MultiDroneSimulator:
         self.drone_states[:, 2] = altitude
         self.drone_states[:, 3:6] = 0.0
         self._set_drone_states()
+        self.space = space
 
     def initialize_grid_positions(
         self,
@@ -127,6 +137,7 @@ class MultiDroneSimulator:
                 drone_id += 1
                 if drone_id >= self.num_drones:
                     self._set_drone_states()
+                    self.space = space
                     return
 
     def update(self, dt: float = None) -> None:
@@ -134,11 +145,13 @@ class MultiDroneSimulator:
         self.update_drones(dt)
         self.update_links_matrix()
         self.update_edge_drones_mask()
+        self.update_drones_spacing()
 
     def update_drones(self, dt: float = None) -> None:
         dt = dt or self.dt
         for drone in self.drones:
             drone.update(dt)
+            drone.position_control.set_natural_length(self.space)
         self.time += dt
         self.step += 1
 
@@ -167,3 +180,6 @@ class MultiDroneSimulator:
     def update_edge_drones_mask(self) -> None:
         for i, drone in enumerate(self.drones):
             self.edge_drones_mask[i] = drone.position_control.is_edge_robot()
+            
+    def update_drones_spacing(self) -> None:
+        self.space = np.clip(self.time, self.space, self.max_space)
