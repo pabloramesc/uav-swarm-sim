@@ -1,0 +1,218 @@
+"""
+Copyright (c) 2025 Pablo Ramirez Escudero
+
+This software is released under the MIT License.
+https://opensource.org/licenses/MIT
+"""
+
+import numpy as np
+
+from simulator.environment.avoid_regions import AvoidRegion
+from simulator.math.angles import SweepAngle
+
+from .evsm_numba import (
+    calculate_avoidance_force,
+    calculate_control_force,
+    calculate_damping_force,
+    calculate_exploration_force,
+    calculate_links,
+    calculate_sweep_angle,
+)
+
+
+class EVSM:
+    """
+    EVSM (Exploration and Virtual Spring Model) class for swarm behavior.
+
+    This class models the behavior of a robot in a swarm, including control
+    forces, obstacle avoidance, and exploration.
+    """
+
+    def __init__(
+        self,
+        ln: float = 50.0,
+        ks: float = 0.2,
+        kd: float = 0.8,
+        d_obs: float = 10.0,
+        k_obs: float = 1.0,
+        k_expl: float = 1.0,
+        avoid_regions: list[AvoidRegion] = [],
+    ) -> None:
+        """
+        Initializes the EVSM model with default parameters.
+
+        Parameters
+        ----------
+        ln : float, optional
+            Natural length of the virtual spring (default is 50.0).
+        """
+        self.ln = ln
+        self.ks = ks
+        self.kd = kd
+        self.d_obs = d_obs
+        self.k_obs = k_obs
+        self.k_expl = k_expl
+
+        self.state = np.zeros(4)  # [px, py, vx, vy]
+        self.neighbors = np.zeros((0, 2))  # [px, py] of neighbors
+        self.links_mask = np.zeros((0,), dtype=bool)
+
+        self.avoid_regions = avoid_regions
+        self.sweep_angle: SweepAngle = None
+
+    @property
+    def position(self) -> np.ndarray:
+        """A (2,) array with the current position [px, py] of the agent in meters."""
+        return self.state[0:2]
+
+    @property
+    def velocity(self) -> np.ndarray:
+        """A (2,) array with the current veclocity [vx, vy] of the agent in m/s."""
+        return self.state[2:4]
+
+    def update(
+        self,
+        position: np.ndarray,
+        velocity: np.ndarray,
+        neighbors: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Updates the state of the agent's position, velocity, and neighbors.
+
+        Parameters
+        ----------
+        position : np.ndarray
+            A (2,) array with the position [px, py] of the agent in meters.
+        velocity : np.ndarray
+            A (2,) array with the velocity [vx, vy] of the agent in m/s.
+        neighbors : np.ndarray
+            A (N,2) array with the positions [px, py] of the visible neighbors
+            in meters.
+
+        Returns
+        -------
+        np.ndarray
+            Total force acting on the robot [fx, fy] in N.
+        """
+        self.state[0:2] = position.copy()
+        self.state[2:4] = velocity.copy()
+        self.neighbors = neighbors.copy()
+        return self._compute_total_force()
+
+    def _compute_total_force(self) -> np.ndarray:
+        """
+        Update the links mask an compute the total force acting on the agent.
+        """
+        self.links_mask = self._calculate_links()
+
+        damping_force = self._calculate_damping_force()
+        obstacles_force = self._calculate_obstacle_avoidance_force()
+
+        if self.is_near_obstacle():
+            return obstacles_force + damping_force
+
+        control_force = self._calculate_control_force()
+        exploration_force = self._calculate_exploration_force()
+
+        return control_force + damping_force + exploration_force
+
+    def _calculate_links(self) -> np.ndarray:
+        return calculate_links(self.position, self.neighbors)
+
+    def _calculate_control_force(self) -> np.ndarray:
+        linked_neighbors = self.neighbors[self.links_mask]
+        return calculate_control_force(
+            self.position, linked_neighbors, ln=self.ln, ks=self.ks
+        )
+
+    def _calculate_damping_force(self) -> np.ndarray:
+        return calculate_damping_force(self.velocity, kd=self.kd)
+
+    def _calculate_exploration_force(self) -> np.ndarray:
+        if not self.is_edge_robot():
+            return np.zeros(2)
+
+        region_distances, region_directions = (
+            self.get_avoidance_distances_and_directions()
+        )
+        return calculate_exploration_force(
+            region_distances,
+            region_directions,
+            self.sweep_angle.to_tuple(),
+            ln=self.ln,
+            ks=self.k_expl,
+        )
+
+    def _calculate_obstacle_avoidance_force(self) -> np.ndarray:
+        region_distances, region_directions = (
+            self.get_avoidance_distances_and_directions()
+        )
+        return calculate_avoidance_force(
+            region_distances, region_directions, d_min=self.d_obs, ks=self.k_obs
+        )
+
+    def _calculate_sweep_angle(self) -> SweepAngle:
+        start, stop = calculate_sweep_angle(self.position, self.neighbors)
+        if np.isnan((start, stop)).any():
+            return None
+        return SweepAngle(start, stop)
+
+    def get_avoidance_distances_and_directions(self) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Calculates distances and directions to avoidance regions.
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            Distances and directions to avoidance regions.
+        """
+        num_regions = len(self.avoid_regions)
+        distances = np.zeros((num_regions,))
+        directions = np.zeros((num_regions, 2))
+        for i, region in enumerate(self.avoid_regions):
+            distances[i] = region.distance(self.position)
+            directions[i, :] = region.direction(self.position)
+        return distances, directions
+
+    def is_edge_robot(self) -> bool:
+        """
+        Checks if the robot is at the edge of the swarm.
+
+        Returns
+        -------
+        bool
+            True if the robot is at the edge, False otherwise.
+        """
+        return self.sweep_angle is not None
+
+    def is_near_obstacle(self) -> bool:
+        """
+        Checks if the robot is near any obstacle.
+
+        Returns
+        -------
+        bool
+            True if the robot is near an obstacle, False otherwise.
+        """
+        for region in self.avoid_regions:
+            if region.distance(self.position) < self.d_obs:
+                return True
+        return False
+
+    def set_natural_length(self, ln: float) -> None:
+        """
+        Sets the natural length of the virtual spring.
+
+        Parameters
+        ----------
+        ln : float
+            New natural length.
+
+        Raises
+        ------
+        ValueError
+            If the natural length is not greater than 0.
+        """
+        if ln <= 0.0:
+            raise ValueError("Natural length must be greater than 0.0")
+        self.ln = ln

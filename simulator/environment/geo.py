@@ -1,6 +1,14 @@
+"""
+Copyright (c) 2025 Pablo Ramirez Escudero
+
+This software is released under the MIT License.
+https://opensource.org/licenses/MIT
+"""
+
 import numpy as np
 
 LATDEG2METERS = 111320
+
 
 def geo2xyz(geo: np.ndarray, home: np.ndarray) -> np.ndarray:
     """
@@ -26,6 +34,7 @@ def geo2xyz(geo: np.ndarray, home: np.ndarray) -> np.ndarray:
     xyz[1] = dlat * LATDEG2METERS
     xyz[2] = geo[2] - home[2]
     return xyz
+
 
 def xyz2geo(xyz: np.ndarray, home: np.ndarray) -> np.ndarray:
     """

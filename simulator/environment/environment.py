@@ -1,31 +1,56 @@
+"""
+Copyright (c) 2025 Pablo Ramirez Escudero
+
+This software is released under the MIT License.
+https://opensource.org/licenses/MIT
+"""
+
 import numpy as np
 
-from simulator.environment.elevation_map import ElevationMap
-from simulator.environment.avoid_regions import Boundary, Obstacle, AvoidRegion
-from simulator.environment.geo import geo2xyz, xyz2geo
+from .elevation_map import ElevationMap
+from .avoid_regions import Boundary, Obstacle, AvoidRegion
+from .geo import geo2xyz, xyz2geo
 
 
 class Environment:
     """
-    Manages the simulation environment, including elevation data, boundaries, and obstacles.
+    Manages the simulation environment, including elevation data, boundaries,
+    and obstacles.
     """
 
-    def __init__(self, dem_path: str) -> None:
+    def __init__(
+        self, dem_path: str, boundary: Boundary = None, obstacles: list[Obstacle] = []
+    ) -> None:
         """
-        Initializes the environment with elevation data, calculates the home reference point,
-        and initializes empty boundary/obstacle lists.
+        Initializes the environment with elevation data, calculates the home
+        reference point, and initializes empty boundary/obstacle lists.
 
         Parameters
         ----------
         dem_path : str
             Path to the DEM (Digital Elevation Model) file.
+        boundary : Boundary, optional
+            The boundary object defining the limits of the environment.
+            Default is None.
+        obstacle : list[Obstacle], optional
+            A list with obstacle objects to add to the environment.
+            Default is [].
         """
         self.elevation = ElevationMap(dem_path)
-        self.boundary: Boundary = None
-        self.obstacles: list[Obstacle] = []
+        self.boundary = boundary
+        self.obstacles = obstacles
 
         # Calculate the home reference point (bottom-left corner of the elevation map)
-        self.home = np.array([self.elevation.bounds.bottom, self.elevation.bounds.left, 0.0])
+        self.home = np.array(
+            [self.elevation.bounds.bottom, self.elevation.bounds.left, 0.0]
+        )
+
+    @property
+    def avoid_regions(self) -> list[AvoidRegion]:
+        """
+        A list of all avoid regions, including the boundary and obstacles.
+        """
+        return [self.boundary] + self.obstacles
 
     def set_boundary(self, boundary: Boundary) -> None:
         """
@@ -49,17 +74,6 @@ class Environment:
         """
         self.obstacles.append(obstacle)
 
-    def get_avoid_regions(self) -> list[AvoidRegion]:
-        """
-        Returns a list of all avoid regions, including the boundary and obstacles.
-
-        Returns
-        -------
-        list[AvoidRegion]
-            List of avoid regions.
-        """
-        return [self.boundary] + self.obstacles
-
     def is_inside(self, pos: np.ndarray) -> bool:
         """
         Checks if a position is inside the environment boundary.
@@ -67,7 +81,7 @@ class Environment:
         Parameters
         ----------
         pos : np.ndarray
-            Position [x, y] in meters.
+            Position [x, y, z] in meters.
 
         Returns
         -------
@@ -76,7 +90,7 @@ class Environment:
         """
         if self.boundary is None:
             raise ValueError("Boundary is not defined.")
-        return self.boundary.is_inside(pos)
+        return self.boundary.is_inside(pos[0:2])
 
     def is_collision(self, pos: np.ndarray) -> bool:
         """
@@ -90,18 +104,19 @@ class Environment:
         Returns
         -------
         bool
-            True if the position collides with an obstacle or the ground, False otherwise.
+            True if the position collides with an obstacle or the ground,
+            False otherwise.
         """
         # Check collision with the ground
-        ground_elevation = self.get_elevation(pos[:2])
+        ground_elevation = self.get_elevation(pos)
         if pos[2] <= ground_elevation:  # Check if altitude is below or at ground level
             return True
 
         # Check collision with obstacles
         for obstacle in self.obstacles:
-            if obstacle.is_inside(pos[:2]):  # Check only x, y for obstacles
+            if obstacle.is_inside(pos[0:2]):  # Check only x, y for obstacles
                 return True
-            
+
         return False
 
     def get_elevation(self, pos: np.ndarray) -> float:
@@ -111,7 +126,7 @@ class Environment:
         Parameters
         ----------
         pos : np.ndarray
-            Position [x, y] in meters.
+            A (2,) array with horizontal position [x, y] in meters.
 
         Returns
         -------
@@ -119,7 +134,9 @@ class Environment:
             Elevation in meters.
         """
         # Convert local Cartesian coordinates to geographic coordinates
-        geo = xyz2geo(pos, self.home)
+        xyz = np.zeros(3)
+        xyz[0:2] = pos
+        geo = xyz2geo(xyz, self.home)
         lat, lon = geo[0], geo[1]
         return self.elevation.get_elevation(lat, lon)
 
@@ -135,7 +152,8 @@ class Environment:
         Returns
         -------
         np.ndarray
-            Geographic coordinates [latitude, longitude, altitude] in degrees and meters.
+            Geographic coordinates [latitude, longitude, altitude] in 
+            (degrees, degrees, meters).
         """
         return xyz2geo(pos, self.home)
 
@@ -146,7 +164,8 @@ class Environment:
         Parameters
         ----------
         geo : np.ndarray
-            Geographic coordinates [latitude, longitude, altitude] in degrees and meters.
+            Geographic coordinates [latitude, longitude, altitude] in 
+            (degrees, degrees, meters).
 
         Returns
         -------
@@ -157,7 +176,8 @@ class Environment:
 
     def plot_environment(self) -> None:
         """
-        Visualizes the environment, including the boundary, obstacles, and elevation map.
+        Visualizes the environment, including the boundary, obstacles, and
+        elevation map.
         """
         import matplotlib.pyplot as plt
 
