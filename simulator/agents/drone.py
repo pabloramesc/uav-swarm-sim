@@ -13,7 +13,7 @@ from .agent import Agent
 
 class Drone(Agent):
     """
-    Represents a Drone (or drone) in the simulation.
+    Represents a Drone (or UAV) in the simulation.
 
     This class models the behavior of a drone, including its dynamics, neighbor interactions,
     and position control using a provided position controller.
@@ -35,7 +35,6 @@ class Drone(Agent):
         id: int,
         env: Environment,
         position_controller: PositionController,
-        max_acc: float = None,
     ):
         """
         Initializes the drone with a unique ID, environment, and position controller.
@@ -48,14 +47,14 @@ class Drone(Agent):
             The simulation environment the drone interacts with.
         position_controller : PositionController
             The position controller used to compute control forces for the drone.
-        max_acc : float, optional
-            Maximum allowable acceleration for the drone in m/s^2 (default is None, meaning no limit).
         """
         super().__init__(id=id, type="drone", env=env)
         self.position_controller = position_controller
         self.neighbor_ids = np.zeros((0,), dtype=int)
         self.neighbor_states = np.zeros((0, 6))
-        self.max_acc = max_acc
+
+        self.mass = 1.0  # 1 kg for simple equivalence between force and acceleration
+        self.max_acc = 10.0  # aprox. 1 g = 9.81 m/s^2
 
     def update(self, dt: float = 0.01) -> None:
         """
@@ -66,6 +65,8 @@ class Drone(Agent):
         dt : float, optional
             Time step in seconds (default is 0.01).
         """
+        super().update(dt)
+        
         # Compute control force using the position controller
         control_force = self.position_controller.update(
             self.state, self.neighbor_states, self.time

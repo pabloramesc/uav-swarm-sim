@@ -1,2 +1,2 @@
 from .base_position_control import PositionController, PositionControllerConfig
-from .evsm_position_control import EVSMConfig, EVSMPositionControl
+from .evsm_position_control import EVSMConfig, EVSMPositionController

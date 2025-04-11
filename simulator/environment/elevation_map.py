@@ -17,13 +17,17 @@ class ElevationMap:
         self.dem_path = dem_path
         self.bounds = None
         self.resolution = None
-        self.elevation_data = None
+        self.elevation_data: np.ndarray = None
 
         # Cargar el archivo DEM
-        self._load_dem()
-
-    def _load_dem(self):
-        with rasterio.open(self.dem_path) as dem:
+        self.load_dem(self.dem_path)
+        
+    @property
+    def max_elevation(self) -> float:
+        return self.elevation_data.max()
+        
+    def load_dem(self, dem_path: str):
+        with rasterio.open(dem_path) as dem:
             self.bounds = dem.bounds
             self.resolution = dem.res
             self.elevation_data = dem.read(1)

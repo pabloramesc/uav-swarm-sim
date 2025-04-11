@@ -19,7 +19,10 @@ class Environment:
     """
 
     def __init__(
-        self, dem_path: str, boundary: Boundary = None, obstacles: list[Obstacle] = []
+        self,
+        dem_path: str = None,
+        boundary: Boundary = None,
+        obstacles: list[Obstacle] = [],
     ) -> None:
         """
         Initializes the environment with elevation data, calculates the home
@@ -27,8 +30,8 @@ class Environment:
 
         Parameters
         ----------
-        dem_path : str
-            Path to the DEM (Digital Elevation Model) file.
+        dem_path : str, optional
+            Path to the DEM (Digital Elevation Model) file. Default is None.
         boundary : Boundary, optional
             The boundary object defining the limits of the environment.
             Default is None.
@@ -36,13 +39,15 @@ class Environment:
             A list with obstacle objects to add to the environment.
             Default is [].
         """
-        self.elevation = ElevationMap(dem_path)
+        self.elevation = ElevationMap(dem_path) if dem_path is not None else None
         self.boundary = boundary
         self.obstacles = obstacles
 
         # Calculate the home reference point (bottom-left corner of the elevation map)
-        self.home = np.array(
-            [self.elevation.bounds.bottom, self.elevation.bounds.left, 0.0]
+        self.home = (
+            np.array([self.elevation.bounds.bottom, self.elevation.bounds.left, 0.0])
+            if self.elevation is not None
+            else np.zeros(3)
         )
 
     @property
@@ -73,6 +78,12 @@ class Environment:
             The obstacle object to add to the environment.
         """
         self.obstacles.append(obstacle)
+        
+    def clear_obstacles(self) -> None:
+        """
+        Delete all obstacles.
+        """
+        self.obstacles = []
 
     def is_inside(self, pos: np.ndarray) -> bool:
         """
@@ -133,6 +144,8 @@ class Environment:
         float
             Elevation in meters.
         """
+        if self.elevation is None:
+            return 0.0
         # Convert local Cartesian coordinates to geographic coordinates
         xyz = np.zeros(3)
         xyz[0:2] = pos
@@ -152,7 +165,7 @@ class Environment:
         Returns
         -------
         np.ndarray
-            Geographic coordinates [latitude, longitude, altitude] in 
+            Geographic coordinates [latitude, longitude, altitude] in
             (degrees, degrees, meters).
         """
         return xyz2geo(pos, self.home)
@@ -164,7 +177,7 @@ class Environment:
         Parameters
         ----------
         geo : np.ndarray
-            Geographic coordinates [latitude, longitude, altitude] in 
+            Geographic coordinates [latitude, longitude, altitude] in
             (degrees, degrees, meters).
 
         Returns

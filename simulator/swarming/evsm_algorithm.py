@@ -7,9 +7,8 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from simulator.environment.avoid_regions import AvoidRegion
-from simulator.math.angles import SweepAngle
-
+from ..environment import Environment
+from ..math.angles import SweepAngle
 from .evsm_numba import (
     calculate_avoidance_force,
     calculate_control_force,
@@ -30,13 +29,13 @@ class EVSM:
 
     def __init__(
         self,
+        env: Environment,
         ln: float = 50.0,
         ks: float = 0.2,
         kd: float = 0.8,
         d_obs: float = 10.0,
         k_obs: float = 1.0,
-        k_expl: float = 1.0,
-        avoid_regions: list[AvoidRegion] = [],
+        k_expl: float = 0.02,
     ) -> None:
         """
         Initializes the EVSM model with default parameters.
@@ -46,6 +45,8 @@ class EVSM:
         ln : float, optional
             Natural length of the virtual spring (default is 50.0).
         """
+        self.env = env
+
         self.ln = ln
         self.ks = ks
         self.kd = kd
@@ -57,7 +58,6 @@ class EVSM:
         self.neighbors = np.zeros((0, 2))  # [px, py] of neighbors
         self.links_mask = np.zeros((0,), dtype=bool)
 
-        self.avoid_regions = avoid_regions
         self.sweep_angle: SweepAngle = None
 
     @property
@@ -104,17 +104,21 @@ class EVSM:
         Update the links mask an compute the total force acting on the agent.
         """
         self.links_mask = self._calculate_links()
+        self.sweep_angle = self._calculate_sweep_angle()
 
         damping_force = self._calculate_damping_force()
-        obstacles_force = self._calculate_obstacle_avoidance_force()
 
         if self.is_near_obstacle():
+            obstacles_force = self._calculate_obstacle_avoidance_force()
             return obstacles_force + damping_force
 
         control_force = self._calculate_control_force()
-        exploration_force = self._calculate_exploration_force()
 
-        return control_force + damping_force + exploration_force
+        if self.is_edge_robot():
+            exploration_force = self._calculate_exploration_force()
+            return control_force + damping_force + exploration_force
+
+        return control_force + damping_force
 
     def _calculate_links(self) -> np.ndarray:
         return calculate_links(self.position, self.neighbors)
@@ -133,7 +137,7 @@ class EVSM:
             return np.zeros(2)
 
         region_distances, region_directions = (
-            self.get_avoidance_distances_and_directions()
+            self._get_avoidance_distances_and_directions()
         )
         return calculate_exploration_force(
             region_distances,
@@ -145,7 +149,7 @@ class EVSM:
 
     def _calculate_obstacle_avoidance_force(self) -> np.ndarray:
         region_distances, region_directions = (
-            self.get_avoidance_distances_and_directions()
+            self._get_avoidance_distances_and_directions()
         )
         return calculate_avoidance_force(
             region_distances, region_directions, d_min=self.d_obs, ks=self.k_obs
@@ -157,19 +161,14 @@ class EVSM:
             return None
         return SweepAngle(start, stop)
 
-    def get_avoidance_distances_and_directions(self) -> tuple[np.ndarray, np.ndarray]:
+    def _get_avoidance_distances_and_directions(self) -> tuple[np.ndarray, np.ndarray]:
         """
         Calculates distances and directions to avoidance regions.
-
-        Returns
-        -------
-        tuple[np.ndarray, np.ndarray]
-            Distances and directions to avoidance regions.
         """
-        num_regions = len(self.avoid_regions)
+        num_regions = len(self.env.avoid_regions)
         distances = np.zeros((num_regions,))
         directions = np.zeros((num_regions, 2))
-        for i, region in enumerate(self.avoid_regions):
+        for i, region in enumerate(self.env.avoid_regions):
             distances[i] = region.distance(self.position)
             directions[i, :] = region.direction(self.position)
         return distances, directions
@@ -194,7 +193,7 @@ class EVSM:
         bool
             True if the robot is near an obstacle, False otherwise.
         """
-        for region in self.avoid_regions:
+        for region in self.env.avoid_regions:
             if region.distance(self.position) < self.d_obs:
                 return True
         return False

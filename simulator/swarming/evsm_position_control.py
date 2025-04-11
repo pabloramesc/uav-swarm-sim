@@ -1,8 +1,8 @@
 """
- Copyright (c) 2025 Pablo Ramirez Escudero
- 
- This software is released under the MIT License.
- https://opensource.org/licenses/MIT
+Copyright (c) 2025 Pablo Ramirez Escudero
+
+This software is released under the MIT License.
+https://opensource.org/licenses/MIT
 """
 
 from dataclasses import dataclass
@@ -36,7 +36,8 @@ class EVSMConfig(PositionControllerConfig):
     target_altitude : float
         Desired altitude of the agent in meters (default is 100.0).
     """
-    separation_distance: float = 50.0
+
+    separation_distance: float = 60.0
     obstacle_distance: float = 10.0
     agent_mass: float = 1.0  # simple equivalence between force and acceleration
     max_acceleration: float = 10.0  # 1 g aprox. 9.81 m/s^2
@@ -44,7 +45,7 @@ class EVSMConfig(PositionControllerConfig):
     target_altitude: float = 100.0
 
 
-class EVSMPositionControl(PositionController):
+class EVSMPositionController(PositionController):
     """
     EVSM-based horizontal position control and altitude hold.
 
@@ -71,30 +72,35 @@ class EVSMPositionControl(PositionController):
             The simulation environment.
         """
         super().__init__(config, env)
+        self.config = config
+
+        self.min_ln = 10.0
+        self.max_ln = config.separation_distance
+        self.ln_rate = 1.0
+        self.ln = self.min_ln
 
         self.evsm = EVSM(
-            ln=config.separation_distance,
-            ks=config.max_acceleration
-            / config.separation_distance,  # max acceleration when separation is 0
-            # kd=config.agent_mass / 1.0,  # 1 second damping (kd = m / tau)
-            kd=config.max_acceleration
-            / config.target_velocity,  # max acceleration when speed is target velocity
+            env=self.env,
+            ln=self.min_ln,
+            # ln=config.separation_distance,
+            # ks=config.max_acceleration / config.separation_distance,
+            # kd=config.agent_mass / 1.0,
+            # kd=config.max_acceleration / config.target_velocity,
             d_obs=config.obstacle_distance,
-            avoid_regions=env.avoid_regions,
         )
 
         self.altitude_hold = AltitudeController(
-            kp=config.max_acceleration
-            / config.target_altitude,  # max acceleration when error is target altitude
-            # kd=config.agent_mass / 1.0,  # 1 second damping (kd = m / tau)
-            kd=config.max_acceleration
-            / config.target_velocity,  # max acceleration when speed is target velocity
+            kp=config.max_acceleration / config.target_altitude,
+            kd=config.agent_mass / 1.0,
+            # kd=config.max_acceleration / config.target_velocity,
             target_altitude=config.target_altitude,
         )
 
     def update(
         self, agent_state: np.ndarray, neighbot_states: np.ndarray, time: float = None
     ) -> np.ndarray:
+        self._update_natural_length(time)
+
         control = np.zeros(3)
 
         # Horizontal control using EVSM (Extended Virtual Spring Mesh)
@@ -105,8 +111,15 @@ class EVSMPositionControl(PositionController):
         )
 
         # Vertical control by altitude hold
-        control[3] = self.altitude_hold.control(
+        control[2] = self.altitude_hold.control(
             altitude=agent_state[2], vspeed=agent_state[5]
         )
-        
+
         return control
+
+    def _update_natural_length(self, time: float) -> None:
+        """
+        Updates the natural length of the EVSM algorithm based on the rate of change.
+        """
+        self.ln = min(self.max_ln, self.min_ln + self.ln_rate * time)
+        self.evsm.set_natural_length(self.ln)

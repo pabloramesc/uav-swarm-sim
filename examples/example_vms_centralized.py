@@ -15,7 +15,7 @@ field_size = 1000.0
 sim = MultiDroneSimulator(num_drones, dt)
 gui = MultiDroneViewer(num_drones, field_size)
 
-sim.initialize_grid_positions()
+sim.set_grid_positions()
 
 while True:
     sim.update_central()
