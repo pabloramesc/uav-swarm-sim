@@ -144,7 +144,7 @@ class SweepAngle:
     def sweep(self) -> float:
         if self.start == self.stop:
             return 2 * np.pi
-        diff_angle_2pi(self.stop, self.start)
+        return diff_angle_2pi(self.stop, self.start)
 
     def contains(self, angle: float) -> bool:
         if self.start == self.stop:

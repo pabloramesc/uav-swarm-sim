@@ -11,7 +11,7 @@ from simulator.multidrone_simulator import MultiDroneSimulator
 from simulator.gui.multidrone_viewer import MultiDroneViewer
 
 dt = 0.1
-num_drones = 60
+num_drones = 50
 xlim = np.array([-200.0, +200.0])
 ylim = np.array([-100.0, +100.0])
 
@@ -23,12 +23,8 @@ sim.add_rectangular_obstacle((100.0, -50.0), (150.0, 0.0))
 sim.set_grid_positions(origin=[-50.0, -50.0], space=5.0)
 sim.initialize()
 
-gui = MultiDroneViewer(sim, xlim * 1.1, ylim * 1.1)
+gui = MultiDroneViewer(sim, xlim, ylim, is_3d=False)
 
 while True:
     sim.update()        
-    gui.update(force_render=False, verbose=True)
-
-    if gui.non_render_steps == 0:
-        speed = np.linalg.norm(sim.drones[0].velocity)
-        print(f"Drone 0 speed: {speed:.2f} m/s")
+    gui.update(force=False, verbose=True)

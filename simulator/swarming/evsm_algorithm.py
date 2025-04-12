@@ -135,17 +135,21 @@ class EVSM:
     def _calculate_exploration_force(self) -> np.ndarray:
         if not self.is_edge_robot():
             return np.zeros(2)
-
         region_distances, region_directions = (
             self._get_avoidance_distances_and_directions()
         )
-        return calculate_exploration_force(
+        force = calculate_exploration_force(
             region_distances,
             region_directions,
             self.sweep_angle.to_tuple(),
             ln=self.ln,
             ks=self.k_expl,
         )
+        max_force = 1.0
+        force_mag = np.linalg.norm(force)
+        if force_mag > max_force:
+            force = max_force * force / force_mag
+        return force
 
     def _calculate_obstacle_avoidance_force(self) -> np.ndarray:
         region_distances, region_directions = (

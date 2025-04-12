@@ -37,7 +37,7 @@ class EVSMConfig(PositionControllerConfig):
         Desired altitude of the agent in meters (default is 100.0).
     """
 
-    separation_distance: float = 60.0
+    separation_distance: float = 1000.0
     obstacle_distance: float = 10.0
     agent_mass: float = 1.0  # simple equivalence between force and acceleration
     max_acceleration: float = 10.0  # 1 g aprox. 9.81 m/s^2
@@ -76,7 +76,7 @@ class EVSMPositionController(PositionController):
 
         self.min_ln = 10.0
         self.max_ln = config.separation_distance
-        self.ln_rate = 1.0
+        self.ln_rate = 10.0
         self.ln = self.min_ln
 
         self.evsm = EVSM(

@@ -5,56 +5,111 @@ This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
 
+"""
+Geographic to ENU conversion utilities.
+"""
+
 import numpy as np
 
 LATDEG2METERS = 111320
 
 
-def geo2xyz(geo: np.ndarray, home: np.ndarray) -> np.ndarray:
+def geo2enu(geo: np.ndarray, home: np.ndarray) -> np.ndarray:
     """
     Converts geographic coordinates (latitude, longitude, altitude) to local
-    Cartesian coordinates (X, Y, Z) in meters, relative to a reference point.
+    ENU (East-North-Up) coordinates in meters, relative to a reference point.
 
     Parameters
     ----------
     geo : np.ndarray
-        Geographic coordinates [latitude, longitude, altitude] in degrees and meters.
+        Geographic coordinates [latitude, longitude, altitude] in (deg, deg, m).
+        Can be a (3,) array for a single point or an (N, 3) array for multiple points.
     home : np.ndarray
-        Reference geographic coordinates [latitude, longitude, altitude] in degrees and meters.
+        Reference geographic coordinates [latitude, longitude, altitude] in (deg, deg, m).
+        Must be a (3,) array.
 
     Returns
     -------
     np.ndarray
-        Local Cartesian coordinates [X, Y, Z] in meters.
+        Local ENU coordinates [E, N, U] in meters.
+        Returns a (3,) array for a single point or an (N, 3) array for multiple points.
     """
-    xyz = np.zeros(3)
-    dlat = geo[0] - home[0]
-    dlon = geo[1] - home[1]
-    xyz[0] = dlon * LATDEG2METERS * np.cos(np.deg2rad(home[0]))
-    xyz[1] = dlat * LATDEG2METERS
-    xyz[2] = geo[2] - home[2]
-    return xyz
+    geo = np.atleast_2d(geo)  # Ensure geo is at least 2D (N, 3)
+    if home.shape != (3,):
+        raise ValueError("Home must be a (3,) array.")
+
+    enu = np.zeros_like(geo)
+    dlat = geo[:, 0] - home[0]
+    dlon = geo[:, 1] - home[1]
+    enu[:, 0] = dlon * LATDEG2METERS * np.cos(np.deg2rad(home[0]))  # East
+    enu[:, 1] = dlat * LATDEG2METERS  # North
+    enu[:, 2] = geo[:, 2] - home[2]  # Up
+
+    return np.squeeze(enu)  # Return (3,) if input was (3,)
 
 
-def xyz2geo(xyz: np.ndarray, home: np.ndarray) -> np.ndarray:
+def enu2geo(enu: np.ndarray, home: np.ndarray) -> np.ndarray:
     """
-    Converts local Cartesian coordinates (X, Y, Z) in meters to geographic
+    Converts local ENU (East-North-Up) coordinates in meters to geographic
     coordinates (latitude, longitude, altitude) relative to a reference point.
 
     Parameters
     ----------
-    xyz : np.ndarray
-        Local Cartesian coordinates [X, Y, Z] in meters.
+    enu : np.ndarray
+        Local ENU coordinates [E, N, U] in meters.
+        Can be a (3,) array for a single point or an (N, 3) array for multiple points.
     home : np.ndarray
-        Reference geographic coordinates [latitude, longitude, altitude] in degrees and meters.
+        Reference geographic coordinates [latitude, longitude, altitude] in (deg, deg, m).
+        Must be a (3,) array.
 
     Returns
     -------
     np.ndarray
-        Geographic coordinates [latitude, longitude, altitude] in degrees and meters.
+        Geographic coordinates [latitude, longitude, altitude] in (deg, deg, m).
+        Returns a (3,) array for a single point or an (N, 3) array for multiple points.
     """
-    geo = np.zeros(3)
-    geo[0] = home[0] + (xyz[1] / LATDEG2METERS)
-    geo[1] = home[1] + (xyz[0] / (LATDEG2METERS * np.cos(np.deg2rad(home[0]))))
-    geo[2] = home[2] + xyz[2]
-    return geo
+    enu = np.atleast_2d(enu)  # Ensure enu is at least 2D (N, 3)
+    if home.shape != (3,):
+        raise ValueError("Home must be a (3,) array.")
+
+    geo = np.zeros_like(enu)
+    geo[:, 0] = home[0] + (enu[:, 1] / LATDEG2METERS)  # Latitude
+    geo[:, 1] = home[1] + (
+        enu[:, 0] / (LATDEG2METERS * np.cos(np.deg2rad(home[0])))
+    )  # Longitude
+    geo[:, 2] = home[2] + enu[:, 2]  # Altitude
+
+    return np.squeeze(geo)  # Return (3,) if input was (3,)
+
+if __name__ == "__main__":
+    home = np.array([37.7749, -122.4194, 30.0])  # Reference point (latitude, longitude, altitude)
+
+    # Test single point conversion
+    print("Single point conversion:")
+    enu_point = np.array([100.0, 100.0, 10.0])
+    print(f"- ENU coordinates: {enu_point}")
+
+    # Convert ENU to geographic
+    geo_point = enu2geo(enu_point, home)
+    print(f"- Geographic coordinates: {geo_point}")
+
+    # Convert geographic back to ENU
+    enu_converted = geo2enu(geo_point, home)
+    print(f"- Converted ENU coordinates: {enu_converted}")
+    
+    # Test multiple points conversion
+    print("Multiple points conversion:")
+    enu_points = np.array([
+        [100.0, 100.0, 10.0],
+        [-100.0, -100.0, 10.0],
+        [100.0, -100.0, -10.0],        
+    ])
+    print(f"- ENU coordinates:\n{enu_points}")
+
+    # Convert ENU to geographic
+    geo_points = enu2geo(enu_points, home)
+    print(f"- Geographic coordinates:\n{geo_points}")
+
+    # Convert geographic back to ENU
+    enu_converted = geo2enu(geo_points, home)
+    print(f"- Converted ENU coordinates:\n{enu_converted}")

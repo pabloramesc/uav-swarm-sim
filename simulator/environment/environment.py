@@ -9,7 +9,7 @@ import numpy as np
 
 from .elevation_map import ElevationMap
 from .avoid_regions import Boundary, Obstacle, AvoidRegion
-from .geo import geo2xyz, xyz2geo
+from .geo import geo2enu, enu2geo
 
 
 class Environment:
@@ -39,14 +39,16 @@ class Environment:
             A list with obstacle objects to add to the environment.
             Default is [].
         """
-        self.elevation = ElevationMap(dem_path) if dem_path is not None else None
+        self.elevation_map = ElevationMap(dem_path) if dem_path is not None else None
         self.boundary = boundary
         self.obstacles = obstacles
 
         # Calculate the home reference point (bottom-left corner of the elevation map)
         self.home = (
-            np.array([self.elevation.bounds.bottom, self.elevation.bounds.left, 0.0])
-            if self.elevation is not None
+            np.array(
+                [self.elevation_map.bounds.bottom, self.elevation_map.bounds.left, 0.0]
+            )
+            if self.elevation_map is not None
             else np.zeros(3)
         )
 
@@ -78,7 +80,7 @@ class Environment:
             The obstacle object to add to the environment.
         """
         self.obstacles.append(obstacle)
-        
+
     def clear_obstacles(self) -> None:
         """
         Delete all obstacles.
@@ -137,30 +139,32 @@ class Environment:
         Parameters
         ----------
         pos : np.ndarray
-            A (2,) array with horizontal position [x, y] in meters.
+            Horizontal position(s) [x, y] in meters. Can be a (2,) array for a single
+            position or an (N, 2) array for multiple positions.
 
         Returns
         -------
         float
             Elevation in meters.
         """
-        if self.elevation is None:
+        if self.elevation_map is None:
             return 0.0
         # Convert local Cartesian coordinates to geographic coordinates
-        xyz = np.zeros(3)
-        xyz[0:2] = pos
-        geo = xyz2geo(xyz, self.home)
-        lat, lon = geo[0], geo[1]
-        return self.elevation.get_elevation(lat, lon)
+        pos = np.atleast_2d(pos)
+        enu = np.zeros((pos.shape[0], 3))
+        enu[:, 0:2] = pos[:, 0:2]
+        geo = enu2geo(enu, self.home)
+        lat, lon = geo[:, 0], geo[:, 1]
+        return self.elevation_map.get_elevation(lat, lon)
 
-    def xyz_to_geo(self, pos: np.ndarray) -> np.ndarray:
+    def enu_to_geo(self, pos: np.ndarray) -> np.ndarray:
         """
-        Converts local Cartesian coordinates to geographic coordinates.
+        Converts local ENU (East-North-Up) coordinates to geographic coordinates.
 
         Parameters
         ----------
         pos : np.ndarray
-            Local Cartesian coordinates [x, y, z] in meters.
+            Local ENU coordinates [e, n, u] in meters.
 
         Returns
         -------
@@ -168,11 +172,11 @@ class Environment:
             Geographic coordinates [latitude, longitude, altitude] in
             (degrees, degrees, meters).
         """
-        return xyz2geo(pos, self.home)
+        return enu2geo(pos, self.home)
 
-    def geo_to_xyz(self, geo: np.ndarray) -> np.ndarray:
+    def geo_to_enu(self, geo: np.ndarray) -> np.ndarray:
         """
-        Converts geographic coordinates to local Cartesian coordinates.
+        Converts geographic coordinates to local ENU (East-North-Up) coordinates.
 
         Parameters
         ----------
@@ -183,9 +187,9 @@ class Environment:
         Returns
         -------
         np.ndarray
-            Local Cartesian coordinates [x, y, z] in meters.
+            Local ENU coordinates [e, n, u] in meters.
         """
-        return geo2xyz(geo, self.home)
+        return geo2enu(geo, self.home)
 
     def plot_environment(self) -> None:
         """
@@ -195,7 +199,7 @@ class Environment:
         import matplotlib.pyplot as plt
 
         # Plot the elevation map
-        self.elevation.plot()
+        self.elevation_map.plot()
 
         # Create a new figure for boundaries and obstacles
         fig, ax = plt.subplots(figsize=(10, 8))

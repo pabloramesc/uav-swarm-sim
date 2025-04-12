@@ -51,7 +51,7 @@ class MultiDroneSimulator:
         Boolean array indicating which drones are at the edge of the swarm.
     """
 
-    def __init__(self, num_drones: int, dt: float = 0.01) -> None:
+    def __init__(self, num_drones: int, dt: float = 0.01, dem_path: str = None) -> None:
         """
         Initializes the MultiDroneSimulator.
 
@@ -68,7 +68,7 @@ class MultiDroneSimulator:
         self.time = 0.0
         self.step = 0
 
-        self.environment = Environment()
+        self.environment = Environment(dem_path)
 
         self.drones: list[Drone] = []
         self.drone_ids = np.zeros((num_drones,), dtype=np.int32)
@@ -241,7 +241,7 @@ class MultiDroneSimulator:
         """
         dt = dt if dt is not None else self.dt
         self._get_drone_states()
-        self._update_visible_neighbors(100.0)
+        self._update_visible_neighbors(1000.0)
         self._update_drones(dt)
         self._update_links_matrix()
         self._update_edge_drones_mask()

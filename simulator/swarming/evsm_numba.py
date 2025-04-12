@@ -174,7 +174,7 @@ def calculate_avoidance_force(
     return avoidance_force
 
 
-@njit
+# @njit
 def calculate_exploration_force(
     region_distances: np.ndarray,
     region_directions: np.ndarray,
