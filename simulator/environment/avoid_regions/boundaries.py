@@ -7,12 +7,18 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 from numpy.typing import ArrayLike
-from shapely import Point, Polygon, box
 
-from .base import AvoidRegion
+from shapely import Polygon
+
+from .base import (
+    Region,
+    CircularRegion,
+    RectangularRegion,
+    PolygonalRegion,
+)
 
 
-class Boundary(AvoidRegion):
+class Boundary(Region):
     """
     Represents a boundary in the simulation environment.
     """
@@ -58,8 +64,7 @@ class Boundary(AvoidRegion):
         Returns
         -------
         np.ndarray
-            A normalized direction vector [dx, dy]. If the position is outside the boundary,
-            the direction points inward.
+            A normalized direction vector [dx, dy].
         """
         direction = super().direction(pos)
         if not self.is_inside(pos):
@@ -67,7 +72,7 @@ class Boundary(AvoidRegion):
         return direction
 
 
-class CircularBoundary(Boundary):
+class CircularBoundary(CircularRegion, Boundary):
     """
     Represents a circular boundary in the simulation environment.
 
@@ -86,30 +91,13 @@ class CircularBoundary(Boundary):
         Parameters
         ----------
         center : ArrayLike
-            The center of the circular boundary [x, y].
+            The center of the circular region [x, y].
         radius : float
-            The radius of the circular boundary.
+            The radius of the circular region.
+        quad_segs : int, optional
+            Number of segments to approximate the circle (default is 2).
         """
-        self.center = np.array(center)
-        self.radius = float(radius)
-        super().__init__(Point(self.center).buffer(self.radius, quad_segs))
-
-    def is_inside(self, pos: ArrayLike) -> bool:
-        """
-        Checks if a position is inside the circular boundary.
-
-        Parameters
-        ----------
-        pos : ArrayLike
-            The position [x, y] to check.
-
-        Returns
-        -------
-        bool
-            True if the position is inside the boundary, False otherwise.
-        """
-        delta = self.center - pos
-        return np.linalg.norm(delta) <= self.radius
+        super().__init__(center, radius, quad_segs)
 
     def distance(self, pos: ArrayLike) -> float:
         """
@@ -127,7 +115,7 @@ class CircularBoundary(Boundary):
         """
         delta = self.center - pos
         return max(0.0, self.radius - np.linalg.norm(delta))
-
+    
     def direction(self, pos: ArrayLike) -> np.ndarray:
         """
         Calculates the normalized direction vector from a position to the circular boundary.
@@ -140,15 +128,15 @@ class CircularBoundary(Boundary):
         Returns
         -------
         np.ndarray
-            A normalized direction vector [dx, dy]. If the position is outside the boundary,
-            the direction points inward.
+            A normalized direction vector [dx, dy].
         """
         delta = pos - self.center
         norm = np.linalg.norm(delta)
-        return delta / norm if norm > 0.0 else np.zeros(2)
+        direction = delta / norm if norm > 0.0 else np.zeros(2)
+        return direction
 
 
-class RectangularBoundary(Boundary):
+class RectangularBoundary(RectangularRegion, Boundary):
     """
     Represents a rectangular boundary in the simulation environment.
 
@@ -171,44 +159,51 @@ class RectangularBoundary(Boundary):
         top_right : ArrayLike
             The top-right corner of the rectangle [x, y].
         """
-        self.bottom_left = np.array(bottom_left)
-        self.top_right = np.array(top_right)
-        super().__init__(box(*self.bottom_left, *self.top_right))
-
-    @property
-    def bottom(self) -> float:
-        return self.bottom_left[1]
-
-    @property
-    def left(self) -> float:
-        return self.bottom_left[0]
-
-    @property
-    def top(self) -> float:
-        return self.top_right[1]
-
-    @property
-    def right(self) -> float:
-        return self.top_right[0]
-
-    def is_inside(self, pos: ArrayLike) -> bool:
+        super().__init__(bottom_left, top_right)
+        
+    def distance(self, pos: ArrayLike) -> float:
         """
-        Checks if a position is inside the rectangular obstacle.
+        Calculates the distance from a position to the rectangular region.
 
         Parameters
         ----------
         pos : ArrayLike
-            The position [x, y] to check.
+            The position [x, y] to calculate the distance from.
 
         Returns
         -------
-        bool
-            True if the position is inside the rectangle, False otherwise.
+        float
+            The distance to the region. Returns 0.0 if the position is outside the region.
         """
-        return self.left <= pos[0] <= self.right and self.bottom <= pos[1] <= self.top
+        if not self.is_inside(pos):
+            return 0.0
+        closest_point = self.closest_point(pos)
+        return np.linalg.norm(pos - closest_point)
+
+    def direction(self, pos: ArrayLike) -> np.ndarray:
+        """
+        Calculates the normalized direction vector from a position to the rectangular region.
+
+        Parameters
+        ----------
+        pos : ArrayLike
+            The position [x, y] to calculate the direction from.
+
+        Returns
+        -------
+        np.ndarray
+            A normalized direction vector [dx, dy].
+        """
+        closest = self.closest_point(pos)
+        delta = closest - pos
+        norm = np.linalg.norm(delta)
+        direction = delta / norm if norm > 0.0 else np.zeros(2)
+        if not self.is_inside(pos):
+            return -direction
+        return direction
 
 
-class PolygonalBoundary(Boundary):
+class PolygonalBoundary(PolygonalRegion, Boundary):
     """
     Represents a polygonal boundary in the simulation environment.
 
@@ -227,5 +222,4 @@ class PolygonalBoundary(Boundary):
         vertices : ArrayLike
             The vertices of the polygon as an array of [x, y] coordinates.
         """
-        self.vertices = np.array(vertices)
-        super().__init__(Polygon(self.vertices))
+        super().__init__(vertices)

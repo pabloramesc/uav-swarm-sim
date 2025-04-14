@@ -8,7 +8,7 @@ https://opensource.org/licenses/MIT
 import numpy as np
 
 from .elevation_map import ElevationMap
-from .avoid_regions import Boundary, Obstacle, AvoidRegion
+from .avoid_regions import Boundary, Obstacle, Region
 from .geo import geo2enu, enu2geo
 
 
@@ -53,7 +53,7 @@ class Environment:
         )
 
     @property
-    def avoid_regions(self) -> list[AvoidRegion]:
+    def avoid_regions(self) -> list[Region]:
         """
         A list of all avoid regions, including the boundary and obstacles.
         """

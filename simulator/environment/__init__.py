@@ -7,7 +7,7 @@ https://opensource.org/licenses/MIT
 
 from .environment import Environment
 from .avoid_regions import (
-    AvoidRegion,
+    Region,
     Obstacle,
     CircularObstacle,
     RectangularObstacle,

@@ -8,13 +8,18 @@ https://opensource.org/licenses/MIT
 import numpy as np
 from matplotlib import pyplot as plt
 
-from .base import AvoidRegion
+from .base import (
+    Region,
+    CircularRegion,
+    PolygonalRegion,
+    RectangularRegion,
+)
 from .boundaries import CircularBoundary, PolygonalBoundary, RectangularBoundary
 from .obstacles import CircularObstacle, PolygonalObstacle, RectangularObstacle
 
 
 def plot_limited_region(
-    region: AvoidRegion, x_range=(-20, 20), y_range=(-20, 20), resolution=100
+    region: Region, x_range=(-20, 20), y_range=(-20, 20), resolution=100
 ):
     """
     Visualizes the distance and direction to a given region in the simulation environment.
@@ -78,6 +83,21 @@ def plot_limited_region(
 
 
 if __name__ == "__main__":
+
+    """TEST AVOID REGIONS"""
+    # Create a circular avoid region
+    circ_obs = CircularRegion([0, 0], 10.0, quad_segs=16)
+    plot_limited_region(circ_obs)
+
+    # Create a rectangular avoid region
+    rect_obs = RectangularRegion([-10, -10], [+10, +10])
+    plot_limited_region(rect_obs)
+
+    # Create a polygonal avoid region
+    poly_obs = PolygonalRegion([[-10, 0], [-10, -5], [10, -5], [5, 10]])
+    plot_limited_region(poly_obs)
+
+    """TEST OBSTACLES"""
     # Create a circular obstacle
     circ_obs = CircularObstacle([0, 0], 10.0, quad_segs=16)
     plot_limited_region(circ_obs)
@@ -90,6 +110,7 @@ if __name__ == "__main__":
     poly_obs = PolygonalObstacle([[-10, 0], [-10, -5], [10, -5], [5, 10]])
     plot_limited_region(poly_obs)
 
+    """TEST BOUNDARIES"""
     # Create a circular boundary
     circ_bound = CircularBoundary([0, 0], 10.0, quad_segs=16)
     plot_limited_region(circ_bound)

@@ -5,7 +5,7 @@ This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
 
-from .base import AvoidRegion
+from .base import Region
 from .boundaries import (
     Boundary,
     CircularBoundary,
