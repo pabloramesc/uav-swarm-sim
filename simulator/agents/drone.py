@@ -55,6 +55,8 @@ class Drone(Agent):
 
         self.mass = 1.0  # 1 kg for simple equivalence between force and acceleration
         self.max_acc = 10.0  # aprox. 1 g = 9.81 m/s^2
+        
+        self.path_loss_model = PathLossModel()
 
     def update(self, dt: float = 0.01) -> None:
         """
@@ -66,7 +68,7 @@ class Drone(Agent):
             Time step in seconds (default is 0.01).
         """
         super().update(dt)
-        
+
         # Compute control force using the position controller
         control_force = self.position_controller.update(
             self.state, self.neighbor_states, self.time
@@ -94,6 +96,10 @@ class Drone(Agent):
         """
         self.neighbor_ids = np.copy(ids)
         self.neighbor_states = np.copy(states)
+
+    def rx_power(self, pos: np.ndarray) -> float:
+        d = np.linalg.norm(pos - self.position)
+        return self.path_loss_model.rx_power(d)
 
     def _compute_dynamics(self, state: np.ndarray, acc: np.ndarray) -> np.ndarray:
         """
@@ -140,3 +146,18 @@ class Drone(Agent):
             acc_dir = np.zeros(3)
 
         return acc_dir * min(acc_mag, self.max_acc)
+
+
+class PathLossModel:
+
+    def __init__(self, freq: float = 10.0, tx_power: float = 20.0, n: float = 3.0):
+        self.freq = freq  # Mhz
+        self.tx_power = tx_power  # dBm
+        self.n = n
+
+        self.d0 = 1.0
+        self.pl0 = 20 * np.log10(self.d0) + 20 * np.log10(self.freq) + 32.44
+
+    def rx_power(self, d: float) -> float:
+        pl = self.pl0 + 10 * self.n * np.log10(d / self.d0)
+        return self.tx_power - pl

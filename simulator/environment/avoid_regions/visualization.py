@@ -79,7 +79,7 @@ def plot_limited_region(
 
 if __name__ == "__main__":
     # Create a circular obstacle
-    circ_obs = CircularObstacle([0, 0], 10.0)
+    circ_obs = CircularObstacle([0, 0], 10.0, quad_segs=16)
     plot_limited_region(circ_obs)
 
     # Create a rectangular obstacle
@@ -91,7 +91,7 @@ if __name__ == "__main__":
     plot_limited_region(poly_obs)
 
     # Create a circular boundary
-    circ_bound = CircularBoundary([0, 0], 10.0)
+    circ_bound = CircularBoundary([0, 0], 10.0, quad_segs=16)
     plot_limited_region(circ_bound)
 
     # Create a rectangular boundary

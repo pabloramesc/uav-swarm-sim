@@ -37,12 +37,13 @@ class EVSMConfig(PositionControllerConfig):
         Desired altitude of the agent in meters (default is 100.0).
     """
 
-    separation_distance: float = 1000.0
-    obstacle_distance: float = 10.0
+    separation_distance: float = 50.0  # in meters
+    obstacle_distance: float = 10.0  # in meters
     agent_mass: float = 1.0  # simple equivalence between force and acceleration
     max_acceleration: float = 10.0  # 1 g aprox. 9.81 m/s^2
     target_velocity: float = 15.0  # between 5-25 m/S
-    target_altitude: float = 100.0
+    target_altitude: float = 100.0  # in meters
+    ln_rate: float = 1.0
 
 
 class EVSMPositionController(PositionController):
@@ -76,23 +77,23 @@ class EVSMPositionController(PositionController):
 
         self.min_ln = 10.0
         self.max_ln = config.separation_distance
-        self.ln_rate = 10.0
+        self.ln_rate = config.ln_rate
         self.ln = self.min_ln
 
         self.evsm = EVSM(
             env=self.env,
             ln=self.min_ln,
             # ln=config.separation_distance,
-            # ks=config.max_acceleration / config.separation_distance,
+            ks=config.max_acceleration / config.separation_distance,
             # kd=config.agent_mass / 1.0,
-            # kd=config.max_acceleration / config.target_velocity,
+            kd=config.max_acceleration / config.target_velocity,
             d_obs=config.obstacle_distance,
         )
 
         self.altitude_hold = AltitudeController(
             kp=config.max_acceleration / config.target_altitude,
-            kd=config.agent_mass / 1.0,
-            # kd=config.max_acceleration / config.target_velocity,
+            # kd=config.agent_mass / 1.0,
+            kd=config.max_acceleration / config.target_velocity,
             target_altitude=config.target_altitude,
         )
 
@@ -111,8 +112,9 @@ class EVSMPositionController(PositionController):
         )
 
         # Vertical control by altitude hold
+        altitude = agent_state[2] - self.env.get_elevation(agent_state[0:2])
         control[2] = self.altitude_hold.control(
-            altitude=agent_state[2], vspeed=agent_state[5]
+            altitude=altitude, vspeed=agent_state[5]
         )
 
         return control

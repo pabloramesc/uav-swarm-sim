@@ -36,6 +36,7 @@ class EVSM:
         d_obs: float = 10.0,
         k_obs: float = 1.0,
         k_expl: float = 0.02,
+        max_force: float = 1.0,
     ) -> None:
         """
         Initializes the EVSM model with default parameters.
@@ -53,6 +54,8 @@ class EVSM:
         self.d_obs = d_obs
         self.k_obs = k_obs
         self.k_expl = k_expl
+
+        self.max_force = max_force
 
         self.state = np.zeros(4)  # [px, py, vx, vy]
         self.neighbors = np.zeros((0, 2))  # [px, py] of neighbors
@@ -116,9 +119,16 @@ class EVSM:
 
         if self.is_edge_robot():
             exploration_force = self._calculate_exploration_force()
+            exploration_force = self._limit_force(exploration_force)
             return control_force + damping_force + exploration_force
 
         return control_force + damping_force
+
+    def _limit_force(self, force: np.ndarray) -> np.ndarray:
+        force_mag = np.linalg.norm(force)
+        if force_mag > self.max_force:
+            return self.max_force * force / force_mag
+        return force
 
     def _calculate_links(self) -> np.ndarray:
         return calculate_links(self.position, self.neighbors)
@@ -138,18 +148,13 @@ class EVSM:
         region_distances, region_directions = (
             self._get_avoidance_distances_and_directions()
         )
-        force = calculate_exploration_force(
+        return calculate_exploration_force(
             region_distances,
             region_directions,
             self.sweep_angle.to_tuple(),
             ln=self.ln,
             ks=self.k_expl,
         )
-        max_force = 1.0
-        force_mag = np.linalg.norm(force)
-        if force_mag > max_force:
-            force = max_force * force / force_mag
-        return force
 
     def _calculate_obstacle_avoidance_force(self) -> np.ndarray:
         region_distances, region_directions = (

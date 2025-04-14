@@ -9,7 +9,7 @@ import numpy as np
 from numba import njit, prange
 
 
-@njit(parallel=True)
+@njit(parallel=True, cache=True)
 def calculate_links(position: np.ndarray, neighbors: np.ndarray) -> np.ndarray:
     """
     Determines which neighbors are linked to the given position based on the EVSM algorithm.
@@ -49,7 +49,7 @@ def calculate_links(position: np.ndarray, neighbors: np.ndarray) -> np.ndarray:
     return links
 
 
-@njit
+@njit(cache=True)
 def calculate_control_force(
     position: np.ndarray, linked_neighbors: np.ndarray, ln: float = 1.0, ks: float = 1.0
 ) -> np.ndarray:
@@ -81,7 +81,7 @@ def calculate_control_force(
     return control_force
 
 
-@njit
+@njit(cache=True)
 def calculate_damping_force(velocity: np.ndarray, kd: float = 1.0) -> np.ndarray:
     """
     Calculates the damping force to reduce velocity.
@@ -102,7 +102,7 @@ def calculate_damping_force(velocity: np.ndarray, kd: float = 1.0) -> np.ndarray
     return damping_force
 
 
-@njit
+@njit(cache=True)
 def calculate_sweep_angle(
     position: np.ndarray, neighbors: np.ndarray
 ) -> tuple[float, float]:
@@ -139,7 +139,7 @@ def calculate_sweep_angle(
     return (np.nan, np.nan)
 
 
-@njit
+@njit(cache=True)
 def calculate_avoidance_force(
     region_distances: np.ndarray,
     region_directions: np.ndarray,
@@ -174,7 +174,7 @@ def calculate_avoidance_force(
     return avoidance_force
 
 
-# @njit
+@njit(cache=True)
 def calculate_exploration_force(
     region_distances: np.ndarray,
     region_directions: np.ndarray,

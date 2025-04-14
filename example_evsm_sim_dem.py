@@ -7,23 +7,29 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
+from simulator.gui import MultiDroneViewer
 from simulator.multidrone_simulator import MultiDroneSimulator
-from simulator.gui.multidrone_viewer import MultiDroneViewer
+from simulator.swarming import EVSMConfig
 
 dt = 0.1
 num_drones = 100
-xlim = np.array([2e3, 14e3])
-ylim = np.array([1e3, 8e3])
 
-sim = MultiDroneSimulator(num_drones, dt, dem_path="./data/barcelona_dem.tif")
-sim.set_rectangular_boundary((xlim[0], ylim[0]), (xlim[1], ylim[1]))
-sim.add_circular_obstacle((10e3, 4e3), 2e3)
-sim.add_rectangular_obstacle((2e3, 6e3), (6e3, 10e3))
+config = EVSMConfig(separation_distance=1000.0, ln_rate=10.0)
+sim = MultiDroneSimulator(
+    num_drones,
+    dt,
+    dem_path="./data/barcelona_dem.tif",
+    config=config,
+    visible_distance=1000.0,
+)
+sim.set_rectangular_boundary([0e3, 0e3], [7e3, 7e3])
+sim.add_circular_obstacle([6e3, 3e3], 1e3)
+sim.add_rectangular_obstacle([0e3, 6e3], [5e3, 8e3])
 sim.set_grid_positions(origin=[4e3, 4e3], space=5.0)
 sim.initialize()
 
-gui = MultiDroneViewer(sim)
+gui = MultiDroneViewer(sim, is_3d=True, aspect_ratio="auto", plot_regions_3d=False)
 
 while True:
-    sim.update()        
+    sim.update()
     gui.update(force=False, verbose=True)

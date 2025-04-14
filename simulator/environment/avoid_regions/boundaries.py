@@ -79,7 +79,7 @@ class CircularBoundary(Boundary):
         The radius of the circular boundary.
     """
 
-    def __init__(self, center: ArrayLike, radius: float) -> None:
+    def __init__(self, center: ArrayLike, radius: float, quad_segs: int = 2) -> None:
         """
         Initializes the circular boundary with a center and radius.
 
@@ -92,7 +92,7 @@ class CircularBoundary(Boundary):
         """
         self.center = np.array(center)
         self.radius = float(radius)
-        super().__init__(Point(self.center).buffer(self.radius))
+        super().__init__(Point(self.center).buffer(self.radius, quad_segs))
 
     def is_inside(self, pos: ArrayLike) -> bool:
         """
@@ -109,7 +109,7 @@ class CircularBoundary(Boundary):
             True if the position is inside the boundary, False otherwise.
         """
         delta = self.center - pos
-        return np.linalg.norm(delta) < self.radius
+        return np.linalg.norm(delta) <= self.radius
 
     def distance(self, pos: ArrayLike) -> float:
         """
@@ -174,6 +174,38 @@ class RectangularBoundary(Boundary):
         self.bottom_left = np.array(bottom_left)
         self.top_right = np.array(top_right)
         super().__init__(box(*self.bottom_left, *self.top_right))
+
+    @property
+    def bottom(self) -> float:
+        return self.bottom_left[1]
+
+    @property
+    def left(self) -> float:
+        return self.bottom_left[0]
+
+    @property
+    def top(self) -> float:
+        return self.top_right[1]
+
+    @property
+    def right(self) -> float:
+        return self.top_right[0]
+
+    def is_inside(self, pos: ArrayLike) -> bool:
+        """
+        Checks if a position is inside the rectangular obstacle.
+
+        Parameters
+        ----------
+        pos : ArrayLike
+            The position [x, y] to check.
+
+        Returns
+        -------
+        bool
+            True if the position is inside the rectangle, False otherwise.
+        """
+        return self.left <= pos[0] <= self.right and self.bottom <= pos[1] <= self.top
 
 
 class PolygonalBoundary(Boundary):

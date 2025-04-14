@@ -58,6 +58,20 @@ class Environment:
         A list of all avoid regions, including the boundary and obstacles.
         """
         return [self.boundary] + self.obstacles
+    
+    @property
+    def boundary_xlim(self) -> tuple[float, float]:
+        if self.boundary is None:
+            return None
+        x = self.boundary.shape.exterior.xy[0]
+        return min(x), max(x)
+    
+    @property
+    def boundary_ylim(self) -> tuple[float, float]:
+        if self.boundary is None:
+            return None
+        y = self.boundary.shape.exterior.xy[1]
+        return min(y), max(y)
 
     def set_boundary(self, boundary: Boundary) -> None:
         """
@@ -87,52 +101,62 @@ class Environment:
         """
         self.obstacles = []
 
-    def is_inside(self, pos: np.ndarray) -> bool:
+    def is_inside(self, pos: np.ndarray) -> np.ndarray:
         """
-        Checks if a position is inside the environment boundary.
+        Checks if one or more positions are inside the environment boundary.
 
         Parameters
         ----------
         pos : np.ndarray
-            Position [x, y, z] in meters.
+            Position(s) [x, y, z] in meters. Can be a (3,) array for a single
+            position or an (N, 3) array for multiple positions.
 
         Returns
         -------
-        bool
-            True if the position is inside the boundary, False otherwise.
+        np.ndarray
+            A boolean array of shape (N,) indicating whether each position is
+            inside the boundary. If a single position is provided, a single
+            boolean value is returned.
         """
+        pos = np.atleast_2d(pos)  # Ensure pos is (N, 3)
         if self.boundary is None:
             raise ValueError("Boundary is not defined.")
-        return self.boundary.is_inside(pos[0:2])
+        inside = np.array([self.boundary.is_inside(p[0:2]) for p in pos])
+        return inside if len(inside) > 1 else inside[0]
 
-    def is_collision(self, pos: np.ndarray) -> bool:
+    def is_collision(self, pos: np.ndarray) -> np.ndarray:
         """
-        Checks if a position collides with any obstacle or the ground.
+        Checks if one or more positions collide with any obstacle or the ground.
 
         Parameters
         ----------
         pos : np.ndarray
-            Position [x, y, z] in meters.
+            Position(s) [x, y, z] in meters. Can be a (3,) array for a single
+            position or an (N, 3) array for multiple positions.
 
         Returns
         -------
-        bool
-            True if the position collides with an obstacle or the ground,
-            False otherwise.
+        np.ndarray
+            A boolean array of shape (N,) indicating whether each position
+            collides with an obstacle or the ground. If a single position is
+            provided, a single boolean value is returned.
         """
+        pos = np.atleast_2d(pos)  # Ensure pos is (N, 3)
+
         # Check collision with the ground
-        ground_elevation = self.get_elevation(pos)
-        if pos[2] <= ground_elevation:  # Check if altitude is below or at ground level
-            return True
+        ground_elevations = self.get_elevation(pos[:, 0:2])  # Get ground elevation for all positions
+        below_ground = pos[:, 2] < ground_elevations
 
         # Check collision with obstacles
-        for obstacle in self.obstacles:
-            if obstacle.is_inside(pos[0:2]):  # Check only x, y for obstacles
-                return True
+        obstacle_collisions = np.array([
+            any(obstacle.is_inside(p[0:2]) for obstacle in self.obstacles)
+            for p in pos
+        ])
 
-        return False
+        collisions = below_ground | obstacle_collisions
+        return collisions if len(collisions) > 1 else collisions[0]
 
-    def get_elevation(self, pos: np.ndarray) -> float:
+    def get_elevation(self, pos: np.ndarray) -> np.ndarray:
         """
         Gets the elevation at a specific position.
 
@@ -144,13 +168,13 @@ class Environment:
 
         Returns
         -------
-        float
-            Elevation in meters.
+        np.ndarray
+            An (N,2) array with elevation values in meters.
         """
-        if self.elevation_map is None:
-            return 0.0
-        # Convert local Cartesian coordinates to geographic coordinates
         pos = np.atleast_2d(pos)
+        if self.elevation_map is None:
+            return np.zeros(pos.shape[0])
+        # Convert local Cartesian coordinates to geographic coordinates
         enu = np.zeros((pos.shape[0], 3))
         enu[:, 0:2] = pos[:, 0:2]
         geo = enu2geo(enu, self.home)

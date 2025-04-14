@@ -5,26 +5,33 @@ This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
 
-import numpy as np
-
+from simulator.gui import MultiDroneViewer
 from simulator.multidrone_simulator import MultiDroneSimulator
-from simulator.gui.multidrone_viewer import MultiDroneViewer
+from simulator.swarming import EVSMConfig
 
 dt = 0.1
 num_drones = 50
-xlim = np.array([-200.0, +200.0])
-ylim = np.array([-100.0, +100.0])
 
-sim = MultiDroneSimulator(num_drones, dt)
-sim.set_rectangular_boundary((xlim[0], ylim[0]), (xlim[1], ylim[1]))
-sim.add_circular_obstacle((25.0, 25.0), 25.0)
-sim.add_rectangular_obstacle((-125.0, -50.0), (-100.0, +50.0))
-sim.add_rectangular_obstacle((100.0, -50.0), (150.0, 0.0))
+config = EVSMConfig(
+    separation_distance=50.0,
+    obstacle_distance=10.0,
+    max_acceleration=10.0,
+    target_velocity=15.0,
+    target_altitude=10.0,
+)
+sim = MultiDroneSimulator(num_drones, dt, config=config)
+sim.set_rectangular_boundary([-200.0, -100.0], [+200.0, +100.0])
+sim.add_circular_obstacle([25.0, 25.0], 25.0)
+sim.add_rectangular_obstacle([-125.0, -50.0], [-100.0, +50.0])
+sim.add_rectangular_obstacle([100.0, -50.0], [150.0, 0.0])
 sim.set_grid_positions(origin=[-50.0, -50.0], space=5.0)
 sim.initialize()
 
-gui = MultiDroneViewer(sim, xlim, ylim, is_3d=False)
+gui = MultiDroneViewer(sim, is_3d=False)
 
 while True:
-    sim.update()        
+    sim.update()
     gui.update(force=False, verbose=True)
+
+    cr = sim.area_coverage_ratio()
+    print(f"Area coverage ratio: {cr * 100:.2f} %")
