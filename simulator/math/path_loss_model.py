@@ -2,7 +2,7 @@ import numpy as np
 from numba import njit
 
 
-def calculate_tx_power(
+def calculate_signal_strength(
     tx_positions: np.ndarray,
     rx_positions: np.ndarray,
     f: float = 10.0,
@@ -37,23 +37,7 @@ def calculate_tx_power(
         - "total": Total received power from all transmitters.
         - "max": Maximum received power from a single transmitter.
     """
-    d0 = 1.0  # Path loss reference is calculated with d0 in km and f in MHz
-    pl0 = 20 * np.log10(d0 * 1e-3) + 20 * np.log10(f) + 32.44
-
-    # Compute delta vectors (num_tx x num_rx x 3)
-    delta = tx_positions[:, None, :] - rx_positions[None, :, :]
-
-    # Compute distances (num_tx x num_rx)
-    distances = np.sqrt(np.sum(delta**2, axis=-1))  # Euclidean distance
-
-    # Avoid division by zero
-    distances = np.maximum(distances, d0)
-
-    # Compute path loss (num_tx x num_rx)
-    path_loss = pl0 + 10 * n * np.log10(distances / d0)
-
-    # Compute received power (num_tx x num_rx)
-    rx_power = tx_power - path_loss
+    rx_power = _calculate_rx_powers(tx_positions, rx_positions, f, n, tx_power)
 
     if mode == "total":
         # Compute received power in linear scale (mW)
@@ -75,7 +59,7 @@ def calculate_tx_power(
         raise ValueError("Invalid mode. Choose 'total' or 'max'.")
 
 
-def tx_power_heatmap(
+def signal_strength_map(
     tx_positions: np.ndarray,
     xs: np.ndarray,
     ys: np.ndarray,
@@ -116,12 +100,42 @@ def tx_power_heatmap(
     grid_points = np.stack([x_grid.ravel(), y_grid.ravel(), z_grid.ravel()], axis=-1)
 
     # Calculate received power at grid points
-    rx_power = calculate_tx_power(tx_positions, grid_points, f, n, tx_power, mode)
+    rx_power = calculate_signal_strength(
+        tx_positions, grid_points, f, n, tx_power, mode
+    )
 
     # Reshape to grid shape
     rx_power_map = rx_power.reshape(ys.size, xs.size)
 
     return rx_power_map
+
+
+@njit(cache=True)
+def _calculate_rx_powers(
+    tx_positions: np.ndarray,
+    rx_positions: np.ndarray,
+    f: float = 10.0,
+    n: float = 3.0,
+    tx_power: float = 20.0,
+) -> np.ndarray:
+    d0 = 1.0  # Path loss reference is calculated with d0 in km and f in MHz
+    pl0 = 20 * np.log10(d0 * 1e-3) + 20 * np.log10(f) + 32.44
+
+    # Compute delta vectors (num_tx x num_rx x 3)
+    delta = tx_positions[:, None, :] - rx_positions[None, :, :]
+
+    # Compute distances (num_tx x num_rx)
+    distances = np.sqrt(np.sum(delta**2, axis=-1))  # Euclidean distance
+
+    # Avoid division by zero
+    distances = np.maximum(distances, d0)
+
+    # Compute path loss (num_tx x num_rx)
+    path_loss = pl0 + 10 * n * np.log10(distances / d0)
+
+    # Compute received power (num_tx x num_rx)
+    rx_power = tx_power - path_loss
+    return rx_power
 
 
 if __name__ == "__main__":
@@ -136,7 +150,7 @@ if __name__ == "__main__":
     ys = np.linspace(-space, +space, 100)
 
     # Generate the heatmap
-    heatmap = tx_power_heatmap(tx_positions, xs, ys, f=10.0, n=3.0, mode="max")
+    heatmap = signal_strength_map(tx_positions, xs, ys, f=10.0, n=3.0, mode="max")
 
     # Plot the heatmap
     from matplotlib import pyplot as plt

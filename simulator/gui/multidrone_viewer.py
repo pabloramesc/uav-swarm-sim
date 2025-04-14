@@ -336,7 +336,7 @@ class MultiDroneViewer:
         ys = np.linspace(self.ylim[0], self.ylim[1], 100)
 
         # Calculate the heatmap using the simulator's tx_power_heatmap method
-        heatmap = self.sim.tx_power_heatmap(xs, ys)
+        heatmap = self.sim.signal_strength_map(xs, ys)
 
         # Plot the heatmap
         if self.heatmap_image is None:

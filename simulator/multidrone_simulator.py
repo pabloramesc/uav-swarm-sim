@@ -17,7 +17,10 @@ from simulator.environment import (
     RectangularObstacle,
 )
 from simulator.swarming import EVSMConfig, EVSMPositionController
-from simulator.math.path_loss_model import calculate_tx_power, tx_power_heatmap
+from simulator.math.path_loss_model import (
+    calculate_signal_strength,
+    signal_strength_map,
+)
 
 
 class MultiDroneSimulator:
@@ -211,6 +214,14 @@ class MultiDroneSimulator:
                     return
 
     def initialize(self, verbose: bool = True) -> None:
+        """
+        Initializes the simulation by updating the initial state of all drones.
+
+        Parameters
+        ----------
+        verbose : bool, optional
+            If True, prints initialization progress (default is True).
+        """
         if verbose:
             print("Initializing simulation ...")
 
@@ -235,20 +246,82 @@ class MultiDroneSimulator:
         self._update_links_matrix()
         self._update_edge_drones_mask()
 
-    def calculate_tx_power(self, positions: np.ndarray) -> np.ndarray:
-        return calculate_tx_power(self.drone_positions, positions, f=2.4e3, mode="max")
+    def calculate_signal_strength(self, positions: np.ndarray) -> np.ndarray:
+        """
+        Calculates the signal strength at given positions based on the drone positions.
 
-    def tx_power_heatmap(self, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
-        return tx_power_heatmap(self.drone_positions, xs, ys, f=2.4e3, mode="max")
+        Parameters
+        ----------
+        positions : np.ndarray
+            A (N, 3) array of positions [x, y, z] where the signal strength is to be calculated.
+
+        Returns
+        -------
+        np.ndarray
+            A (N,) array of signal strength values in dBm at the given positions.
+        """
+        return calculate_signal_strength(
+            self.drone_positions, positions, f=2.4e3, mode="max"
+        )
+
+    def signal_strength_map(self, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
+        """
+        Generates a 2D heatmap of signal strength over a grid of points.
+
+        Parameters
+        ----------
+        xs : np.ndarray
+            A 1D array of x-coordinates for the grid.
+        ys : np.ndarray
+            A 1D array of y-coordinates for the grid.
+
+        Returns
+        -------
+        np.ndarray
+            A 2D array of signal strength values in dBm over the grid.
+        """
+        return signal_strength_map(self.drone_positions, xs, ys, f=2.4e3, mode="max")
 
     def coverage_map(
         self, xs: np.ndarray, ys: np.ndarray, rx_sens: float = -80.0
     ) -> np.ndarray:
-        return self.tx_power_heatmap(xs, ys) > rx_sens
+        """
+        Generates a binary coverage map indicating areas with sufficient signal strength.
+
+        Parameters
+        ----------
+        xs : np.ndarray
+            A 1D array of x-coordinates for the grid.
+        ys : np.ndarray
+            A 1D array of y-coordinates for the grid.
+        rx_sens : float, optional
+            Receiver sensitivity threshold in dBm (default is -80.0).
+
+        Returns
+        -------
+        np.ndarray
+            A 2D binary array where True indicates sufficient signal strength.
+        """
+        return self.signal_strength_map(xs, ys) > rx_sens
 
     def area_coverage_ratio(
         self, num_points: int = 1000, rx_sens: float = -80.0
     ) -> float:
+        """
+        Calculates the ratio of the area covered by sufficient signal strength.
+
+        Parameters
+        ----------
+        num_points : int, optional
+            Number of random points to sample within the environment (default is 1000).
+        rx_sens : float, optional
+            Receiver sensitivity threshold in dBm (default is -80.0).
+
+        Returns
+        -------
+        float
+            The ratio of the area covered by sufficient signal strength.
+        """
         eval_points = np.zeros((num_points, 3))
         eval_points[:, 0] = np.random.uniform(
             *self.environment.boundary_xlim, num_points
@@ -260,7 +333,7 @@ class MultiDroneSimulator:
         in_area = self.environment.is_inside(
             eval_points
         ) & ~self.environment.is_collision(eval_points)
-        tx_power = self.calculate_tx_power(eval_points[in_area])
+        tx_power = self.calculate_signal_strength(eval_points[in_area])
         in_range = tx_power > rx_sens
         return np.sum(in_range) / np.sum(in_area)
 

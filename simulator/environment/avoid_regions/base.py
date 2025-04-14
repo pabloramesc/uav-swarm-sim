@@ -11,6 +11,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 from shapely import Point, Polygon, shortest_line, box
 
+from numba import njit
 
 class Region(ABC):
     """
@@ -156,8 +157,18 @@ class CircularRegion(Region):
         bool
             True if the position is inside the region, False otherwise.
         """
-        delta = self.center - pos
-        return np.linalg.norm(delta) <= self.radius
+        return self._is_inside_numba(pos, self.center, self.radius)
+    
+    @staticmethod
+    @njit(cache=True)
+    def _is_inside_numba(pos: np.ndarray, center: np.ndarray, radius: float) -> bool:
+        """
+        Numba-optimized helper to check if a position is inside circular region.
+        """
+        delta = center - pos
+        distance = np.sqrt(np.sum(delta**2))
+        return distance <= radius
+        
 
     def distance(self, pos: ArrayLike) -> float:
         """
@@ -329,28 +340,39 @@ class RectangularRegion(Region):
         np.ndarray
             The closest point [x, y] on the boundary.
         """
+        pos = np.asarray(pos)
+        return self._closest_point_numba(pos, self.left, self.right, self.bottom, self.top)
+        
+    @staticmethod
+    @njit(cache=True)
+    def _closest_point_numba(pos: np.ndarray, left: float, right: float, bottom: float, top: float) -> np.ndarray:
+        """
+        Numba-optimized helper to calculate the closest point on the rectangular region.
+        """
+        # Clamp the position to the rectangle's bounds
+        closest_x = min(max(pos[0], left), right)
+        closest_y = min(max(pos[1], bottom), top)
+
         # Determine if the position is inside the rectangle
-        if self.is_inside(pos):
+        if left <= pos[0] <= right and bottom <= pos[1] <= top:
             # If inside, find the closest edge
             distances = [
-                abs(pos[0] - self.left),  # Distance to left edge
-                abs(pos[0] - self.right),  # Distance to right edge
-                abs(pos[1] - self.bottom),  # Distance to bottom edge
-                abs(pos[1] - self.top),  # Distance to top edge
+                abs(pos[0] - left),   # Distance to left edge
+                abs(pos[0] - right),  # Distance to right edge
+                abs(pos[1] - bottom), # Distance to bottom edge
+                abs(pos[1] - top),    # Distance to top edge
             ]
-            min_index = np.argmin(distances)
+            min_index = distances.index(min(distances))
             if min_index == 0:  # Closest to left edge
-                return np.array([self.left, pos[1]])
+                return np.array([left, pos[1]])
             elif min_index == 1:  # Closest to right edge
-                return np.array([self.right, pos[1]])
+                return np.array([right, pos[1]])
             elif min_index == 2:  # Closest to bottom edge
-                return np.array([pos[0], self.bottom])
+                return np.array([pos[0], bottom])
             else:  # Closest to top edge
-                return np.array([pos[0], self.top])
+                return np.array([pos[0], top])
         else:
             # If outside, return the clamped position
-            closest_x = np.clip(pos[0], self.left, self.right)
-            closest_y = np.clip(pos[1], self.bottom, self.top)
             return np.array([closest_x, closest_y])
 
 
