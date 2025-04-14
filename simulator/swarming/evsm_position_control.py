@@ -98,23 +98,54 @@ class EVSMPositionController(PositionController):
         )
 
     def update(
-        self, agent_state: np.ndarray, neighbot_states: np.ndarray, time: float = None
+        self,
+        state: np.ndarray,
+        neighbor_states: np.ndarray,
+        neighbor_ids: np.ndarray = None,
+        time: float = None,
     ) -> np.ndarray:
+        """
+        Updates the EVSM controller's state and computes the control output.
+
+        Parameters
+        ----------
+        state : np.ndarray
+            A (6,) array representing the agent's state [px, py, pz, vx, vy, vz].
+        neighbor_states : np.ndarray
+            A (N, 6) array representing the states [px, py, pz, vx, vy, vz] of N neighbors.
+        neighbor_states : np.ndarray
+            A (N,) array with the IDs of the N neighbors.
+        time : float, optional
+            Current simulation time in seconds. Default is None.
+
+        Returns
+        -------
+        np.ndarray
+            Control output [fx, fy, fz].
+        """
+        force_evsm_update = False
+        if not np.array_equal(neighbor_ids, self.neighbor_ids):
+            force_evsm_update = True
+            
+        super().update(state, neighbor_states, neighbor_ids, time)
+        
         self._update_natural_length(time)
 
         control = np.zeros(3)
 
         # Horizontal control using EVSM (Extended Virtual Spring Mesh)
         control[0:2] = self.evsm.update(
-            position=agent_state[0:2],
-            velocity=agent_state[3:5],
-            neighbors=neighbot_states[:, 0:2],
+            position=state[0:2],
+            velocity=state[3:5],
+            neighbors=neighbor_states[:, 0:2],
+            time=time,
+            force=force_evsm_update,
         )
 
         # Vertical control by altitude hold
-        altitude = agent_state[2] - self.env.get_elevation(agent_state[0:2])
+        altitude = state[2] - self.env.get_elevation(state[0:2])
         control[2] = self.altitude_hold.control(
-            altitude=altitude, vspeed=agent_state[5]
+            altitude=altitude, vspeed=state[5]
         )
 
         return control

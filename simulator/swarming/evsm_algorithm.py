@@ -63,6 +63,8 @@ class EVSM:
 
         self.sweep_angle: SweepAngle = None
 
+        self.last_update_time: float = None
+
     @property
     def position(self) -> np.ndarray:
         """A (2,) array with the current position [px, py] of the agent in meters."""
@@ -78,6 +80,8 @@ class EVSM:
         position: np.ndarray,
         velocity: np.ndarray,
         neighbors: np.ndarray,
+        time: float = None,
+        force: bool = True,
     ) -> np.ndarray:
         """
         Updates the state of the agent's position, velocity, and neighbors.
@@ -91,6 +95,11 @@ class EVSM:
         neighbors : np.ndarray
             A (N,2) array with the positions [px, py] of the visible neighbors
             in meters.
+        time : float, optional
+            The current simulation time in seconds. Default is None.
+        force : bool, optional
+            Whether to force `links_mask` and `sweep_angle` update. Recommended
+            when neighbors or environment change. Default is True.
 
         Returns
         -------
@@ -100,14 +109,16 @@ class EVSM:
         self.state[0:2] = position.copy()
         self.state[2:4] = velocity.copy()
         self.neighbors = neighbors.copy()
-        return self._compute_total_force()
+        return self._compute_total_force(time, force)
 
-    def _compute_total_force(self) -> np.ndarray:
+    def _compute_total_force(self, time: float = None, force: bool = True) -> np.ndarray:
         """
-        Update the links mask an compute the total force acting on the agent.
+        Update the links mask and compute the total force acting on the agent.
         """
-        self.links_mask = self._calculate_links()
-        self.sweep_angle = self._calculate_sweep_angle()
+        if force or self._needs_update(time):
+            self.links_mask = self._calculate_links()
+            self.sweep_angle = self._calculate_sweep_angle()
+            self.last_update_time = time
 
         damping_force = self._calculate_damping_force()
 
@@ -123,6 +134,12 @@ class EVSM:
             return control_force + damping_force + exploration_force
 
         return control_force + damping_force
+    
+    def _needs_update(self, time: float) -> bool:
+        elapsed_time: float = None
+        if time is not None and self.last_update_time is not None:
+            elapsed_time = time - self.last_update_time
+        return elapsed_time is None or elapsed_time > 1.0
 
     def _limit_force(self, force: np.ndarray) -> np.ndarray:
         force_mag = np.linalg.norm(force)

@@ -71,7 +71,7 @@ class Drone(Agent):
 
         # Compute control force using the position controller
         control_force = self.position_controller.update(
-            self.state, self.neighbor_states, self.time
+            self.state, self.neighbor_states, self.neighbor_ids, self.time
         )
 
         # Limit the acceleration to the maximum allowable value
