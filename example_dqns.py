@@ -12,13 +12,13 @@ from simulator.environment import CircularObstacle, Environment, RectangularBoun
 from simulator.swarming.dqns_swarming import DQNS
 
 # Define the environment
-xlim = (-80.0, +80.0)
-ylim = (-80.0, +80.0)
+xlim = (-100.0, +100.0)
+ylim = (-100.0, +100.0)
 env = Environment(
-    boundary=RectangularBoundary((xlim[0], ylim[0]), (xlim[1], ylim[1])),
+    boundary=RectangularBoundary((-90.0, -90.0), (+90.0, +90.0)),
     obstacles=[
         CircularObstacle(center=xy, radius=10.0)
-        for xy in np.random.uniform((xlim[0], ylim[0]), (xlim[1], ylim[1]), (5, 2))
+        for xy in np.random.uniform((-120.0, -120.0), (+120.0, +120.0), (5, 2))
     ],
 )
 
@@ -27,26 +27,41 @@ dqns = DQNS(env, num_cells=100, sense_radius=100.0)
 
 # Define UAV position and neighbors
 uav_position = np.array([0.0, 0.0])
-neighbors = np.random.uniform((xlim[0], ylim[0]), (xlim[1], ylim[1]), (10, 2))
+neighbors = np.random.uniform((-120.0, -120.0), (+120.0, +120.0), (10, 2))
 
 # Update DQNS
 dqns.update(position=uav_position, neighbors=neighbors)
 
 # Generate matrices
-environment_matrix = dqns.get_environment_matrix()
-neighbor_matrix = dqns.get_neighbor_matrix()
-signal_matrix = dqns.get_signal_matrix()
+environment_matrix = dqns.obstacles_matrix()
+neighbor_matrix = dqns.neighbor_matrix()
+signal_matrix = dqns.signal_matrix()
 
 # Plot the matrices and the real layout
 fig, axes = plt.subplots(2, 2)
 
 # Real Layout
 axes[0, 0].set_title("Real Layout")
-axes[0, 0].set_xlim(xlim)
-axes[0, 0].set_ylim(ylim)
+axes[0, 0].set_xlim((-120.0, +120.0))
+axes[0, 0].set_ylim((-120.0, +120.0))
 axes[0, 0].set_aspect("equal", adjustable="box")
 axes[0, 0].set_xlabel("X")
 axes[0, 0].set_ylabel("Y")
+
+# Plot boundary
+rect = plt.Rectangle(
+    (env.boundary.bottom_left[0], env.boundary.bottom_left[1]),
+    env.boundary.top_right[0] - env.boundary.bottom_left[0],
+    env.boundary.top_right[1] - env.boundary.bottom_left[1],
+    edgecolor="red",
+    facecolor="none",
+    linewidth=2,
+)
+axes[0, 0].add_artist(rect)
+
+# Plot sense area
+circle = plt.Circle(uav_position, dqns.sense_radius, color="red", alpha=0.1)
+axes[0, 0].add_artist(circle)
 
 # Plot obstacles
 for obstacle in env.obstacles:

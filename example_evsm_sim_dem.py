@@ -8,14 +8,14 @@ https://opensource.org/licenses/MIT
 import numpy as np
 
 from simulator.gui import MultiDroneViewer
-from simulator.multidrone_simulator import MultiDroneSimulator
+from simulator.multidrone_evsm_simulator import MultiDroneEVSMSimulator
 from simulator.swarming import EVSMConfig
 
 dt = 0.1
 num_drones = 100
 
 config = EVSMConfig(separation_distance=1000.0, ln_rate=10.0)
-sim = MultiDroneSimulator(
+sim = MultiDroneEVSMSimulator(
     num_drones,
     dt,
     dem_path="./data/barcelona_dem.tif",

@@ -139,7 +139,7 @@ class EVSMPositionController(PositionController):
             velocity=state[3:5],
             neighbors=neighbor_states[:, 0:2],
             time=time,
-            force=force_evsm_update,
+            force_update=force_evsm_update,
         )
 
         # Vertical control by altitude hold

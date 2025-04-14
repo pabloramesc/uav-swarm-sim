@@ -3,7 +3,7 @@ from numba import njit
 
 
 @njit(cache=True)
-def calculate_relative_distances(
+def relative_distances(
     reference: np.ndarray, positions: np.ndarray
 ) -> np.ndarray:
     """

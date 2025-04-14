@@ -6,7 +6,7 @@ https://opensource.org/licenses/MIT
 """
 
 from simulator.gui import MultiDroneViewer
-from simulator.multidrone_simulator import MultiDroneSimulator
+from simulator.multidrone_evsm_simulator import MultiDroneEVSMSimulator
 from simulator.swarming import EVSMConfig
 
 dt = 0.1
@@ -19,7 +19,7 @@ config = EVSMConfig(
     target_velocity=15.0,
     target_altitude=10.0,
 )
-sim = MultiDroneSimulator(num_drones, dt, config=config)
+sim = MultiDroneEVSMSimulator(num_drones, dt, config=config)
 sim.set_rectangular_boundary([-200.0, -100.0], [+200.0, +100.0])
 sim.add_circular_obstacle([25.0, 25.0], 25.0)
 sim.add_rectangular_obstacle([-125.0, -50.0], [-100.0, +50.0])

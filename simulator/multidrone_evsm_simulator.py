@@ -23,7 +23,7 @@ from simulator.math.path_loss_model import (
 )
 
 
-class MultiDroneSimulator:
+class MultiDroneEVSMSimulator:
     """
     Simulates a swarm of drones in a 3D environment.
 

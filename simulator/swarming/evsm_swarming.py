@@ -10,12 +10,12 @@ import numpy as np
 from ..environment import Environment
 from ..math.angles import SweepAngle
 from .evsm_numba import (
-    calculate_avoidance_force,
-    calculate_control_force,
-    calculate_damping_force,
-    calculate_exploration_force,
-    calculate_links,
-    calculate_sweep_angle,
+    obstacles_force,
+    control_force,
+    damping_force,
+    exploration_force,
+    links_matrix,
+    sweep_angle,
 )
 
 
@@ -82,7 +82,7 @@ class EVSM:
         velocity: np.ndarray,
         neighbors: np.ndarray,
         time: float = None,
-        force: bool = True,
+        force_update: bool = True,
     ) -> np.ndarray:
         """
         Updates the state of the agent's position, velocity, and neighbors.
@@ -98,7 +98,7 @@ class EVSM:
             in meters.
         time : float, optional
             The current simulation time in seconds. Default is None.
-        force : bool, optional
+        force_update : bool, optional
             Whether to force `links_mask` and `sweep_angle` update. Recommended
             when neighbors or environment change. Default is True.
 
@@ -110,15 +110,15 @@ class EVSM:
         self.state[0:2] = position.copy()
         self.state[2:4] = velocity.copy()
         self.neighbors = neighbors.copy()
-        return self._compute_total_force(time, force)
+        return self._calculate_total_force(time, force_update)
 
-    def _compute_total_force(
-        self, time: float = None, force: bool = True
+    def _calculate_total_force(
+        self, time: float = None, force_update: bool = True
     ) -> np.ndarray:
         """
         Update the links mask and compute the total force acting on the agent.
         """
-        if force or self._needs_update(time):
+        if force_update or self._needs_update(time):
             self.links_mask = self._calculate_links()
             self.sweep_angle = self._calculate_sweep_angle()
             self.last_update_time = time
@@ -126,13 +126,13 @@ class EVSM:
         damping_force = self._calculate_damping_force()
 
         if self.is_near_obstacle():
-            obstacles_force = self._calculate_obstacle_avoidance_force()
+            obstacles_force = self._calculate_obstacles_force()
             return obstacles_force + damping_force
 
         control_force = self._calculate_control_force()
 
         if self.is_edge_robot():
-            if force or self._needs_update(time) or self.exploration_force is None:
+            if force_update or self._needs_update(time) or self.exploration_force is None:
                 exploration_force = self._calculate_exploration_force()
                 self.exploration_force = self._limit_force(exploration_force)
             return control_force + damping_force + self.exploration_force
@@ -152,16 +152,16 @@ class EVSM:
         return force
 
     def _calculate_links(self) -> np.ndarray:
-        return calculate_links(self.position, self.neighbors)
+        return links_matrix(self.position, self.neighbors)
 
     def _calculate_control_force(self) -> np.ndarray:
         linked_neighbors = self.neighbors[self.links_mask]
-        return calculate_control_force(
+        return control_force(
             self.position, linked_neighbors, ln=self.ln, ks=self.ks
         )
 
     def _calculate_damping_force(self) -> np.ndarray:
-        return calculate_damping_force(self.velocity, kd=self.kd)
+        return damping_force(self.velocity, kd=self.kd)
 
     def _calculate_exploration_force(self) -> np.ndarray:
         if not self.is_edge_robot():
@@ -169,7 +169,7 @@ class EVSM:
         region_distances, region_directions = (
             self._get_avoidance_distances_and_directions()
         )
-        return calculate_exploration_force(
+        return exploration_force(
             region_distances,
             region_directions,
             self.sweep_angle.to_tuple(),
@@ -177,16 +177,16 @@ class EVSM:
             ks=self.k_expl,
         )
 
-    def _calculate_obstacle_avoidance_force(self) -> np.ndarray:
+    def _calculate_obstacles_force(self) -> np.ndarray:
         region_distances, region_directions = (
             self._get_avoidance_distances_and_directions()
         )
-        return calculate_avoidance_force(
+        return obstacles_force(
             region_distances, region_directions, d_min=self.d_obs, ks=self.k_obs
         )
 
     def _calculate_sweep_angle(self) -> SweepAngle:
-        start, stop = calculate_sweep_angle(self.position, self.neighbors)
+        start, stop = sweep_angle(self.position, self.neighbors)
         if np.isnan((start, stop)).any():
             return None
         return SweepAngle(start, stop)

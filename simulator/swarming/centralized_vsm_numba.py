@@ -10,7 +10,7 @@ from numba import njit, prange
 
 
 @njit(parallel=True)
-def calculate_links(positions: np.ndarray) -> np.ndarray:
+def links_matrix(positions: np.ndarray) -> np.ndarray:
     num_drones = positions.shape[0]
     links = np.full((num_drones, num_drones), False, dtype=bool)
     for drone1_id in prange(num_drones):
@@ -34,7 +34,7 @@ def calculate_links(positions: np.ndarray) -> np.ndarray:
 
 
 @njit(parallel=True)
-def calculate_forces(
+def control_force(
     states: np.ndarray,
     links: np.ndarray,
     ln: float = 10.0,

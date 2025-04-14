@@ -5,14 +5,14 @@
  https://opensource.org/licenses/MIT
 """
 
-from simulator.multidrone_simulator import MultiDroneSimulator
+from simulator.multidrone_evsm_simulator import MultiDroneEVSMSimulator
 from simulator.gui.multidrone_viewer import MultiDroneViewer
 
 dt = 0.01
 num_drones = 20
 field_size = 1000.0
 
-sim = MultiDroneSimulator(num_drones, dt)
+sim = MultiDroneEVSMSimulator(num_drones, dt)
 gui = MultiDroneViewer(num_drones, field_size)
 
 sim.set_grid_positions()

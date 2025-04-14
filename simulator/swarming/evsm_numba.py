@@ -10,7 +10,7 @@ from numba import njit, prange
 
 
 @njit(parallel=True, cache=True)
-def calculate_links(position: np.ndarray, neighbors: np.ndarray) -> np.ndarray:
+def links_matrix(position: np.ndarray, neighbors: np.ndarray) -> np.ndarray:
     """
     Determines which neighbors are linked to the given position based on the EVSM algorithm.
 
@@ -50,7 +50,7 @@ def calculate_links(position: np.ndarray, neighbors: np.ndarray) -> np.ndarray:
 
 
 @njit(cache=True)
-def calculate_control_force(
+def control_force(
     position: np.ndarray, linked_neighbors: np.ndarray, ln: float = 1.0, ks: float = 1.0
 ) -> np.ndarray:
     """
@@ -82,7 +82,7 @@ def calculate_control_force(
 
 
 @njit(cache=True)
-def calculate_damping_force(velocity: np.ndarray, kd: float = 1.0) -> np.ndarray:
+def damping_force(velocity: np.ndarray, kd: float = 1.0) -> np.ndarray:
     """
     Calculates the damping force to reduce velocity.
 
@@ -103,7 +103,7 @@ def calculate_damping_force(velocity: np.ndarray, kd: float = 1.0) -> np.ndarray
 
 
 @njit(cache=True)
-def calculate_sweep_angle(
+def sweep_angle(
     position: np.ndarray, neighbors: np.ndarray
 ) -> tuple[float, float]:
     """
@@ -140,21 +140,21 @@ def calculate_sweep_angle(
 
 
 @njit(cache=True)
-def calculate_avoidance_force(
-    region_distances: np.ndarray,
-    region_directions: np.ndarray,
+def obstacles_force(
+    obstacle_distances: np.ndarray,
+    obstacle_directions: np.ndarray,
     d_min: float = 1.0,
     ks: float = 1.0,
 ) -> np.ndarray:
     """
-    Calculates the avoidance force to maintain a safe distance from regions.
+    Calculates the avoidance force to maintain a safe distance from obstacles.
 
     Parameters
     ----------
-    region_distances : np.ndarray
-        A (N, 1) array with distances to N regions in meters.
-    region_directions : np.ndarray
-        A (N, 2) array with [dx, dy] direction vectors to N regions.
+    obstacle_distances : np.ndarray
+        A (N, 1) array with distances to N obstacles in meters.
+    obstacle_directions : np.ndarray
+        A (N, 2) array with [dx, dy] direction vectors to N obstacles.
     d_min : float, optional
         Minimum safe distance in meters (default is 1.0).
     ks : float, optional
@@ -165,32 +165,32 @@ def calculate_avoidance_force(
     np.ndarray
         A (2,) array representing the avoidance force [fx, fy] in m/s^2.
     """
-    region_distances = region_distances.reshape(-1, 1)
-    region_directions = region_directions.reshape(-1, 2)
-    is_near = region_distances < d_min
-    region_distances = np.maximum(region_distances, 1e-2)
-    repulsion_forces = (d_min / region_distances) ** 2 * (-region_directions) * is_near
+    obstacle_distances = obstacle_distances.reshape(-1, 1)
+    obstacle_directions = obstacle_directions.reshape(-1, 2)
+    is_near = obstacle_distances < d_min
+    obstacle_distances = np.maximum(obstacle_distances, 1e-2)
+    repulsion_forces = (d_min / obstacle_distances) ** 2 * (-obstacle_directions) * is_near
     avoidance_force = ks * np.sum(repulsion_forces, axis=0)
     return avoidance_force
 
 
 @njit(cache=True)
-def calculate_exploration_force(
-    region_distances: np.ndarray,
-    region_directions: np.ndarray,
+def exploration_force(
+    obstacle_distances: np.ndarray,
+    obstacle_directions: np.ndarray,
     sweep_angle: tuple[float, float],
     ln: float = 1.0,
     ks: float = 1.0,
 ) -> np.ndarray:
     """
-    Calculates the exploration force based on visible regions.
+    Calculates the exploration force based on visible obstacles.
 
     Parameters
     ----------
-    region_distances : np.ndarray
-        A (N, 1) array with distances to N regions in meters.
-    region_directions : np.ndarray
-        A (N, 2) array with [dx, dy] direction vectors to N regions.
+    obstacle_distances : np.ndarray
+        A (N, 1) array with distances to N obstacles in meters.
+    obstacle_directions : np.ndarray
+        A (N, 2) array with [dx, dy] direction vectors to N obstacles.
     sweep_angle : tuple[float, float]
         The start and end angles of the sweep (in radians).
     ln : float, optional
@@ -203,18 +203,18 @@ def calculate_exploration_force(
     np.ndarray
         A (2,) array representing the exploration force [fx, fy] in m/s^2.
     """
-    region_distances = region_distances.reshape(-1, 1)
-    region_directions = region_directions.reshape(-1, 2)
-    num_regions = region_distances.shape[0]
-    if num_regions == 0:
+    obstacle_distances = obstacle_distances.reshape(-1, 1)
+    obstacle_directions = obstacle_directions.reshape(-1, 2)
+    num_obstacles = obstacle_distances.shape[0]
+    if num_obstacles == 0:
         return np.zeros(2)
-    region_angles = np.arctan2(region_directions[:, 1], region_directions[:, 0])
+    obstacle_angles = np.arctan2(obstacle_directions[:, 1], obstacle_directions[:, 0])
     # Get visible obstacle by checking if direction angles are inside the sweep angle
-    diff = (region_angles - sweep_angle[0]) % (2 * np.pi)
+    diff = (obstacle_angles - sweep_angle[0]) % (2 * np.pi)
     sweep = (sweep_angle[1] - sweep_angle[0]) % (2 * np.pi)
     is_visible = ((diff >= 0) & (diff <= sweep))[:, np.newaxis]
-    weights = region_distances / np.sqrt(np.sum(region_distances**2)) * is_visible
+    weights = obstacle_distances / np.sqrt(np.sum(obstacle_distances**2)) * is_visible
     # Calculate the exploration forces
-    forces = weights * (region_distances - ln) * region_directions
+    forces = weights * (obstacle_distances - ln) * obstacle_directions
     exploration_force = ks * np.sum(forces, axis=0)
     return exploration_force
