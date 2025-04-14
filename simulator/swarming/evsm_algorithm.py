@@ -64,6 +64,7 @@ class EVSM:
         self.sweep_angle: SweepAngle = None
 
         self.last_update_time: float = None
+        self.exploration_force: np.ndarray = None
 
     @property
     def position(self) -> np.ndarray:
@@ -111,7 +112,9 @@ class EVSM:
         self.neighbors = neighbors.copy()
         return self._compute_total_force(time, force)
 
-    def _compute_total_force(self, time: float = None, force: bool = True) -> np.ndarray:
+    def _compute_total_force(
+        self, time: float = None, force: bool = True
+    ) -> np.ndarray:
         """
         Update the links mask and compute the total force acting on the agent.
         """
@@ -129,12 +132,13 @@ class EVSM:
         control_force = self._calculate_control_force()
 
         if self.is_edge_robot():
-            exploration_force = self._calculate_exploration_force()
-            exploration_force = self._limit_force(exploration_force)
-            return control_force + damping_force + exploration_force
+            if force or self._needs_update(time) or self.exploration_force is None:
+                exploration_force = self._calculate_exploration_force()
+                self.exploration_force = self._limit_force(exploration_force)
+            return control_force + damping_force + self.exploration_force
 
         return control_force + damping_force
-    
+
     def _needs_update(self, time: float) -> bool:
         elapsed_time: float = None
         if time is not None and self.last_update_time is not None:
