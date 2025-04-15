@@ -23,7 +23,7 @@ from simulator.math.path_loss_model import (
 )
 
 
-class MultiDroneEVSMSimulator:
+class MultiDroneSimulatorEVSM:
     """
     Simulates a swarm of drones in a 3D environment.
 
@@ -52,30 +52,28 @@ class MultiDroneEVSMSimulator:
         """
         self.num_drones = num_drones
         self.dt = dt
-
-        self.time = 0.0
-        self.step = 0
-
         self.environment = Environment(dem_path)
-
         self.config = config if config is not None else EVSMConfig()
         self.visible_distance = visible_distance
 
-        self.drones: list[Drone] = []
-        self.drone_ids = np.zeros((num_drones,), dtype=np.int32)
-        for i in range(num_drones):
-            controller = EVSMPositionController(
-                config=self.config, env=self.environment
-            )
-            drone = Drone(
-                id=i + 1, env=self.environment, position_controller=controller
-            )
-            self.drones.append(drone)
-            self.drone_ids[i] = drone.id
+        self._init_states()
+        self._init_drones()
 
-        self.drone_states = np.zeros((num_drones, 6))  # px, py, pz, vx, vy, vz
-        self.links_matrix = np.full((num_drones, num_drones), False, dtype=bool)
-        self.edge_drones_mask = np.full((num_drones,), False, dtype=bool)
+    def _init_states(self) -> None:
+        self.time = 0.0
+        self.step = 0
+        self.drone_states = np.zeros((self.num_drones, 6))  # px, py, pz, vx, vy, vz
+        self.links_matrix = np.full(
+            (self.num_drones, self.num_drones), False, dtype=bool
+        )
+        self.edge_drones_mask = np.full((self.num_drones,), False, dtype=bool)
+
+    def _init_drones(self) -> None:
+        self.drones: list[Drone] = []
+        for id in range(self.num_drones):
+            evsm = EVSMPositionController(self.config, self.environment)
+            drone = Drone(id, self.environment, evsm)
+            self.drones.append(drone)
 
     @property
     def drone_positions(self) -> np.ndarray:
@@ -93,137 +91,27 @@ class MultiDroneEVSMSimulator:
         """
         return self.drone_states[:, 3:6]
 
-    def set_rectangular_boundary(
-        self, bottom_left: ArrayLike, top_right: ArrayLike
-    ) -> None:
-        """
-        Sets a rectangular boundary for the simulation environment.
-
-        Parameters
-        ----------
-        bottom_left : ArrayLike
-            Coordinates of the bottom-left corner of the boundary [x, y].
-        top_right : ArrayLike
-            Coordinates of the top-right corner of the boundary [x, y].
-        """
-        rect = RectangularBoundary(bottom_left, top_right)
-        self.environment.set_boundary(rect)
-
-    def set_polygonal_boundary(self, vertices: ArrayLike) -> None:
-        """
-        Sets a polygonal boundary for the simulation environment.
-
-        Parameters
-        ----------
-        vertices : ArrayLike
-            List of vertices defining the polygonal boundary.
-        """
-        poly = PolygonalBoundary(vertices)
-        self.environment.set_boundary(poly)
-
-    def add_circular_obstacle(self, center: ArrayLike, radius: float) -> None:
-        """
-        Adds a circular obstacle to the simulation environment.
-
-        Parameters
-        ----------
-        center : ArrayLike
-            Coordinates of the center of the obstacle [x, y].
-        radius : float
-            Radius of the circular obstacle.
-        """
-        circ = CircularObstacle(center, radius)
-        self.environment.add_obstacle(circ)
-
-    def add_rectangular_obstacle(
-        self, bottom_left: ArrayLike, top_right: ArrayLike
-    ) -> None:
-        """
-        Adds a rectangular obstacle to the simulation environment.
-
-        Parameters
-        ----------
-        bottom_left : ArrayLike
-            Coordinates of the bottom-left corner of the obstacle [x, y].
-        top_right : ArrayLike
-            Coordinates of the top-right corner of the obstacle [x, y].
-        """
-        rect = RectangularObstacle(bottom_left, top_right)
-        self.environment.add_obstacle(rect)
-
-    def clear_obstacles(self) -> None:
-        """
-        Removes all obstacles from the simulation environment.
-        """
-        self.environment.clear_obstacles()
-
-    def set_random_positions(
-        self,
-        origin: np.ndarray = np.zeros(2),
-        space: float = 1.0,
-        altitude: float = 0.0,
-    ) -> None:
-        """
-        Initializes drones with random positions around a given origin.
-
-        Parameters
-        ----------
-        origin : np.ndarray, optional
-            Center of the random distribution [x, y] (default is [0, 0]).
-        space : float, optional
-            Standard deviation of the random distribution (default is 1.0).
-        altitude : float, optional
-            Initial altitude for all drones (default is 0.0).
-        """
-        self.drone_states[:, 0:2] = np.random.normal(
-            origin, space, (self.num_drones, 2)
-        )
-        self.drone_states[:, 2] = altitude
-        self.drone_states[:, 3:6] = 0.0
-        self._set_drone_states()
-
-    def set_grid_positions(
-        self,
-        origin: np.ndarray = np.zeros(2),
-        space: float = 1.0,
-        altitude: float = 0.0,
-    ) -> None:
-        """
-        Initializes drones in a grid formation.
-
-        Parameters
-        ----------
-        origin : np.ndarray, optional
-            Bottom-left corner of the grid [x, y] (default is [0, 0]).
-        space : float, optional
-            Spacing between drones in the grid (default is 1.0).
-        altitude : float, optional
-            Initial altitude for all drones (default is 0.0).
-        """
-        self.drone_states[:, 2] = altitude
-        self.drone_states[:, 3:6] = 0.0
-        grid_size = int(np.ceil(np.sqrt(self.num_drones)))
-        drone_id = 0
-        for row in range(grid_size):
-            for col in range(grid_size):
-                self.drone_states[drone_id, 0] = origin[0] + space * row
-                self.drone_states[drone_id, 1] = origin[1] + space * col
-                drone_id += 1
-                if drone_id >= self.num_drones:
-                    self._set_drone_states()
-                    return
-
-    def initialize(self, verbose: bool = True) -> None:
+    def initialize(self, positions: np.ndarray = None, verbose: bool = True) -> None:
         """
         Initializes the simulation by updating the initial state of all drones.
 
         Parameters
         ----------
+        positions : np.ndarray, optional
+            A (N, 3) array specifying the initial positions [px, py, pz] of the drones.
+            If None, the positions remain unchanged (default is None).
         verbose : bool, optional
             If True, prints initialization progress (default is True).
         """
         if verbose:
             print("Initializing simulation ...")
+
+        self._init_states()
+        self._init_drones()
+
+        if positions is not None:
+            self.drone_states[:, 0:3] = positions  # Fix assignment to update all drones
+            self._set_drone_states()
 
         self.update(dt=0.0)
 
@@ -240,13 +128,15 @@ class MultiDroneEVSMSimulator:
             Time step for the update in seconds (default is `self.dt`).
         """
         dt = dt if dt is not None else self.dt
+        self.time += dt
+        self.step += 1
         self._get_drone_states()
         self._update_visible_neighbors()
         self._update_drones(dt)
         self._update_links_matrix()
         self._update_edge_drones_mask()
 
-    def calculate_signal_strength(self, positions: np.ndarray) -> np.ndarray:
+    def signal_strength(self, positions: np.ndarray) -> np.ndarray:
         """
         Calculates the signal strength at given positions based on the drone positions.
 
@@ -260,9 +150,7 @@ class MultiDroneEVSMSimulator:
         np.ndarray
             A (N,) array of signal strength values in dBm at the given positions.
         """
-        return signal_strength(
-            self.drone_positions, positions, f=2.4e3, mode="max"
-        )
+        return signal_strength(self.drone_positions, positions, f=2.4e3, mode="max")
 
     def signal_strength_map(self, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
         """
@@ -333,7 +221,7 @@ class MultiDroneEVSMSimulator:
         in_area = self.environment.is_inside(
             eval_points
         ) & ~self.environment.is_collision(eval_points)
-        tx_power = self.calculate_signal_strength(eval_points[in_area])
+        tx_power = self.signal_strength(eval_points[in_area])
         in_range = tx_power > rx_sens
         return np.sum(in_range) / np.sum(in_area)
 
@@ -359,8 +247,6 @@ class MultiDroneEVSMSimulator:
         """
         for drone in self.drones:
             drone.update(dt)
-        self.time += dt
-        self.step += 1
 
     def _update_visible_neighbors(self) -> None:
         """
@@ -371,10 +257,9 @@ class MultiDroneEVSMSimulator:
         for drone in self.drones:
             deltas = positions - drone.position
             distances = np.linalg.norm(deltas, axis=1)
-            visible_neighbors = (distances < self.visible_distance) & (distances > 0.0)
-            drone.set_neighbors(
-                self.drone_ids[visible_neighbors], positions[visible_neighbors]
-            )
+            is_visible = (distances < self.visible_distance) & (distances > 0.0)
+            indices = np.where(is_visible)[0]
+            drone.set_neighbors(indices, positions[indices])
 
     def _update_links_matrix(self) -> None:
         """
@@ -384,14 +269,14 @@ class MultiDroneEVSMSimulator:
             (self.num_drones, self.num_drones), False, dtype=bool
         )
         for drone in self.drones:
-            neighbor_indexes = drone.neighbor_ids - 1
+            indices = drone.neighbor_ids
             controller: EVSMPositionController = drone.position_controller
             if not isinstance(controller, EVSMPositionController):
                 raise Exception(f"Drone {drone.id} position controller is not EVSM")
             links_mask = controller.evsm.links_mask
             drone_links = np.zeros((self.num_drones,), dtype=bool)
-            drone_links[neighbor_indexes] = links_mask
-            self.links_matrix[drone.id - 1, :] = drone_links
+            drone_links[indices] = links_mask
+            self.links_matrix[drone.id, :] = drone_links
 
     def _update_edge_drones_mask(self) -> None:
         """

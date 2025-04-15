@@ -6,15 +6,24 @@ https://opensource.org/licenses/MIT
 """
 
 import numpy as np
+from numpy.typing import ArrayLike
 
+from .avoid_regions import (
+    Boundary,
+    CircularObstacle,
+    Obstacle,
+    PolygonalBoundary,
+    RectangularBoundary,
+    RectangularObstacle,
+    Region,
+)
 from .elevation_map import ElevationMap
-from .avoid_regions import Boundary, Obstacle, Region
-from .geo import geo2enu, enu2geo
+from .geo import enu2geo, geo2enu
 
 
 class Environment:
     """
-    Manages the simulation environment, including elevation data, boundaries,
+    Manages the environment, including elevation data, boundaries,
     and obstacles.
     """
 
@@ -58,14 +67,14 @@ class Environment:
         A list of all avoid regions, including the boundary and obstacles.
         """
         return [self.boundary] + self.obstacles
-    
+
     @property
     def boundary_xlim(self) -> tuple[float, float]:
         if self.boundary is None:
             return None
         x = self.boundary.shape.exterior.xy[0]
         return min(x), max(x)
-    
+
     @property
     def boundary_ylim(self) -> tuple[float, float]:
         if self.boundary is None:
@@ -101,6 +110,64 @@ class Environment:
         """
         self.obstacles = []
 
+    def set_rectangular_boundary(
+        self, bottom_left: ArrayLike, top_right: ArrayLike
+    ) -> None:
+        """
+        Sets a rectangular boundary for the environment.
+
+        Parameters
+        ----------
+        bottom_left : ArrayLike
+            Coordinates of the bottom-left corner of the boundary [x, y].
+        top_right : ArrayLike
+            Coordinates of the top-right corner of the boundary [x, y].
+        """
+        rect = RectangularBoundary(bottom_left, top_right)
+        self.set_boundary(rect)
+
+    def set_polygonal_boundary(self, vertices: ArrayLike) -> None:
+        """
+        Sets a polygonal boundary for the environment.
+
+        Parameters
+        ----------
+        vertices : ArrayLike
+            List of vertices defining the polygonal boundary.
+        """
+        poly = PolygonalBoundary(vertices)
+        self.set_boundary(poly)
+
+    def add_circular_obstacle(self, center: ArrayLike, radius: float) -> None:
+        """
+        Adds a circular obstacle to the environment.
+
+        Parameters
+        ----------
+        center : ArrayLike
+            Coordinates of the center of the obstacle [x, y].
+        radius : float
+            Radius of the circular obstacle.
+        """
+        circ = CircularObstacle(center, radius)
+        self.add_obstacle(circ)
+
+    def add_rectangular_obstacle(
+        self, bottom_left: ArrayLike, top_right: ArrayLike
+    ) -> None:
+        """
+        Adds a rectangular obstacle to the environment.
+
+        Parameters
+        ----------
+        bottom_left : ArrayLike
+            Coordinates of the bottom-left corner of the obstacle [x, y].
+        top_right : ArrayLike
+            Coordinates of the top-right corner of the obstacle [x, y].
+        """
+        rect = RectangularObstacle(bottom_left, top_right)
+        self.add_obstacle(rect)
+
     def is_inside(self, pos: np.ndarray) -> np.ndarray:
         """
         Checks if one or more positions are inside the environment boundary.
@@ -124,7 +191,7 @@ class Environment:
         inside = np.array([self.boundary.is_inside(p[0:2]) for p in pos])
         return inside if len(inside) > 1 else inside[0]
 
-    def is_collision(self, pos: np.ndarray) -> np.ndarray:
+    def is_collision(self, pos: np.ndarray, check_altitude: bool = True) -> np.ndarray:
         """
         Checks if one or more positions collide with any obstacle or the ground.
 
@@ -143,18 +210,24 @@ class Environment:
         """
         pos = np.atleast_2d(pos)  # Ensure pos is (N, 3)
 
-        # Check collision with the ground
-        ground_elevations = self.get_elevation(pos[:, 0:2])  # Get ground elevation for all positions
-        below_ground = pos[:, 2] < ground_elevations
-
         # Check collision with obstacles
-        obstacle_collisions = np.array([
-            any(obstacle.is_inside(p[0:2]) for obstacle in self.obstacles)
-            for p in pos
-        ])
+        obstacle_collisions = np.array(
+            [
+                any(obstacle.is_inside(p[0:2]) for obstacle in self.obstacles)
+                for p in pos
+            ]
+        )
+        collisions = obstacle_collisions
 
-        collisions = below_ground | obstacle_collisions
-        return collisions if len(collisions) > 1 else collisions[0]
+        # Check collision with the ground
+        if check_altitude:
+            ground_elevations = self.get_elevation(
+                pos[:, 0:2]
+            )  # Get ground elevation for all positions
+            below_ground = pos[:, 2] < ground_elevations
+            collisions = obstacle_collisions | below_ground
+
+        return collisions if len(collisions) > 1 else collisions.item()
 
     def get_elevation(self, pos: np.ndarray) -> np.ndarray:
         """
@@ -239,7 +312,7 @@ class Environment:
             ax.plot(x, y, color="red", label="Obstacle")
 
         # Configure the plot
-        ax.set_title("Simulation Environment")
+        ax.set_title("Environment")
         ax.set_xlabel("Longitude (deg)")
         ax.set_ylabel("Latitude (deg)")
         ax.legend()

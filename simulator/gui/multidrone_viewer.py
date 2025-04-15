@@ -13,7 +13,7 @@ from numpy.typing import ArrayLike
 
 from typing import Literal
 
-from simulator.multidrone_evsm_simulator import MultiDroneEVSMSimulator
+from simulator.multidrone_simulator_evsm import MultiDroneSimulatorEVSM
 
 from matplotlib.axes import Axes
 from matplotlib.lines import Line2D
@@ -35,7 +35,7 @@ class MultiDroneViewer:
 
     def __init__(
         self,
-        sim: MultiDroneEVSMSimulator,
+        sim: MultiDroneSimulatorEVSM,
         xlim: tuple[float, float] = None,
         ylim: tuple[float, float] = None,
         zlim: tuple[float, float] = None,
@@ -92,10 +92,10 @@ class MultiDroneViewer:
         """
         self.ax.clear()
         self._reset_timers()
-        self._set_axis_limits()
+        self._calculate_axis_limits()
+        self._configure_axis()
         self._plot_elevation_map()
         self._initiate_plots()
-        self._configure_axis()
         plt.pause(0.01)
 
     def update(
@@ -119,7 +119,10 @@ class MultiDroneViewer:
         if not (force or self._need_render()):
             return
 
-        self._render()
+        self._plot_tx_heatmap()
+        self._update_links_lines()
+        self._update_drone_points()
+        plt.pause(0.01)
 
         if verbose:
             self._print_fps()
@@ -139,12 +142,14 @@ class MultiDroneViewer:
         self._plot_avoid_regions_2d()
 
     def _initiate_plots_3d(self) -> None:
-        # (self.link_lines,) = self.ax.plot([], [], [], "b-", lw=0.5)
-        self.link_lines = Line3DCollection([], colors="blue", linewidth=0.5)
+        # Initialize with a placeholder segment to avoid issues
+        placeholder_segment = np.array([[[0, 0, 0], [0, 0, 0]]])  # A degenerate line
+        self.link_lines = Line3DCollection(placeholder_segment, colors="blue", linewidth=0.5)
         self.ax.add_collection3d(self.link_lines)
+
         (self.drone_points,) = self.ax.plot([], [], [], "ro", ms=2.0)
         (self.edge_drone_points,) = self.ax.plot([], [], [], "go", ms=2.0)
-
+        
         if self.plot_regions_3d:
             self._plot_avoid_regions_3d()
         else:
@@ -211,16 +216,7 @@ class MultiDroneViewer:
             faces.append(face)
         return faces
 
-    def _render(self) -> None:
-        """
-        Renders the simulation.
-        """
-        self._plot_tx_heatmap()
-        self._set_links_data()
-        self._set_drones_data()
-        plt.pause(0.01)
-
-    def _set_drones_data(self) -> None:
+    def _update_drone_points(self) -> None:
         self.drone_points.set_data(
             self.sim.drone_states[~self.sim.edge_drones_mask, 0],
             self.sim.drone_states[~self.sim.edge_drones_mask, 1],
@@ -237,7 +233,7 @@ class MultiDroneViewer:
                 self.sim.drone_states[self.sim.edge_drones_mask, 2]
             )
 
-    def _set_links_data(self) -> None:
+    def _update_links_lines(self) -> None:
         links_x, links_y, links_z = self._get_links_coords()
         if self.is_3d:
             xyz = np.array([links_x, links_y, links_z], dtype=np.float32).T
@@ -247,7 +243,7 @@ class MultiDroneViewer:
         else:
             self.link_lines.set_data(links_x, links_y)
 
-    def _set_axis_limits(self) -> None:
+    def _calculate_axis_limits(self) -> None:
         if self.sim.environment.elevation_map is None:
             x, y = self.sim.environment.boundary.shape.exterior.xy
             new_xlim = (min(x) - 0.1 * np.ptp(x), max(x) + 0.1 * np.ptp(x))
@@ -276,10 +272,10 @@ class MultiDroneViewer:
 
         self.fig.tight_layout()
 
-        if self.xlim is not None:
+        if self.xlim:
             self.ax.set_xlim(*self.xlim)
 
-        if self.ylim is not None:
+        if self.ylim:
             self.ax.set_ylim(*self.ylim)
 
         if not self.is_3d:
@@ -287,10 +283,10 @@ class MultiDroneViewer:
 
         self.ax.set_ylabel("Z (m)")
 
-        if self.zlim is not None:
+        if self.zlim:
             self.ax.set_zlim(*self.zlim)
 
-        if self.xlim is not None and self.ylim is not None and self.zlim is not None:
+        if self.xlim and self.ylim and self.zlim:
             if self.aspect_ratio == "auto":
                 return
 

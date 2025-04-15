@@ -9,7 +9,7 @@ import numpy as np
 from matplotlib.animation import FFMpegWriter, FuncAnimation
 
 from simulator.gui.multidrone_viewer import MultiDroneViewer
-from simulator.multidrone_evsm_simulator import MultiDroneEVSMSimulator
+from simulator.multidrone_simulator_evsm import MultiDroneSimulatorEVSM
 
 # Configuración de la simulación
 dt = 0.1
@@ -18,7 +18,7 @@ xlim = np.array([-200.0, +200.0])
 ylim = np.array([-100.0, +100.0])
 
 # Inicializar simulador y entorno
-sim = MultiDroneEVSMSimulator(num_drones, dt)
+sim = MultiDroneSimulatorEVSM(num_drones, dt)
 sim.set_rectangular_boundary((xlim[0], ylim[0]), (xlim[1], ylim[1]))
 sim.add_circular_obstacle((25.0, 25.0), 25.0)
 sim.add_rectangular_obstacle((-125.0, -50.0), (-100.0, +50.0))

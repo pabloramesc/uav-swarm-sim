@@ -68,18 +68,18 @@ def enu2geo(enu: np.ndarray, home: np.ndarray) -> np.ndarray:
         Geographic coordinates [latitude, longitude, altitude] in (deg, deg, m).
         Returns a (3,) array for a single point or an (N, 3) array for multiple points.
     """
-    enu = np.atleast_2d(enu)  # Ensure enu is at least 2D (N, 3)
+    enu2d = np.atleast_2d(enu)  # Ensure enu is at least 2D (N, 3)
     if home.shape != (3,):
         raise ValueError("Home must be a (3,) array.")
 
-    geo = np.zeros_like(enu)
-    geo[:, 0] = home[0] + (enu[:, 1] / LATDEG2METERS)  # Latitude
+    geo = np.zeros_like(enu2d)
+    geo[:, 0] = home[0] + (enu2d[:, 1] / LATDEG2METERS)  # Latitude
     geo[:, 1] = home[1] + (
-        enu[:, 0] / (LATDEG2METERS * np.cos(np.deg2rad(home[0])))
+        enu2d[:, 0] / (LATDEG2METERS * np.cos(np.deg2rad(home[0])))
     )  # Longitude
-    geo[:, 2] = home[2] + enu[:, 2]  # Altitude
+    geo[:, 2] = home[2] + enu2d[:, 2]  # Altitude
 
-    return np.squeeze(geo)  # Return (3,) if input was (3,)
+    return geo.reshape(enu.shape)
 
 if __name__ == "__main__":
     home = np.array([37.7749, -122.4194, 30.0])  # Reference point (latitude, longitude, altitude)

@@ -11,7 +11,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from numpy.typing import ArrayLike
 
-from simulator.multidrone_evsm_simulator import MultiDroneEVSMSimulator
+from simulator.multidrone_simulator_evsm import MultiDroneSimulatorEVSM
 
 from matplotlib.axes import Axes
 from matplotlib.lines import Line2D
@@ -30,7 +30,7 @@ class MultiDroneViewer:
 
     def __init__(
         self,
-        sim: MultiDroneEVSMSimulator,
+        sim: MultiDroneSimulatorEVSM,
         xlim: tuple[float, float] = None,
         ylim: tuple[float, float] = None,
         zlim: tuple[float, float] = None,

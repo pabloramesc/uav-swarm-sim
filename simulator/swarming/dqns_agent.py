@@ -18,7 +18,7 @@ class DQNSAgent:
     Manages the training and inference of a DQN-based agent for controlling a swarm of drones.
     """
 
-    def __init__(self, num_drones: int, train: bool = False, model_path: str = None):
+    def __init__(self, num_drones: int, training_mode: bool = False, model_path: str = None):
         """
         Initialize the DQNSAgent.
 
@@ -26,7 +26,7 @@ class DQNSAgent:
         ----------
         num_drones : int
             The number of drones in the swarm.
-        train : bool, default=False
+        training_mode : bool, default=False
             Whether the agent is in training mode.
         model_path : str, optional
             Path to the pre-trained model. Required if `train` is False.
@@ -47,18 +47,19 @@ class DQNSAgent:
         self.state_shape = (self.num_cells, self.num_cells, 2)
         self.states_shape = (self.num_drones, self.num_cells, self.num_cells, 2)
 
-        if not train and model_path is None:
+        if not training_mode and model_path is None:
             raise Exception("Model path must be provided in no training mode.")
+        self.training_mode = training_mode
 
-        if train and model_path is None:
+        if self.training_mode and model_path is None:
             model = self.build_keras_model()
             timestamp = datetime.now().strftime("%y%m%d-%H%M%S")
             self.model_path = f"dqns-model-{timestamp}.keras"
             kr.models.save_model(model, self.model_path)
 
         policy = EpsilonGreedyPolicy(
-            epsilon=1.0 if train else 0.0,
-            epsilon_min=0.1 if train else 0.0,
+            epsilon=1.0 if self.training_mode else 0.0,
+            epsilon_min=0.1 if self.training_mode else 0.0,
         )
         self.dqn_agent = DQNAgent(
             model=None,
@@ -69,7 +70,7 @@ class DQNSAgent:
             update_steps=10_000,
             autosave_steps=1000,
             file_name=self.model_path,
-            verbose=train,
+            verbose=self.training_mode,
         )
         self.dqn_agent.load_model()
 
@@ -150,7 +151,7 @@ class DQNSAgent:
         dict
             Training metrics, or None if training is not performed.
         """
-        if not self.train:
+        if not self.training_mode:
             return
 
         if self.dqn_agent.memory.size < self.min_train_samples:

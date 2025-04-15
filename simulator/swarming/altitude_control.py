@@ -5,17 +5,15 @@ This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
 
+from .pd_controller import PDController
 
-class AltitudeController:
+
+class AltitudeController(PDController):
     """
-    A simple PD controller for altitude control.
+    A PD controller for altitude control.
 
     Attributes
     ----------
-    kp : float
-        Proportional gain.
-    kd : float
-        Derivative gain.
     target_altitude : float
         Desired altitude in meters.
     """
@@ -33,8 +31,7 @@ class AltitudeController:
         target_altitude : float, optional
             Desired altitude in meters (default is 0.0).
         """
-        self.kp = kp
-        self.kd = kd
+        super().__init__(kp, kd)
         self.target_altitude = target_altitude
 
     def control(self, altitude: float, vspeed: float) -> float:
@@ -54,5 +51,15 @@ class AltitudeController:
             Control output (e.g., thrust or acceleration) to achieve the target altitude.
         """
         error = self.target_altitude - altitude
-        control_output = self.kp * error - self.kd * vspeed
-        return control_output
+        return super().control(error, vspeed)
+
+    def set_target(self, target_altitude: float):
+        """
+        Updates the target altitude.
+
+        Parameters
+        ----------
+        target_altitude : float
+            Desired altitude in meters.
+        """
+        self.target_altitude = target_altitude

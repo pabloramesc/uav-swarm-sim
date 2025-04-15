@@ -1,1 +1,1 @@
-from .multidrone_evsm_simulator import MultiDroneEVSMSimulator
+from .multidrone_simulator_evsm import MultiDroneSimulatorEVSM
