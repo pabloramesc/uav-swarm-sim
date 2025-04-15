@@ -100,7 +100,7 @@ class MultiDroneViewer:
 
     def update(
         self,
-        force: bool = False,
+        force_render: bool = False,
         verbose: bool = False,
     ) -> None:
         """
@@ -111,12 +111,12 @@ class MultiDroneViewer:
 
         Parameters
         ----------
-        force : bool, optional
+        force_render : bool, optional
             If True, forces rendering regardless of constraints (default is False).
         verbose : bool, optional
             If True, prints real-time and simulation-time statistics (default is False).
         """
-        if not (force or self._need_render()):
+        if not (force_render or self._need_render()):
             return
 
         self._plot_tx_heatmap()

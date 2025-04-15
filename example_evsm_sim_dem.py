@@ -33,4 +33,4 @@ gui = MultiDroneViewer(sim, is_3d=True, aspect_ratio="auto", plot_regions_3d=Fal
 
 while True:
     sim.update()
-    gui.update(force=False, verbose=True)
+    gui.update(force_render=False, verbose=True)
