@@ -2,7 +2,7 @@ import numpy as np
 from numba import njit
 
 
-def calculate_signal_strength(
+def signal_strength(
     tx_positions: np.ndarray,
     rx_positions: np.ndarray,
     f: float = 10.0,
@@ -37,7 +37,7 @@ def calculate_signal_strength(
         - "total": Total received power from all transmitters.
         - "max": Maximum received power from a single transmitter.
     """
-    rx_power = _calculate_rx_powers(tx_positions, rx_positions, f, n, tx_power)
+    rx_power = _signal_strength_numba(tx_positions, rx_positions, f, n, tx_power)
 
     if mode == "total":
         # Compute received power in linear scale (mW)
@@ -100,9 +100,7 @@ def signal_strength_map(
     grid_points = np.stack([x_grid.ravel(), y_grid.ravel(), z_grid.ravel()], axis=-1)
 
     # Calculate received power at grid points
-    rx_power = calculate_signal_strength(
-        tx_positions, grid_points, f, n, tx_power, mode
-    )
+    rx_power = signal_strength(tx_positions, grid_points, f, n, tx_power, mode)
 
     # Reshape to grid shape
     rx_power_map = rx_power.reshape(ys.size, xs.size)
@@ -111,7 +109,7 @@ def signal_strength_map(
 
 
 @njit(cache=True)
-def _calculate_rx_powers(
+def _signal_strength_numba(
     tx_positions: np.ndarray,
     rx_positions: np.ndarray,
     f: float = 10.0,

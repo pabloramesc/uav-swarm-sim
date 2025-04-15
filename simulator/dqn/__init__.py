@@ -6,6 +6,7 @@ https://opensource.org/licenses/MIT
 """
 
 from .dqn_agent import DQNAgent
+from .experiences import Experience, ExperiencesBatch
 from .exploration_policies import (
     BoltzmannPolicy,
     EpsilonGreedyPolicy,

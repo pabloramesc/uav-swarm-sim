@@ -11,7 +11,7 @@ import keras.api as kr
 
 from ..environment import Environment
 from ..math.distances import relative_distances
-from ..math.path_loss_model import calculate_signal_strength
+from ..math.path_loss_model import signal_strength
 
 
 class DQNS:
@@ -71,7 +71,7 @@ class DQNS:
         is_visible = neighbor_distances < self.sense_radius
         self.visible_neighbors = neighbors[is_visible]
 
-        self.frame = self.frame()
+        self.frame = self.state_frame()
 
     def cells_positions(self) -> np.ndarray:
         """
@@ -129,7 +129,7 @@ class DQNS:
         flat_cell_positions = self.cell_positions.reshape(-1, 2)
 
         # Compute the signal strength map for the visible neighbors
-        signal_map = calculate_signal_strength(self.visible_neighbors, flat_cell_positions)
+        signal_map = signal_strength(self.visible_neighbors, flat_cell_positions)
         signal_map = 10 ** (signal_map / 10)  # Convert dBm to Watts
 
         # Reshape the signal map back to the grid shape
@@ -141,7 +141,7 @@ class DQNS:
 
         return heatmap
 
-    def neighbor_matrix(self) -> np.ndarray:
+    def neighbors_matrix(self) -> np.ndarray:
         """
         Generate a binary matrix indicating the presence of visible neighbors in each cell.
 
@@ -159,7 +159,7 @@ class DQNS:
 
         return matrix
 
-    def frame(self) -> np.ndarray:
+    def state_frame(self) -> np.ndarray:
         """
         Generate a frame combining the signal matrix and the environment matrix.
 
@@ -208,44 +208,4 @@ class DQNS:
 
         return self.position + delta_position
 
-    @staticmethod
-    def build_keras_model(num_cells: int = 100, num_actions: int = 9) -> kr.Model:
-        """
-        Build a Keras model for the DQNS (Deep Q-Learning Swarming).
-
-        The model processes the state input and outputs Q-values for each action.
-
-        Parameters
-        ----------
-        num_cells : int, optional
-            The number of cells in the sensing grid (default is 100).
-        num_actions : int, optional
-            The number of possible actions (default is 9).
-
-        Returns
-        -------
-        keras.api._v2.keras.Model
-            The compiled Keras model.
-        """
-        state_shape = (num_cells, num_cells, 2)
-
-        model = kr.models.Sequential(
-            [
-                kr.layers.InputLayer(shape=state_shape, dtype="uint8"),
-                kr.layers.Rescaling(1.0 / 255.0),
-                kr.layers.Conv2D(32, (8, 8), strides=(4, 4), activation="relu"),
-                kr.layers.Conv2D(64, (4, 4), strides=(2, 2), activation="relu"),
-                kr.layers.Conv2D(64, (3, 3), strides=(1, 1), activation="relu"),
-                kr.layers.Flatten(),
-                kr.layers.Dense(512, activation="relu"),
-                kr.layers.Dense(num_actions, activation="linear"),
-            ]
-        )
-
-        model.compile(
-            optimizer=kr.optimizers.Adam(learning_rate=0.00025),
-            loss=kr.losses.Huber(delta=1.0),
-            metrics=["accuracy"],
-        )
-
-        return model
+    

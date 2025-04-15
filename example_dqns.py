@@ -34,7 +34,7 @@ dqns.update(position=uav_position, neighbors=neighbors)
 
 # Generate matrices
 environment_matrix = dqns.obstacles_matrix()
-neighbor_matrix = dqns.neighbor_matrix()
+neighbor_matrix = dqns.neighbors_matrix()
 signal_matrix = dqns.signal_matrix()
 
 # Plot the matrices and the real layout

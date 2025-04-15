@@ -18,7 +18,7 @@ from simulator.environment import (
 )
 from simulator.swarming import EVSMConfig, EVSMPositionController
 from simulator.math.path_loss_model import (
-    calculate_signal_strength,
+    signal_strength,
     signal_strength_map,
 )
 
@@ -260,7 +260,7 @@ class MultiDroneEVSMSimulator:
         np.ndarray
             A (N,) array of signal strength values in dBm at the given positions.
         """
-        return calculate_signal_strength(
+        return signal_strength(
             self.drone_positions, positions, f=2.4e3, mode="max"
         )
 
