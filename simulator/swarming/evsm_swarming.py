@@ -64,6 +64,7 @@ class EVSM:
         self.sweep_angle: SweepAngle = None
 
         self.last_update_time: float = None
+        self.min_update_period = 1.0
         self.exploration_force: np.ndarray = None
 
     @property
@@ -140,10 +141,10 @@ class EVSM:
         return control_force + damping_force
 
     def _needs_update(self, time: float) -> bool:
-        elapsed_time: float = None
-        if time is not None and self.last_update_time is not None:
-            elapsed_time = time - self.last_update_time
-        return elapsed_time is None or elapsed_time > 1.0
+        if time is None or self.last_update_time is None:
+            return True
+        elapsed_time = time - self.last_update_time
+        return elapsed_time > self.min_update_period
 
     def _limit_force(self, force: np.ndarray) -> np.ndarray:
         force_mag = np.linalg.norm(force)

@@ -13,7 +13,7 @@ from simulator.environment import Environment
 
 from .altitude_control import AltitudeController
 from .base_position_control import PositionController, PositionControllerConfig
-from .evsm_swarming import EVSM
+from ..swarming.evsm_swarming import EVSM
 
 
 @dataclass
@@ -24,9 +24,11 @@ class EVSMConfig(PositionControllerConfig):
     Attributes
     ----------
     separation_distance : float
-        Desired separation distance between agents in meters (default is 50.0).
+        Desired separation distance between agents in meters
+        (default is 50.0).
     obstacle_distance : float
-        Minimum distance to obstacles for avoidance in meters (default is 10.0).
+        Minimum distance to obstacles for avoidance in meters
+        (default is 10.0).
     agent_mass : float
         Mass of the agent in kilograms (default is 1.0).
     max_acceleration : float
@@ -42,7 +44,7 @@ class EVSMConfig(PositionControllerConfig):
     agent_mass: float = 1.0  # simple equivalence between force and acceleration
     max_acceleration: float = 10.0  # 1 g aprox. 9.81 m/s^2
     target_velocity: float = 15.0  # between 5-25 m/S
-    target_altitude: float = 100.0  # in meters
+    target_height: float = 100.0  # in meters (AGL - Above Ground Level)
     ln_rate: float = 1.0
 
 
@@ -68,7 +70,8 @@ class EVSMPositionController(PositionController):
         Parameters
         ----------
         config : EVSMConfig
-            Configuration object containing parameters for the EVSM and altitude controllers.
+            Configuration object containing parameters for the EVSM and
+            altitude controllers.
         env : Environment
             The simulation environment.
         """
@@ -110,9 +113,11 @@ class EVSMPositionController(PositionController):
         Parameters
         ----------
         state : np.ndarray
-            A (6,) array representing the agent's state [px, py, pz, vx, vy, vz].
+            A (6,) array representing the agent's state
+            [px, py, pz, vx, vy, vz].
         neighbor_states : np.ndarray
-            A (N, 6) array representing the states [px, py, pz, vx, vy, vz] of N neighbors.
+            A (N, 6) array representing the states [px, py, pz, vx, vy, vz]
+            of N neighbors.
         neighbor_states : np.ndarray
             A (N,) array with the IDs of the N neighbors.
         time : float, optional
@@ -126,9 +131,9 @@ class EVSMPositionController(PositionController):
         force_evsm_update = False
         if not np.array_equal(neighbor_ids, self.neighbor_ids):
             force_evsm_update = True
-            
+
         super().update(state, neighbor_states, neighbor_ids, time)
-        
+
         self._update_natural_length(time)
 
         control = np.zeros(3)
@@ -143,16 +148,17 @@ class EVSMPositionController(PositionController):
         )
 
         # Vertical control by altitude hold
-        altitude = state[2] - self.env.get_elevation(state[0:2])
+        target_altitude = self.env.get_elevation(state[0:2]) + self.config.target_height
         control[2] = self.altitude_hold.control(
-            altitude=altitude, vspeed=state[5]
+            target_altitude=target_altitude, altitude=state[2], vspeed=state[5]
         )
 
         return control
 
     def _update_natural_length(self, time: float) -> None:
         """
-        Updates the natural length of the EVSM algorithm based on the rate of change.
+        Updates the natural length of the EVSM algorithm based on the rate of
+        change.
         """
         self.ln = min(self.max_ln, self.min_ln + self.ln_rate * time)
         self.evsm.set_natural_length(self.ln)

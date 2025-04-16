@@ -7,8 +7,6 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-import keras.api as kr
-
 from ..environment import Environment
 from ..math.distances import relative_distances
 from ..math.path_loss_model import signal_strength
@@ -60,9 +58,9 @@ class DQNS:
         Parameters
         ----------
         position : np.ndarray
-            The current position of the drone as a 2D coordinate.
+            A (2,) array with the current horizontal position of the drone.
         neighbors : np.ndarray
-            The positions of neighboring drones as a 2D array.
+            A (N, 2) array with the horizontal positions of the neighbors.
         """
         self.position = position
         self.cell_positions = self.cells_positions()
@@ -80,7 +78,8 @@ class DQNS:
         Returns
         -------
         np.ndarray
-            An array of shape (num_cells, num_cells, 2) containing the positions of each cell.
+            An array of shape (num_cells, num_cells, 2) containing the
+            positions of each cell.
         """
         dx = np.linspace(-self.sense_radius, +self.sense_radius, self.num_cells)
         dy = np.linspace(-self.sense_radius, +self.sense_radius, self.num_cells)
@@ -91,12 +90,14 @@ class DQNS:
 
     def obstacles_matrix(self) -> np.ndarray:
         """
-        Generates a binary matrix indicating whether each cell is inside an obstacle boundary.
+        Generates a binary matrix indicating whether each cell is inside an
+        obstacle boundary.
 
         Returns
         -------
         np.ndarray
-            A binary matrix of shape (num_cells, num_cells) with 1.0 for cells inside obstacles and 0.0 otherwise.
+            A binary matrix of shape (num_cells, num_cells) with 1.0 for cells
+            inside obstacles and 0.0 otherwise.
         """
         matrix = np.zeros((self.num_cells, self.num_cells))
         if self.env.boundary is not None:
@@ -123,7 +124,8 @@ class DQNS:
         Returns
         -------
         np.ndarray
-            A heatmap matrix of shape (num_cells, num_cells) with values normalized between 0 and 1.
+            A heatmap matrix of shape (num_cells, num_cells) with values
+            normalized between 0 and 1.
         """
         # Flatten the cell positions for easier processing
         flat_cell_positions = self.cell_positions.reshape(-1, 2)
@@ -143,12 +145,14 @@ class DQNS:
 
     def neighbors_matrix(self) -> np.ndarray:
         """
-        Generate a binary matrix indicating the presence of visible neighbors in each cell.
+        Generate a binary matrix indicating the presence of visible neighbors
+        in each cell.
 
         Returns
         -------
         np.ndarray
-            A binary matrix of shape (num_cells, num_cells) with 1.0 for cells containing neighbors and 0.0 otherwise.
+            A binary matrix of shape (num_cells, num_cells) with 1.0 for cells
+            containing neighbors and 0.0 otherwise.
         """
         indices = (
             (self.visible_neighbors - self.cell_positions[0, 0]) // self.cell_size
@@ -161,15 +165,17 @@ class DQNS:
 
     def state_frame(self) -> np.ndarray:
         """
-        Generate a frame combining the signal matrix and the environment matrix.
+        Generate a frame combining the signal matrix and the environment
+        matrix.
 
-        The frame is a 3D array where the first channel represents the signal matrix
-        and the second channel represents the environment matrix.
+        The frame is a 3D array where the first channel represents the signal
+        matrix and the second channel represents the environment matrix.
 
         Returns
         -------
         np.ndarray
-            A 3D array of shape (num_cells, num_cells, 2) with values scaled to 0-255.
+            A 3D array of shape (num_cells, num_cells, 2) with values scaled
+            to 0-255.
         """
         neighbors_matrix = self.signal_matrix()
         obstacles_matrix = self.obstacles_matrix()
@@ -184,7 +190,8 @@ class DQNS:
         Parameters
         ----------
         action : int
-            The action index. Action 0 corresponds to staying in the current position.
+            The action index. Action 0 corresponds to staying in the current
+            position.
 
         Returns
         -------
@@ -203,9 +210,9 @@ class DQNS:
             return self.position
 
         num_quads = self.num_actions - 1
-        angle = 2 * np.pi * (action - 1) / num_quads  # Divide the quadrant into equal angles
+        angle = (
+            2 * np.pi * (action - 1) / num_quads
+        )  # Divide the quadrant into equal angles
         delta_position = self.cell_size * np.array([np.cos(angle), np.sin(angle)])
 
         return self.position + delta_position
-
-    

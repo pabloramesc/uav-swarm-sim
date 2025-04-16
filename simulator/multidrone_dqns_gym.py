@@ -21,6 +21,7 @@ class MultidroneGymDQNS:
         self.drones = []
         for id in range(self.num_drones):
             drone = Drone(id, self.env, )
+            self.drones.append(drone)
         
         self.drones_states = np.zeros((self.num_drones, 6)) # px, py, pz, vx, vy, vz
         
