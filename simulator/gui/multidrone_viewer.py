@@ -93,9 +93,9 @@ class MultiDroneViewer:
         self.ax.clear()
         self._reset_timers()
         self._calculate_axis_limits()
-        self._configure_axis()
         self._plot_elevation_map()
         self._initiate_plots()
+        self._configure_axis()
         plt.pause(0.01)
 
     def update(

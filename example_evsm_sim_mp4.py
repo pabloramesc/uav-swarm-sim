@@ -33,11 +33,11 @@ p0 = grid_positions(num_drones, origin=[-50.0, -50.0], space=5.0, altitude=0.0)
 sim.initialize(positions=p0)
 
 # Inicializar visualizador
-gui = MultiDroneViewer(sim)
+gui = MultiDroneViewer(sim, fig_size=(12, 6))
 
 # Configuración para exportar a MP4
 output_filename = "evsm_simulation.mp4"
-fps = 30
+fps = 10
 duration = 120.0  # Duración del video en segundos
 num_frames = int(fps * duration)
 

@@ -155,7 +155,7 @@ class ElevationMap:
         surf = ax.plot_surface(
             lon_grid,
             lat_grid,
-            self.elevation_data,
+            np.flipud(self.elevation_data),
             cmap="terrain",
             edgecolor="none",
             linewidth=0,
