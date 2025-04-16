@@ -1,0 +1,100 @@
+"""
+Copyright (c) 2025 Pablo Ramirez Escudero
+
+This software is released under the MIT License.
+https://opensource.org/licenses/MIT
+"""
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+from simulator.environment import CircularObstacle, Environment, RectangularBoundary
+from simulator.swarming.dqns_swarming import DQNS
+
+# Define the environment
+xlim = (-100.0, +100.0)
+ylim = (-100.0, +100.0)
+env = Environment(
+    boundary=RectangularBoundary((-90.0, -90.0), (+90.0, +90.0)),
+    obstacles=[
+        CircularObstacle(center=xy, radius=10.0)
+        for xy in np.random.uniform((-120.0, -120.0), (+120.0, +120.0), (5, 2))
+    ],
+)
+
+# Initialize DQNS
+dqns = DQNS(env, num_cells=100, sense_radius=100.0)
+
+# Define UAV position and neighbors
+uav_position = np.array([0.0, 0.0])
+neighbors = np.random.uniform((-120.0, -120.0), (+120.0, +120.0), (10, 2))
+
+# Update DQNS
+dqns.update(position=uav_position, neighbors=neighbors)
+
+# Generate matrices
+environment_matrix = dqns.obstacles_matrix()
+neighbor_matrix = dqns.neighbors_matrix()
+signal_matrix = dqns.signal_matrix()
+
+# Plot the matrices and the real layout
+fig, axes = plt.subplots(2, 2)
+
+# Real Layout
+axes[0, 0].set_title("Real Layout")
+axes[0, 0].set_xlim((-120.0, +120.0))
+axes[0, 0].set_ylim((-120.0, +120.0))
+axes[0, 0].set_aspect("equal", adjustable="box")
+axes[0, 0].set_xlabel("X")
+axes[0, 0].set_ylabel("Y")
+
+# Plot boundary
+rect = plt.Rectangle(
+    (env.boundary.bottom_left[0], env.boundary.bottom_left[1]),
+    env.boundary.top_right[0] - env.boundary.bottom_left[0],
+    env.boundary.top_right[1] - env.boundary.bottom_left[1],
+    edgecolor="red",
+    facecolor="none",
+    linewidth=2,
+)
+axes[0, 0].add_artist(rect)
+
+# Plot sense area
+circle = plt.Circle(uav_position, dqns.sense_radius, color="red", alpha=0.1)
+axes[0, 0].add_artist(circle)
+
+# Plot obstacles
+for obstacle in env.obstacles:
+    circle = plt.Circle(obstacle.center, obstacle.radius, color="red", alpha=0.5)
+    axes[0, 0].add_artist(circle)
+
+# Plot UAV position
+axes[0, 0].scatter(uav_position[0], uav_position[1], color="blue", label="UAV", zorder=5)
+
+# Plot neighbors
+axes[0, 0].scatter(neighbors[:, 0], neighbors[:, 1], color="green", label="Neighbors", zorder=5)
+
+axes[0, 0].legend()
+axes[0, 0].grid()
+
+# Environment Matrix
+axes[0, 1].imshow(environment_matrix, origin="lower")
+axes[0, 1].set_title("Environment Matrix")
+axes[0, 1].set_xlabel("X")
+axes[0, 1].set_ylabel("Y")
+
+# Neighbor Matrix
+axes[1, 0].imshow(neighbor_matrix, origin="lower")
+axes[1, 0].set_title("Neighbor Matrix")
+axes[1, 0].set_xlabel("X")
+axes[1, 0].set_ylabel("Y")
+
+# Signal Matrix
+axes[1, 1].imshow(signal_matrix, origin="lower")
+axes[1, 1].set_title("Signal Matrix")
+axes[1, 1].set_xlabel("X")
+axes[1, 1].set_ylabel("Y")
+
+# Adjust layout and show the plot
+plt.tight_layout()
+plt.show()

@@ -5,9 +5,9 @@ This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
 
-from simulator.gui import MultiDroneViewer
+from simulator.gui import MultiDroneViewerEVSM
 from simulator.multidrone_simulator_evsm import MultiDroneSimulatorEVSM
-from simulator.swarming import EVSMConfig
+from simulator.position_control import EVSMConfig
 from simulator.utils.mobility_helper import grid_positions
 
 dt = 0.1
@@ -18,7 +18,7 @@ config = EVSMConfig(
     obstacle_distance=10.0,
     max_acceleration=10.0,
     target_velocity=15.0,
-    target_altitude=10.0,
+    target_height=10.0,
 )
 sim = MultiDroneSimulatorEVSM(num_drones, dt, config=config)
 sim.environment.set_rectangular_boundary([-200.0, -100.0], [+200.0, +100.0])
@@ -28,7 +28,7 @@ sim.environment.add_rectangular_obstacle([100.0, -50.0], [150.0, 0.0])
 p0 = grid_positions(num_drones, origin=[-50.0, -50.0], space=5.0, altitude=0.0)
 sim.initialize(positions=p0)
 
-gui = MultiDroneViewer(sim, is_3d=False)
+gui = MultiDroneViewerEVSM(sim, is_3d=False)
 
 while True:
     sim.update()

@@ -7,7 +7,7 @@ https://opensource.org/licenses/MIT
 
 from matplotlib.animation import FFMpegWriter, FuncAnimation
 
-from simulator.gui.multidrone_viewer import MultiDroneViewer
+from simulator.gui.multidrone_viewer_evsm import MultiDroneViewerEVSM
 from simulator.multidrone_simulator_evsm import MultiDroneSimulatorEVSM
 from simulator.swarming import EVSMConfig
 from simulator.utils.mobility_helper import grid_positions
@@ -33,7 +33,7 @@ p0 = grid_positions(num_drones, origin=[-50.0, -50.0], space=5.0, altitude=0.0)
 sim.initialize(positions=p0)
 
 # Inicializar visualizador
-gui = MultiDroneViewer(sim, fig_size=(12, 6))
+gui = MultiDroneViewerEVSM(sim, fig_size=(12, 6))
 
 # Configuración para exportar a MP4
 output_filename = "evsm_simulation.mp4"

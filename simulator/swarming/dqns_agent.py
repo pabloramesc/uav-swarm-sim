@@ -4,11 +4,13 @@ Copyright (c) 2025 Pablo Ramirez Escudero
 This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
+import os
+from datetime import datetime
 
 import numpy as np
 import keras.api as kr
 
-from dqn import DQNAgent, EpsilonGreedyPolicy, ExperiencesBatch
+from ..dqn import DQNAgent, EpsilonGreedyPolicy, ExperiencesBatch
 
 
 class DQNSAgent:
@@ -18,7 +20,9 @@ class DQNSAgent:
     Manages the training and inference of a DQN-based agent for controlling a swarm of drones.
     """
 
-    def __init__(self, num_drones: int, training_mode: bool = False, model_path: str = None):
+    def __init__(
+        self, num_drones: int, training_mode: bool = False, model_path: str = None
+    ):
         """
         Initialize the DQNSAgent.
 
@@ -50,20 +54,25 @@ class DQNSAgent:
         if not training_mode and model_path is None:
             raise Exception("Model path must be provided in no training mode.")
         self.training_mode = training_mode
+        self.model_path = model_path
 
-        if self.training_mode and model_path is None:
-            model = self.build_keras_model()
+        if self.model_path is None:
             timestamp = datetime.now().strftime("%y%m%d-%H%M%S")
             self.model_path = f"dqns-model-{timestamp}.keras"
+            
+        if not os.path.exists(self.model_path):
+            model = self.build_keras_model()
             kr.models.save_model(model, self.model_path)
 
         policy = EpsilonGreedyPolicy(
             epsilon=1.0 if self.training_mode else 0.0,
             epsilon_min=0.1 if self.training_mode else 0.0,
+            epsilon_decay=1e-4 if self.training_mode else 0.0,
+            decay_type="linear" if self.training_mode else "fixed",
         )
         self.dqn_agent = DQNAgent(
             model=None,
-            batch_size=256,
+            batch_size=64,
             gamma=0.95,
             policy=policy,
             memory_size=100_000,
@@ -72,13 +81,16 @@ class DQNSAgent:
             file_name=self.model_path,
             verbose=self.training_mode,
         )
-        self.dqn_agent.load_model()
+        self.dqn_agent.load_model(self.model_path, compile=True)
+        
+        self.min_train_samples = 0
 
     def build_keras_model(self) -> kr.Model:
         """
         Build a Keras model for the DQNS (Deep Q-Learning Swarming).
 
-        The model processes the state input and outputs Q-values for each action.
+        The model processes the state input and outputs Q-values for each
+        action.
 
         Returns
         -------
@@ -107,14 +119,15 @@ class DQNSAgent:
 
         return model
 
-    def act(self, states: np.ndarray) -> None:
+    def act(self, states: np.ndarray) -> np.ndarray:
         """
         Perform actions based on the current states.
 
         Parameters
         ----------
         states : np.ndarray
-            The current states of the drones with shape (num_drones, num_cells, num_cells, 2).
+            The current states of the drones with shape (num_drones, num_cells,
+            num_cells, 2).
 
         Raises
         ------
@@ -122,24 +135,47 @@ class DQNSAgent:
             If the states are not valid.
         """
         self._check_states(states)
-        self.dqn_agent.act_batch(states)
-        
-    def add_experiences(self, batch: ExperiencesBatch) -> None:
+        actions = self.dqn_agent.act_batch(states)
+        return actions
+
+    def add_experiences(
+        self,
+        states: np.ndarray,
+        next_states: np.ndarray,
+        actions: np.ndarray,
+        rewards: np.ndarray,
+        dones: np.ndarray,
+    ) -> None:
         """
         Add a batch of experiences to the agent's memory.
 
         Parameters
         ----------
-        batch : ExperiencesBatch
-            A batch of experiences containing states, actions, rewards, next states, and done flags.
+        states : np.ndarray
+            Array of states.
+        next_states : np.ndarray
+            Array of next states.
+        actions : np.ndarray
+            Array of actions taken.
+        rewards : np.ndarray
+            Array of rewards received.
+        dones : np.ndarray
+            Array of done flags indicating episode termination.
 
         Raises
         ------
         ValueError
-            If the states or next states in the batch are not valid.
+            If the states or next states are not valid.
         """
-        self._check_states(batch.states)
-        self._check_states(batch.next_states)
+        self._check_states(states)
+        self._check_states(next_states)
+        batch = ExperiencesBatch(
+            states=states,
+            next_states=next_states,
+            actions=actions,
+            rewards=rewards,
+            dones=dones,
+        )
         self.dqn_agent.update_memory_batch(batch)
 
     def train(self) -> dict:
@@ -172,9 +208,10 @@ class DQNSAgent:
         Raises
         ------
         ValueError
-            If the states are not of dtype uint8 or do not match the expected shape.
+            If the states are not of dtype uint8 or do not match the expected
+            shape.
         """
-        if not states.dtype(np.uint8):
+        if not states.dtype == np.uint8:
             raise ValueError("States must be an uint8 numpy array.")
         if states.shape != self.states_shape:
             raise ValueError(f"States shape must be {self.states_shape}")

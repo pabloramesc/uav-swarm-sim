@@ -8,7 +8,7 @@ https://opensource.org/licenses/MIT
 import numpy as np
 
 from simulator.old.multidrone_simulator_parallel import MultiDroneSimulator
-from simulator.gui.multidrone_viewer import MultiDroneViewer
+from simulator.gui.multidrone_viewer_evsm import MultiDroneViewerEVSM
 
 if __name__ == "__main__":
 
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     sim.add_rectangular_obstacle((100.0, -50.0), (150.0, 0.0))
     sim.initialize_grid_positions(origin=[-50.0, -50.0], space=5.0)
 
-    gui = MultiDroneViewer(sim, xlim * 1.1, ylim * 1.1)
+    gui = MultiDroneViewerEVSM(sim, xlim * 1.1, ylim * 1.1)
 
     sim.launch_simulation()
 

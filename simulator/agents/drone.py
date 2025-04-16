@@ -7,7 +7,7 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 from ..environment import Environment
-from ..swarming import PositionController
+from ..position_control import PositionController
 from .agent import Agent
 
 
@@ -50,8 +50,8 @@ class Drone(Agent):
         """
         super().__init__(id=id, type="drone", env=env)
         self.position_controller = position_controller
-        self.neighbor_ids = np.zeros((0,), dtype=int)
-        self.neighbor_states = np.zeros((0, 6))
+        self.neighbor_ids = np.zeros((0,), dtype=np.int32)
+        self.neighbor_states = np.zeros((0, 6), dtype=np.float32)
 
         self.mass = 1.0  # 1 kg for simple equivalence between force and acceleration
         self.max_acc = 10.0  # aprox. 1 g = 9.81 m/s^2

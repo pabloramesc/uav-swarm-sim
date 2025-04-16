@@ -1,9 +1,11 @@
 from dataclasses import dataclass
+
 import numpy as np
-from .base_position_control import PositionController, PositionControllerConfig
+
 from ..environment import Environment
 from ..swarming.dqns_swarming import DQNS
 from .altitude_control import AltitudeController
+from .base_position_control import PositionController, PositionControllerConfig
 from .horizontal_position_control import HorizontalPositionController
 
 
@@ -23,8 +25,14 @@ class DQNSPostionController(PositionController):
         self.config = config
 
         self.dqns = DQNS(env=self.env)
-        self.altitude_hold = AltitudeController()
-        self.position_controller = HorizontalPositionController()
+        self.altitude_hold = AltitudeController(
+            kp=config.max_acceleration / config.target_height,
+            kd=config.max_acceleration / config.target_velocity,
+        )
+        self.position_controller = HorizontalPositionController(
+            kp=config.max_acceleration / config.visible_distance,
+            kd=config.max_acceleration / config.target_velocity,
+        )
 
         self.last_update_time: float = None
         self.min_update_period = 1.0
@@ -64,20 +72,20 @@ class DQNSPostionController(PositionController):
             self.dqns.update(state[0:2], neighbor_states[:, 0:2])
 
         control = np.zeros(3)
-        
+
         # Horizontal control using PD (Proportional Derivative)
         control[0:2] = self.position_controller.control(
             target_position=self.target_position,
             position=state[0:2],
             velocity=state[3:5],
         )
-        
+
         # Vertical control by altitude hold
         target_altitude = self.env.get_elevation(state[0:2]) + self.config.target_height
         control[2] = self.altitude_hold.control(
             target_altitude=target_altitude, altitude=state[2], vspeed=state[5]
         )
-        
+
         return control
 
     def get_frame(self) -> np.ndarray:

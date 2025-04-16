@@ -6,14 +6,14 @@
 """
 
 from simulator.multidrone_simulator_evsm import MultiDroneSimulatorEVSM
-from simulator.gui.multidrone_viewer import MultiDroneViewer
+from simulator.gui.multidrone_viewer_evsm import MultiDroneViewerEVSM
 
 dt = 0.01
 num_drones = 20
 field_size = 1000.0
 
 sim = MultiDroneSimulatorEVSM(num_drones, dt)
-gui = MultiDroneViewer(num_drones, field_size)
+gui = MultiDroneViewerEVSM(num_drones, field_size)
 
 sim.set_grid_positions()
 

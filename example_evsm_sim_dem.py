@@ -7,7 +7,7 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from simulator.gui import MultiDroneViewer
+from simulator.gui import MultiDroneViewerEVSM
 from simulator.multidrone_simulator_evsm import MultiDroneSimulatorEVSM
 from simulator.swarming import EVSMConfig
 from simulator.utils.mobility_helper import grid_positions
@@ -29,7 +29,7 @@ sim.environment.add_rectangular_obstacle([0e3, 6e3], [5e3, 8e3])
 p0 = grid_positions(num_drones, origin=[4e3, 4e3], space=5.0, altitude=0.0)
 sim.initialize(positions=p0)
 
-gui = MultiDroneViewer(sim, is_3d=True, aspect_ratio="auto", plot_regions_3d=False)
+gui = MultiDroneViewerEVSM(sim, is_3d=True, aspect_ratio="auto", plot_regions_3d=False)
 
 while True:
     sim.update()

@@ -94,10 +94,9 @@ class EVSMPositionController(PositionController):
         )
 
         self.altitude_hold = AltitudeController(
-            kp=config.max_acceleration / config.target_altitude,
+            kp=config.max_acceleration / config.target_height,
             # kd=config.agent_mass / 1.0,
             kd=config.max_acceleration / config.target_velocity,
-            target_altitude=config.target_altitude,
         )
 
     def update(
