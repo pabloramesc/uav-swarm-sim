@@ -6,9 +6,9 @@ https://opensource.org/licenses/MIT
 """
 
 import numpy as np
-from ..environment import Environment
-from ..position_control import PositionController
-from .agent import Agent
+from simulator.environment.environment import Environment
+from simulator.position_control.base_position_control import PositionController
+from simulator.agents.agent import Agent
 
 
 class Drone(Agent):

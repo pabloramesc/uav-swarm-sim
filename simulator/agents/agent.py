@@ -9,7 +9,7 @@ from typing import Literal
 
 import numpy as np
 
-from simulator.environment import Environment
+from simulator.environment.environment import Environment
 
 AgentType = Literal["drone", "user", "gcs"]
 

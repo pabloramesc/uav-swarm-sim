@@ -5,9 +5,9 @@ This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
 
-from simulator.gui import MultiDroneViewerEVSM
+from simulator.gui.multidrone_viewer_evsm import MultiDroneViewerEVSM
 from simulator.multidrone_simulator_evsm import MultiDroneSimulatorEVSM
-from simulator.position_control import EVSMConfig
+from simulator.position_control.evsm_position_control import EVSMConfig
 from simulator.utils.mobility_helper import grid_positions
 
 dt = 0.1

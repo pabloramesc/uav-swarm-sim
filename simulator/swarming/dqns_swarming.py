@@ -7,9 +7,9 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from ..environment import Environment
-from ..math.distances import relative_distances
-from ..math.path_loss_model import signal_strength
+from simulator.environment import Environment
+from simulator.math.distances import relative_distances
+from simulator.math.path_loss_model import signal_strength
 
 
 class DQNS:

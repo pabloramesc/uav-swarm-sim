@@ -7,9 +7,8 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from ..environment import Environment
-
-from .agent import Agent
+from simulator.agents import Agent
+from simulator.environment import Environment
 
 
 class User(Agent):

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from simulator.environment import Environment
+from simulator.environment.environment import Environment
 
 from .altitude_control import AltitudeController
 from .base_position_control import PositionController, PositionControllerConfig

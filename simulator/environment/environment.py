@@ -8,17 +8,10 @@ https://opensource.org/licenses/MIT
 import numpy as np
 from numpy.typing import ArrayLike
 
-from .avoid_regions import (
-    Boundary,
-    CircularObstacle,
-    Obstacle,
-    PolygonalBoundary,
-    RectangularBoundary,
-    RectangularObstacle,
-    Region,
-)
 from .elevation_map import ElevationMap
 from .geo import enu2geo, geo2enu
+from .obstacles.boundaries import Boundary, PolygonalBoundary, RectangularBoundary
+from .obstacles.obstacles import CircularObstacle, Obstacle, RectangularObstacle
 
 
 class Environment:
@@ -62,9 +55,9 @@ class Environment:
         )
 
     @property
-    def avoid_regions(self) -> list[Region]:
+    def all_obstacles(self) -> list[Obstacle]:
         """
-        A list of all avoid regions, including the boundary and obstacles.
+        A list of all osbtacles, including the boundary.
         """
         return [self.boundary] + self.obstacles
 
@@ -188,8 +181,7 @@ class Environment:
         pos = np.atleast_2d(pos)  # Ensure pos is (N, 3)
         if self.boundary is None:
             raise ValueError("Boundary is not defined.")
-        inside = np.array([self.boundary.is_inside(p[0:2]) for p in pos])
-        return inside if len(inside) > 1 else inside[0]
+        return self.boundary.is_inside(pos[:, 0:2])
 
     def is_collision(self, pos: np.ndarray, check_altitude: bool = True) -> np.ndarray:
         """
@@ -211,11 +203,8 @@ class Environment:
         pos = np.atleast_2d(pos)  # Ensure pos is (N, 3)
 
         # Check collision with obstacles
-        obstacle_collisions = np.array(
-            [
-                any(obstacle.is_inside(p[0:2]) for obstacle in self.obstacles)
-                for p in pos
-            ]
+        obstacle_collisions = np.any(
+            [obstacle.is_inside(pos[:, 0:2]) for obstacle in self.obstacles]
         )
         collisions = obstacle_collisions
 

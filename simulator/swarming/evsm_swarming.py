@@ -7,8 +7,8 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from ..environment import Environment
-from ..math.angles import SweepAngle
+from simulator.environment.environment import Environment
+from simulator.math.angles import SweepAngle
 from .evsm_numba import (
     obstacles_force,
     control_force,
@@ -196,10 +196,10 @@ class EVSM:
         """
         Calculates distances and directions to avoidance regions.
         """
-        num_regions = len(self.env.avoid_regions)
+        num_regions = len(self.env.all_obstacles)
         distances = np.zeros((num_regions,))
         directions = np.zeros((num_regions, 2))
-        for i, region in enumerate(self.env.avoid_regions):
+        for i, region in enumerate(self.env.all_obstacles):
             distances[i] = region.distance(self.position)
             directions[i, :] = region.direction(self.position)
         return distances, directions
@@ -224,7 +224,7 @@ class EVSM:
         bool
             True if the robot is near an obstacle, False otherwise.
         """
-        for region in self.env.avoid_regions:
+        for region in self.env.all_obstacles:
             if region.distance(self.position) < self.d_obs:
                 return True
         return False

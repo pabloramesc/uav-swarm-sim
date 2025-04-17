@@ -19,7 +19,7 @@ from numpy.typing import ArrayLike
 
 from simulator.multidrone_simulator_evsm import MultiDroneSimulatorEVSM
 
-from ..math.path_loss_model import signal_strength, signal_strength_map
+from simulator.math.path_loss_model import signal_strength_map
 
 AspectRatios = Literal["auto", "equal"]
 

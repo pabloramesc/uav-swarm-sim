@@ -10,7 +10,7 @@ from datetime import datetime
 import numpy as np
 import keras.api as kr
 
-from ..dqn import DQNAgent, EpsilonGreedyPolicy, ExperiencesBatch
+from simulator.dqn import DQNAgent, EpsilonGreedyPolicy, ExperiencesBatch
 
 
 class DQNSAgent:
