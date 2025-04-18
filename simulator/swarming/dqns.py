@@ -5,6 +5,8 @@ This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
 
+from typing import Literal
+
 import numpy as np
 
 from simulator.environment import Environment
@@ -99,7 +101,7 @@ class DQNS:
             A binary matrix of shape (num_cells, num_cells) with 1.0 for cells
             inside obstacles and 0.0 otherwise.
         """
-        matrix = np.zeros((self.num_cells, self.num_cells))
+        matrix = np.zeros((self.num_cells, self.num_cells), dtype=np.float32)
         if self.env.boundary is not None:
             is_inside = np.array(
                 [
@@ -115,7 +117,7 @@ class DQNS:
             matrix += is_inside.reshape(self.num_cells, self.num_cells)
         return np.clip(matrix, 0, 1)  # Ensure values are binary (0.0 or 1.0)
 
-    def signal_matrix(self) -> np.ndarray:
+    def signal_matrix(self, units: Literal["watts", "dbm"] = "watts") -> np.ndarray:
         """
         Generate a heatmap matrix using the signal strength map.
 
@@ -131,17 +133,35 @@ class DQNS:
         flat_cell_positions = self.cell_positions.reshape(-1, 2)
 
         # Compute the signal strength map for the visible neighbors
-        signal_map = signal_strength(self.visible_neighbors, flat_cell_positions)
-        signal_map = 10 ** (signal_map / 10)  # Convert dBm to Watts
+        signal_map = signal_strength(
+            self.visible_neighbors, flat_cell_positions, f=2.4e3, mode="max"
+        )
+        if units == "watts":
+            signal_map = 10 ** (signal_map / 10)  # Convert dBm to Watts
 
         # Reshape the signal map back to the grid shape
         heatmap = signal_map.reshape(self.num_cells, self.num_cells)
 
         # Normalize the heatmap to values between 0 and 1
+        heatmap: np.ndarray = heatmap - heatmap.min()
         if np.max(heatmap) > 0.0:
             heatmap /= np.max(heatmap)
 
-        return heatmap
+        return heatmap.astype(np.float32)
+
+    def coverage_matrix(self, rx_sense: float = -80) -> np.ndarray:
+        # Flatten the cell positions for easier processing
+        flat_cell_positions = self.cell_positions.reshape(-1, 2)
+
+        # Compute the signal strength map for the visible neighbors
+        signal_map = signal_strength(
+            self.visible_neighbors, flat_cell_positions, f=2.4e3, mode="max"
+        )
+
+        # Reshape the signal map back to the grid shape
+        heatmap = signal_map.reshape(self.num_cells, self.num_cells)
+
+        return (heatmap > rx_sense).astype(np.float32)
 
     def neighbors_matrix(self) -> np.ndarray:
         """
@@ -156,9 +176,9 @@ class DQNS:
         """
         indices = (
             (self.visible_neighbors - self.cell_positions[0, 0]) // self.cell_size
-        ).astype(int)
+        ).astype(np.int32)
 
-        matrix = np.zeros((self.num_cells, self.num_cells))
+        matrix = np.zeros((self.num_cells, self.num_cells), dtype=np.float32)
         matrix[indices[:, 1], indices[:, 0]] = 1.0
 
         return matrix

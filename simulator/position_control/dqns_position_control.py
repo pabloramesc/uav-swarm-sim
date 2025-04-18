@@ -1,9 +1,17 @@
+"""
+Copyright (c) 2025 Pablo Ramirez Escudero
+
+This software is released under the MIT License.
+https://opensource.org/licenses/MIT
+"""
+
 from dataclasses import dataclass
 
 import numpy as np
 
-from ..environment import Environment
-from ..swarming.dqns_swarming import DQNS
+from simulator.environment import Environment
+from simulator.swarming.dqns import DQNS
+
 from .altitude_control import AltitudeController
 from .base_position_control import PositionController, PositionControllerConfig
 from .horizontal_position_control import HorizontalPositionController

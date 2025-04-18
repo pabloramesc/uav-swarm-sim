@@ -9,16 +9,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from simulator.environment import CircularObstacle, Environment, RectangularBoundary
-from simulator.swarming.dqns_swarming import DQNS
+from simulator.swarming.dqns import DQNS
 
 # Define the environment
-xlim = (-100.0, +100.0)
-ylim = (-100.0, +100.0)
+xlim = np.array([-200.0, +200.0])
+ylim = np.array([-200.0, +200.0])
 env = Environment(
-    boundary=RectangularBoundary((-90.0, -90.0), (+90.0, +90.0)),
+    boundary=RectangularBoundary(
+        (0.9 * xlim[0], 0.9 * ylim[0]), (0.9 * xlim[1], 0.9 * ylim[1])
+    ),
     obstacles=[
         CircularObstacle(center=xy, radius=10.0)
-        for xy in np.random.uniform((-120.0, -120.0), (+120.0, +120.0), (5, 2))
+        for xy in np.random.uniform((xlim[0], ylim[0]), (xlim[1], ylim[1]), (25, 2))
     ],
 )
 
@@ -27,7 +29,7 @@ dqns = DQNS(env, num_cells=100, sense_radius=100.0)
 
 # Define UAV position and neighbors
 uav_position = np.array([0.0, 0.0])
-neighbors = np.random.uniform((-120.0, -120.0), (+120.0, +120.0), (10, 2))
+neighbors = np.random.uniform((xlim[0], ylim[0]), (xlim[1], ylim[1]), (50, 2))
 
 # Update DQNS
 dqns.update(position=uav_position, neighbors=neighbors)
@@ -35,15 +37,15 @@ dqns.update(position=uav_position, neighbors=neighbors)
 # Generate matrices
 environment_matrix = dqns.obstacles_matrix()
 neighbor_matrix = dqns.neighbors_matrix()
-signal_matrix = dqns.signal_matrix()
+signal_matrix = dqns.signal_matrix(units="dbm")
 
 # Plot the matrices and the real layout
 fig, axes = plt.subplots(2, 2)
 
 # Real Layout
 axes[0, 0].set_title("Real Layout")
-axes[0, 0].set_xlim((-120.0, +120.0))
-axes[0, 0].set_ylim((-120.0, +120.0))
+axes[0, 0].set_xlim(1.1 * xlim)
+axes[0, 0].set_ylim(1.1 * ylim)
 axes[0, 0].set_aspect("equal", adjustable="box")
 axes[0, 0].set_xlabel("X")
 axes[0, 0].set_ylabel("Y")
@@ -69,10 +71,14 @@ for obstacle in env.obstacles:
     axes[0, 0].add_artist(circle)
 
 # Plot UAV position
-axes[0, 0].scatter(uav_position[0], uav_position[1], color="blue", label="UAV", zorder=5)
+axes[0, 0].scatter(
+    uav_position[0], uav_position[1], color="blue", label="UAV", zorder=5
+)
 
 # Plot neighbors
-axes[0, 0].scatter(neighbors[:, 0], neighbors[:, 1], color="green", label="Neighbors", zorder=5)
+axes[0, 0].scatter(
+    neighbors[:, 0], neighbors[:, 1], color="green", label="Neighbors", zorder=5
+)
 
 axes[0, 0].legend()
 axes[0, 0].grid()
