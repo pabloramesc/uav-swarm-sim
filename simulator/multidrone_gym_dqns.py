@@ -1,9 +1,11 @@
 import numpy as np
+
+from .agents.drone import Drone
 from .environment import Environment
-from .agents import Drone
-from .swarming import DQNSAgent
-from .position_control import DQNSPostionController, DQNSConfig, PositionController
 from .math.path_loss_model import signal_strength
+from .position_control.base_position_control import PositionController
+from .position_control.dqns_position_control import DQNSConfig, DQNSPostionController
+from .swarming.dqns_agent import DQNSAgent
 
 
 class MultidroneGymDQNS:
@@ -22,7 +24,7 @@ class MultidroneGymDQNS:
         self.time = 0.0
         self.step = 0
 
-        self.config = DQNSConfig()
+        self.config = DQNSConfig(num_cells=80)
 
         self.drones: list[Drone] = []
         for id in range(self.num_drones):
@@ -36,7 +38,7 @@ class MultidroneGymDQNS:
         self.initial_states = np.zeros((self.num_drones, 6), dtype=np.float32)
 
         self.dqns_agent = DQNSAgent(
-            self.num_drones, training_mode=True, model_path="dqns-model-01.keras"
+            num_drones=self.num_drones, num_cells=self.config.num_cells, training_mode=True, model_path="dqns-model-01.keras"
         )
         self.last_update_time: float = None
         self.prev_states: np.ndarray = None
@@ -63,15 +65,19 @@ class MultidroneGymDQNS:
             self._set_drone_states()
             self.initial_states = np.copy(self.drone_states)
 
+        for drone in self.drones:
+            indices = np.arange(self.num_drones)
+            indices = indices[indices != drone.id]
+            drone.set_neighbors(ids=indices, states=self.drone_states[indices])
+
     def update(self, dt: float = None) -> dict:
         dt = dt if dt is not None else self.dt
         self.time += dt
         self.step += 1
 
         for drone in self.drones:
-            indices = np.arange(self.num_drones)
-            indices = indices[indices != drone.id]
-            drone.set_neighbors(ids=indices, states=self.drone_states[indices])
+            drone.update(dt)
+        self._get_drone_states()
 
         states = np.zeros(self.dqns_agent.states_shape, dtype=np.uint8)
         for i, drone in enumerate(self.drones):
@@ -83,9 +89,6 @@ class MultidroneGymDQNS:
         for i, drone in enumerate(self.drones):
             dqns: DQNSPostionController = self._get_drone_position_controller(drone)
             dqns.set_target_position(actions[i])
-
-        for drone in self.drones:
-            drone.update(dt)
 
         rewards, dones = self.calculate_rewards_and_dones()
 
@@ -105,19 +108,19 @@ class MultidroneGymDQNS:
         return metrics
 
     def calculate_rewards_and_dones(self) -> tuple[np.ndarray, np.ndarray]:
-        global_score = self.area_coverage_ratio()**2
+        global_score = self.area_coverage_ratio() ** 2
         rewards = np.ones(self.num_drones, dtype=np.float32) * global_score
-        dones = np.zeros(self.num_drones, dtype=bool)
-        for i, drone in enumerate(self.drones):
-            inside = self.environment.is_inside(drone.position)
-            collision = self.environment.is_collision(
-                drone.position, check_altitude=False
-            )
-            terminated = (not inside) or collision
-            dones[i] = terminated
-            if terminated:
-                rewards[i] = -1.0
-                drone.state = self.initial_states[i]
+        
+        inside = self.environment.is_inside(self.drone_positions)
+        collision = self.environment.is_collision(
+            self.drone_positions, check_altitude=False
+        )
+        dones = ~inside | collision
+        
+        rewards[dones] = -1.0
+        self.drone_states[dones, :] = self.initial_states[dones, :]
+        self._set_drone_states()
+        
         return rewards, dones
 
     def area_coverage_ratio(
@@ -133,7 +136,9 @@ class MultidroneGymDQNS:
         eval_points[:, 2] = self.environment.get_elevation(eval_points[:, 0:2])
         in_area = self.environment.is_inside(
             eval_points
-        ) & ~self.environment.is_collision(eval_points)
+        ) & ~self.environment.is_collision(eval_points, check_altitude=False)
+        if not np.any(in_area):
+            return 0.0
         tx_power = signal_strength(
             self.drone_positions, eval_points[in_area], f=2.4e3, mode="max"
         )

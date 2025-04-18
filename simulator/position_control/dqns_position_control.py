@@ -19,6 +19,8 @@ from .horizontal_position_control import HorizontalPositionController
 
 @dataclass
 class DQNSConfig(PositionControllerConfig):
+    num_cells: int = 100
+    num_actions: int = 9
     visible_distance: float = 100.0  # in meters
     obstacle_distance: float = 10.0  # in meters
     agent_mass: float = 1.0  # simple equivalence between force and acceleration
@@ -32,7 +34,12 @@ class DQNSPostionController(PositionController):
         super().__init__(config, env)
         self.config = config
 
-        self.dqns = DQNS(env=self.env)
+        self.dqns = DQNS(
+            env=self.env,
+            sense_radius=config.visible_distance,
+            num_cells=config.num_cells,
+            num_actions=config.num_actions,
+        )
         self.altitude_hold = AltitudeController(
             kp=config.max_acceleration / config.target_height,
             kd=config.max_acceleration / config.target_velocity,

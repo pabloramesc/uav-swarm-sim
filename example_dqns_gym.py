@@ -6,12 +6,12 @@ https://opensource.org/licenses/MIT
 """
 
 import numpy as np
-from simulator.gui import MultiDroneViewerDQNS
+from simulator.gui.multidrone_viewer_dqns import MultiDroneViewerDQNS
 from simulator.multidrone_gym_dqns import MultidroneGymDQNS
 from simulator.utils.mobility_helper import grid_positions
 
 dt = 0.1
-num_drones = 50
+num_drones = 25
 
 size = 200.0
 
@@ -39,6 +39,9 @@ gui = MultiDroneViewerDQNS(sim, is_3d=False)
 while True:
     metrics = sim.update()
     gui.update(force_render=False, verbose=True)
+    
+    if metrics:
+        print(f"Train steps: {metrics["train_steps"]}")
 
     cr = sim.area_coverage_ratio()
     print(f"Area coverage ratio: {cr * 100:.2f} %")

@@ -13,7 +13,7 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.image import AxesImage
 from matplotlib.lines import Line2D
-from mpl_toolkits.mplot3d.art3d import Line3D, Line3DCollection, Poly3DCollection
+from mpl_toolkits.mplot3d.art3d import Line3D, Poly3DCollection
 from mpl_toolkits.mplot3d.axes3d import Axes3D
 from numpy.typing import ArrayLike
 

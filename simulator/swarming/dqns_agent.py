@@ -4,6 +4,7 @@ Copyright (c) 2025 Pablo Ramirez Escudero
 This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
+
 import os
 from datetime import datetime
 
@@ -21,7 +22,12 @@ class DQNSAgent:
     """
 
     def __init__(
-        self, num_drones: int, training_mode: bool = False, model_path: str = None
+        self,
+        num_drones: int,
+        num_cells: int = 100,
+        num_actions: int = 9,
+        training_mode: bool = False,
+        model_path: str = None,
     ):
         """
         Initialize the DQNSAgent.
@@ -45,9 +51,15 @@ class DQNSAgent:
         if num_drones <= 0:
             raise ValueError("The number of drones must be greater than 0")
         self.num_drones = num_drones
+        
+        if num_cells < 10:
+            raise ValueError("The number of cells must be greater or equal 9")
+        self.num_cells = num_cells
 
-        self.num_cells = 100
-        self.num_actions = 9
+        if num_actions < 9:
+            raise ValueError("The number of actions must be greater or equal 9")
+        self.num_actions = num_actions
+
         self.state_shape = (self.num_cells, self.num_cells, 2)
         self.states_shape = (self.num_drones, self.num_cells, self.num_cells, 2)
 
@@ -59,7 +71,7 @@ class DQNSAgent:
         if self.model_path is None:
             timestamp = datetime.now().strftime("%y%m%d-%H%M%S")
             self.model_path = f"dqns-model-{timestamp}.keras"
-            
+
         if not os.path.exists(self.model_path):
             model = self.build_keras_model()
             kr.models.save_model(model, self.model_path)
@@ -82,7 +94,7 @@ class DQNSAgent:
             verbose=self.training_mode,
         )
         self.dqn_agent.load_model(self.model_path, compile=True)
-        
+
         self.min_train_samples = 0
 
     def build_keras_model(self) -> kr.Model:
@@ -194,6 +206,8 @@ class DQNSAgent:
             return
 
         metrics = self.dqn_agent.train()
+        if metrics:
+            metrics["train_steps"] = self.dqn_agent.train_steps
         return metrics
 
     def _check_states(self, states: np.ndarray) -> None:

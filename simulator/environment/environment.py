@@ -203,10 +203,10 @@ class Environment:
         pos = np.atleast_2d(pos)  # Ensure pos is (N, 3)
 
         # Check collision with obstacles
-        obstacle_collisions = np.any(
+        obstacle_collisions = np.array(
             [obstacle.is_inside(pos[:, 0:2]) for obstacle in self.obstacles]
         )
-        collisions = obstacle_collisions
+        obstacle_collisions = np.any(obstacle_collisions, axis=0)
 
         # Check collision with the ground
         if check_altitude:
@@ -215,7 +215,9 @@ class Environment:
             )  # Get ground elevation for all positions
             below_ground = pos[:, 2] < ground_elevations
             collisions = obstacle_collisions | below_ground
-
+        else:
+            collisions = obstacle_collisions
+            
         return collisions if len(collisions) > 1 else collisions.item()
 
     def get_elevation(self, pos: np.ndarray) -> np.ndarray:

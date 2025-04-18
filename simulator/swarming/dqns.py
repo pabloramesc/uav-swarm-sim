@@ -22,8 +22,8 @@ class DQNS:
     def __init__(
         self,
         env: Environment,
-        num_cells: int = 100,
         sense_radius: float = 100.0,
+        num_cells: int = 100,
         num_actions: int = 9,
     ) -> None:
         """
@@ -33,10 +33,10 @@ class DQNS:
         ----------
         env : Environment
             The simulation environment.
-        num_cells : int, optional
-            The number of cells in the sensing grid (default is 100).
         sense_radius : float, optional
             The sensing radius of the drone (default is 100.0).
+        num_cells : int, optional
+            The number of cells in the sensing grid (default is 100).
         num_actions : int, optional
             The number of possible actions (default is 9).
         """
@@ -50,7 +50,7 @@ class DQNS:
 
         self.position = np.zeros(2)
         self.visible_neighbors = np.zeros((0, 2))
-        self.frame = np.zeros((self.num_cells, self.num_cells, 2))
+        self.frame = np.zeros((self.num_cells, self.num_cells, 2), dtype=np.uint8)
         self.cell_positions = np.zeros((self.num_cells, self.num_cells, 2))
 
     def update(self, position: np.ndarray, neighbors: np.ndarray) -> None:
@@ -102,20 +102,16 @@ class DQNS:
             inside obstacles and 0.0 otherwise.
         """
         matrix = np.zeros((self.num_cells, self.num_cells), dtype=np.float32)
+        flat_positions = self.cell_positions.reshape(-1, 2)
         if self.env.boundary is not None:
             is_inside = np.array(
-                [
-                    self.env.boundary.is_inside(pos)
-                    for pos in self.cell_positions.reshape(-1, 2)
-                ]
+                [self.env.boundary.is_inside(pos) for pos in flat_positions]
             )
             matrix += ~is_inside.reshape(self.num_cells, self.num_cells)
         for obs in self.env.obstacles:
-            is_inside = np.array(
-                [obs.is_inside(pos) for pos in self.cell_positions.reshape(-1, 2)]
-            )
+            is_inside = np.array([obs.is_inside(pos) for pos in flat_positions])
             matrix += is_inside.reshape(self.num_cells, self.num_cells)
-        return np.clip(matrix, 0, 1)  # Ensure values are binary (0.0 or 1.0)
+        return np.clip(matrix, 0.0, 1.0)  # Ensure values are binary (0.0 or 1.0)
 
     def signal_matrix(self, units: Literal["watts", "dbm"] = "watts") -> np.ndarray:
         """
@@ -197,7 +193,7 @@ class DQNS:
             A 3D array of shape (num_cells, num_cells, 2) with values scaled
             to 0-255.
         """
-        neighbors_matrix = self.signal_matrix()
+        neighbors_matrix = self.signal_matrix(units="dbm")
         obstacles_matrix = self.obstacles_matrix()
 
         frame = np.stack((neighbors_matrix, obstacles_matrix), axis=-1)
