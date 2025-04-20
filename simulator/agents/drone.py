@@ -55,8 +55,23 @@ class Drone(Agent):
 
         self.mass = 1.0  # 1 kg for simple equivalence between force and acceleration
         self.max_acc = 10.0  # aprox. 1 g = 9.81 m/s^2
-        
+
         self.path_loss_model = PathLossModel()
+
+    def initialize(
+        self,
+        state: np.ndarray,
+        neighbor_states: np.ndarray,
+        neighbor_ids: np.ndarray = None,
+        time: float = 0.0,
+    ):
+        super().initialize(state, time)
+
+        self.neighbor_ids = np.copy(neighbor_ids)
+        self.neighbor_states = np.copy(neighbor_states)
+        self.position_controller.initialize(
+            state, neighbor_states, neighbor_ids, time
+        )
 
     def update(self, dt: float = 0.01) -> None:
         """

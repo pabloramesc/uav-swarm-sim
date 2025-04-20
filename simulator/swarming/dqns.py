@@ -50,8 +50,8 @@ class DQNS:
 
         self.position = np.zeros(2)
         self.visible_neighbors = np.zeros((0, 2))
-        self.frame = np.zeros((self.num_cells, self.num_cells, 2), dtype=np.uint8)
-        self.cell_positions = np.zeros((self.num_cells, self.num_cells, 2))
+
+        self.cell_positions: np.ndarray = None
 
     def update(self, position: np.ndarray, neighbors: np.ndarray) -> None:
         """
@@ -65,17 +65,15 @@ class DQNS:
             A (N, 2) array with the horizontal positions of the neighbors.
         """
         self.position = position
-        self.cell_positions = self.cells_positions()
 
-        neighbor_distances = relative_distances(position, neighbors)
-        is_visible = neighbor_distances < self.sense_radius
-        self.visible_neighbors = neighbors[is_visible]
+        # neighbor_distances = relative_distances(position, neighbors)
+        # is_visible = neighbor_distances < self.sense_radius
+        # self.visible_neighbors = neighbors[is_visible]
+        self.visible_neighbors = np.concatenate([position[None, :], neighbors])
 
-        self.frame = self.state_frame()
-
-    def cells_positions(self) -> np.ndarray:
+    def update_cells_positions(self) -> np.ndarray:
         """
-        Generates the positions of the cells in the sensing grid.
+        Generates and updates the positions of the cells in the sensing grid.
 
         Returns
         -------
@@ -88,7 +86,8 @@ class DQNS:
         xs = dx + self.position[0]
         ys = dy + self.position[1]
         x_grid, y_grid = np.meshgrid(xs, ys)
-        return np.stack((x_grid, y_grid), axis=-1)
+        self.cell_positions = np.stack((x_grid, y_grid), axis=-1)
+        return self.cell_positions
 
     def obstacles_matrix(self) -> np.ndarray:
         """
@@ -102,14 +101,12 @@ class DQNS:
             inside obstacles and 0.0 otherwise.
         """
         matrix = np.zeros((self.num_cells, self.num_cells), dtype=np.float32)
-        flat_positions = self.cell_positions.reshape(-1, 2)
+        flat_cell_positions = self.cell_positions.reshape(-1, 2)
         if self.env.boundary is not None:
-            is_inside = np.array(
-                [self.env.boundary.is_inside(pos) for pos in flat_positions]
-            )
+            is_inside = self.env.boundary.is_inside(flat_cell_positions)
             matrix += ~is_inside.reshape(self.num_cells, self.num_cells)
         for obs in self.env.obstacles:
-            is_inside = np.array([obs.is_inside(pos) for pos in flat_positions])
+            is_inside = obs.is_inside(flat_cell_positions)
             matrix += is_inside.reshape(self.num_cells, self.num_cells)
         return np.clip(matrix, 0.0, 1.0)  # Ensure values are binary (0.0 or 1.0)
 
@@ -179,13 +176,14 @@ class DQNS:
 
         return matrix
 
-    def state_frame(self) -> np.ndarray:
+    def compute_state_frame(self) -> np.ndarray:
         """
         Generate a frame combining the signal matrix and the environment
         matrix.
 
         The frame is a 3D array where the first channel represents the signal
-        matrix and the second channel represents the environment matrix.
+        strength map from neighbors and the second channel represents the
+        obstacles and bounary map.
 
         Returns
         -------
@@ -193,13 +191,14 @@ class DQNS:
             A 3D array of shape (num_cells, num_cells, 2) with values scaled
             to 0-255.
         """
+        self.update_cells_positions()
         neighbors_matrix = self.signal_matrix(units="dbm")
         obstacles_matrix = self.obstacles_matrix()
 
         frame = np.stack((neighbors_matrix, obstacles_matrix), axis=-1)
         return (frame * 255.0).astype(np.uint8)
 
-    def target_position(self, action: int) -> np.ndarray:
+    def calculate_target_position(self, action: int) -> np.ndarray:
         """
         Calculate the target position based on the given action.
 

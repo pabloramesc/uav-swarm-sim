@@ -63,6 +63,7 @@ class MultiDroneSimulatorEVSM:
         for id in range(self.num_drones):
             evsm = EVSMPositionController(self.config, self.environment)
             drone = Drone(id, self.environment, evsm)
+            drone.initialize(self.drone_states[id, :], np.zeros((0, 6)))
             self.drones.append(drone)
 
     @property

@@ -24,7 +24,7 @@ class MultidroneGymDQNS:
         self.time = 0.0
         self.step = 0
 
-        self.config = DQNSConfig(num_cells=80)
+        self.config = DQNSConfig(num_cells=64, target_height=10.0)
 
         self.drones: list[Drone] = []
         for id in range(self.num_drones):
@@ -32,16 +32,18 @@ class MultidroneGymDQNS:
             drone = Drone(id, self.environment, dqns)
             self.drones.append(drone)
 
-        self.drone_states = np.zeros(
-            (self.num_drones, 6), dtype=np.float32
-        )  # px, py, pz, vx, vy, vz
-        self.initial_states = np.zeros((self.num_drones, 6), dtype=np.float32)
+        self.drone_states = np.zeros((self.num_drones, 6))  # px, py, pz, vx, vy, vz
+        self.initial_states = np.zeros((self.num_drones, 6))
 
         self.dqns_agent = DQNSAgent(
-            num_drones=self.num_drones, num_cells=self.config.num_cells, training_mode=True, model_path="dqns-model-01.keras"
+            num_drones=self.num_drones,
+            num_cells=self.config.num_cells,
+            training_mode=True,
+            model_path="dqns-model-01.keras",
         )
         self.last_update_time: float = None
-        self.prev_states: np.ndarray = None
+        self.prev_actions: np.ndarray = None
+        self.prev_frames: np.ndarray = None
 
     @property
     def drone_positions(self) -> np.ndarray:
@@ -60,15 +62,29 @@ class MultidroneGymDQNS:
         return self.drone_states[:, 3:6]
 
     def initialize(self, positions: np.ndarray = None) -> None:
+        initial_states = np.zeros((self.num_drones, 6))
         if positions is not None:
-            self.drone_states[:, 0:3] = positions  # Fix assignment to update all drones
-            self._set_drone_states()
-            self.initial_states = np.copy(self.drone_states)
+            initial_states[:, 0:3] = positions
 
-        for drone in self.drones:
+        for i, drone in enumerate(self.drones):
             indices = np.arange(self.num_drones)
-            indices = indices[indices != drone.id]
-            drone.set_neighbors(ids=indices, states=self.drone_states[indices])
+            indices = indices[indices != i]
+            drone.initialize(
+                state=initial_states[i, :],
+                neighbor_states=initial_states[indices, :],
+                neighbor_ids=indices,
+                time=0.0,
+            )
+
+        self._get_drone_states()
+        self.initial_states = np.copy(self.drone_states)
+
+        self.prev_frames = self.compute_frames()
+        self.prev_actions = self.compute_actions(self.prev_frames)
+        self.set_target_positions(self.prev_actions)
+
+        self.time = 0.0
+        self.last_update_time = 0.0
 
     def update(self, dt: float = None) -> dict:
         dt = dt if dt is not None else self.dt
@@ -79,48 +95,62 @@ class MultidroneGymDQNS:
             drone.update(dt)
         self._get_drone_states()
 
-        states = np.zeros(self.dqns_agent.states_shape, dtype=np.uint8)
+        if not self._needs_update():
+            return None
+
+        frames = self.compute_frames()
+        actions = self.compute_actions(frames)
+        self.set_target_positions(actions)
+        
+        rewards, dones = self.calculate_rewards_and_dones()
+
+        self.dqns_agent.add_experiences(
+            states=self.prev_frames,
+            next_states=frames,
+            actions=self.prev_actions,
+            rewards=rewards,
+            dones=dones,
+        )
+
+        metrics = self.dqns_agent.train()
+
+        self.prev_frames = frames
+        self.prev_actions = actions
+        self.last_update_time = self.time
+
+        return metrics
+
+    def compute_frames(self) -> np.ndarray:
+        frames = np.zeros(self.dqns_agent.states_shape, dtype=np.uint8)
         for i, drone in enumerate(self.drones):
             dqns: DQNSPostionController = self._get_drone_position_controller(drone)
             frame = dqns.get_frame()
-            states[i] = frame
+            frames[i] = frame
+        return frames
 
-        actions = self.dqns_agent.act(states)
+    def compute_actions(self, frames: np.ndarray) -> np.ndarray:
+        actions = self.dqns_agent.act(frames)
+        return actions
+
+    def set_target_positions(self, actions: np.ndarray) -> None:
         for i, drone in enumerate(self.drones):
             dqns: DQNSPostionController = self._get_drone_position_controller(drone)
             dqns.set_target_position(actions[i])
 
-        rewards, dones = self.calculate_rewards_and_dones()
-
-        if self.prev_states is not None:
-            self.dqns_agent.add_experiences(
-                states=self.prev_states,
-                next_states=states,
-                actions=actions,
-                rewards=rewards,
-                dones=dones,
-            )
-
-        metrics = self.dqns_agent.train()
-
-        self.prev_states = states
-
-        return metrics
-
     def calculate_rewards_and_dones(self) -> tuple[np.ndarray, np.ndarray]:
         global_score = self.area_coverage_ratio() ** 2
         rewards = np.ones(self.num_drones, dtype=np.float32) * global_score
-        
+
         inside = self.environment.is_inside(self.drone_positions)
         collision = self.environment.is_collision(
             self.drone_positions, check_altitude=False
         )
         dones = ~inside | collision
-        
+
         rewards[dones] = -1.0
         self.drone_states[dones, :] = self.initial_states[dones, :]
         self._set_drone_states()
-        
+
         return rewards, dones
 
     def area_coverage_ratio(
@@ -161,10 +191,10 @@ class MultidroneGymDQNS:
             drone.state[0:3] = self.drone_states[i, 0:3]
             drone.state[3:6] = self.drone_states[i, 3:6]
 
-    def _needs_update(self, time: float) -> bool:
-        if time is None or self.last_update_time is None:
-            return True
-        elapsed_time = time - self.last_update_time
+    def _needs_update(self) -> bool:
+        if self.time is None or self.last_update_time is None:
+            raise Exception("Bad time initialization.")
+        elapsed_time = self.time - self.last_update_time
         return elapsed_time > 1.0
 
     def _get_drone_position_controller(self, drone: Drone) -> DQNSPostionController:

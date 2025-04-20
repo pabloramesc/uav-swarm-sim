@@ -49,9 +49,10 @@ class Agent(ABC):
         """
         self.id = id
         self.type = type
+        self.environment = env
+        
         self.time = 0.0
         self.state = np.zeros(6)  # px, py, pz, vx, vy, vz
-        self.environment = env
 
     @property
     def position(self) -> np.ndarray:
@@ -67,7 +68,8 @@ class Agent(ABC):
         """
         return self.state[3:6]
 
-    def initialize(self, state: np.ndarray) -> None:
+    @abstractmethod
+    def initialize(self, state: np.ndarray, time: float = 0.0) -> None:
         """
         Initializes the state of the agent.
 
@@ -79,8 +81,8 @@ class Agent(ABC):
             - vx, vy, vz: Velocity in m/s.
         """
         self._check_state(state)
-        self.time = 0.0
         self.state = state
+        self.time = time
 
     @abstractmethod
     def update(self, dt: float = 0.01) -> None:

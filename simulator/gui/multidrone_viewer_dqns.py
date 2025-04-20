@@ -78,7 +78,7 @@ class MultiDroneViewerDQNS:
         return time.time() - self.t0
 
     @property
-    def time_since_render(self) -> float:
+    def elapsed_time(self) -> float:
         return self.time - self.last_render_time
 
     def reset(self) -> None:
@@ -321,14 +321,14 @@ class MultiDroneViewerDQNS:
 
     def _need_render(self) -> bool:
         min_render_period = 1.0 / self.min_fps
-        return self.sim.time >= self.time or self.time_since_render >= min_render_period
+        return self.sim.time >= self.time or self.elapsed_time >= min_render_period
 
     def _reset_timers(self) -> None:
         self.t0 = time.time()
         self.last_render_time = 0.0
 
     def _print_fps(self) -> None:
-        fps = 1.0 / self.time_since_render if self.time_since_render > 0.0 else 0.0
+        fps = 1.0 / self.elapsed_time if self.elapsed_time > 0.0 else 0.0
         print(
-            f"real time: {self.time:.2f} s, sim time: {self.sim.time:.2f} s, FPS: {fps:.2f}"
+            f"VIEWER: real time: {self.time:.2f} s, sim time: {self.sim.time:.2f} s, FPS: {fps:.2f}"
         )

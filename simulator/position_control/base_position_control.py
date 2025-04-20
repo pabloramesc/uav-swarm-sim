@@ -19,11 +19,24 @@ class PositionController(ABC):
     def __init__(self, config: PositionControllerConfig, env: Environment) -> None:
         self.config = config
         self.env = env
-        
+
         self.time = None
         self.state = np.zeros(6)
         self.neighbor_states = np.zeros((0, 6))
         self.neighbor_ids = np.zeros((0,), dtype=int)
+
+    @abstractmethod
+    def initialize(
+        self,
+        state: np.ndarray,
+        neighbor_states: np.ndarray,
+        neighbor_ids: np.ndarray = None,
+        time: float = None,
+    ) -> np.ndarray:
+        self.state = state
+        self.neighbor_states = neighbor_states
+        self.neighbor_ids = neighbor_ids
+        self.time = time
 
     @abstractmethod
     def update(

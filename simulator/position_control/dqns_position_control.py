@@ -50,8 +50,18 @@ class DQNSPostionController(PositionController):
         )
 
         self.last_update_time: float = None
-        self.min_update_period = 1.0
+        self.update_period = 1.0
         self.target_position = np.zeros(2)  # px, py
+
+    def initialize(
+        self,
+        state: np.ndarray,
+        neighbor_states: np.ndarray,
+        neighbor_ids: np.ndarray = None,
+        time: float = None,
+    ) -> None:
+        super().initialize(state, neighbor_states, neighbor_ids, time)
+        self.dqns.update(self.state[0:2], self.neighbor_states[:, 0:2])
 
     def update(
         self,
@@ -104,13 +114,13 @@ class DQNSPostionController(PositionController):
         return control
 
     def get_frame(self) -> np.ndarray:
-        return self.dqns.frame
+        return self.dqns.compute_state_frame()
 
     def set_target_position(self, action: int) -> None:
-        self.target_position = self.dqns.target_position(action)
+        self.target_position = self.dqns.calculate_target_position(action)
 
     def _needs_update(self, time: float) -> bool:
         if time is None or self.last_update_time is None:
             return True
         elapsed_time = time - self.last_update_time
-        return elapsed_time > self.min_update_period
+        return elapsed_time > self.update_period

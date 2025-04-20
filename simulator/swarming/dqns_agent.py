@@ -95,7 +95,7 @@ class DQNSAgent:
         )
         self.dqn_agent.load_model(self.model_path, compile=True)
 
-        self.min_train_samples = 0
+        self.min_train_samples = 1000
 
     def build_keras_model(self) -> kr.Model:
         """

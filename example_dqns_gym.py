@@ -19,12 +19,12 @@ sim = MultidroneGymDQNS(num_drones, dt)
 sim.environment.set_rectangular_boundary([0.0, 0.0], [size, size])
 
 margin = 50.0
-for _ in range(5):
+for _ in range(2):
     center = np.random.uniform(margin, +size, size=(2,))
     radius = np.random.uniform(5.0, 25.0)
     sim.environment.add_circular_obstacle(center, radius)
-    
-for _ in range(5):
+
+for _ in range(2):
     bottom_left = np.random.uniform(margin, +size, size=(2,))
     width_height = np.random.uniform(5.0, 25.0, size=(2,))
     top_right = bottom_left + width_height
@@ -38,10 +38,20 @@ gui = MultiDroneViewerDQNS(sim, is_3d=False)
 
 while True:
     metrics = sim.update()
-    gui.update(force_render=False, verbose=True)
-    
-    if metrics:
-        print(f"Train steps: {metrics["train_steps"]}")
+    gui.update(force_render=False, verbose=False)
 
-    cr = sim.area_coverage_ratio()
-    print(f"Area coverage ratio: {cr * 100:.2f} %")
+    coverage = sim.area_coverage_ratio()
+    print(
+        f"Sim time: {sim.time:.2f} s, "
+        f"Area coverage: {coverage*100:.2f} %, "
+        f"Train steps: {sim.dqns_agent.dqn_agent.train_steps}, "
+        f"Memory size: {sim.dqns_agent.dqn_agent.memory.size}, ",
+        end="",
+    )
+    if metrics:
+        print(
+            f"Loss: {metrics["loss"]:.4e}, "
+            f"Accuracy: {metrics["accuracy"]*100:.4f} %"
+        )
+    else:
+        print()
