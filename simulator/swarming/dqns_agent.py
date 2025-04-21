@@ -95,7 +95,36 @@ class DQNSAgent:
         )
         self.dqn_agent.load_model(self.model_path, compile=True)
 
+        self.metrics: dict = None
         self.min_train_samples = 1000
+        
+    @property
+    def train_steps(self) -> int:
+        return self.dqn_agent.train_steps
+    
+    @property
+    def train_elapsed(self) -> float:
+        return self.dqn_agent.train_elapsed
+    
+    @property
+    def train_speed(self) -> float:
+        return self.dqn_agent.train_speed
+    
+    @property
+    def memory_size(self) -> int:
+        return self.dqn_agent.memory.size
+    
+    @property
+    def accuracy(self) -> float:
+        if self.metrics and "accuracy" in self.metrics:
+            return self.metrics["accuracy"]
+        return np.nan
+    
+    @property
+    def loss(self) -> float:
+        if self.metrics and "loss" in self.metrics:
+            return self.metrics["loss"]
+        return np.nan
 
     def build_keras_model(self) -> kr.Model:
         """
@@ -147,7 +176,7 @@ class DQNSAgent:
             If the states are not valid.
         """
         self._check_states(states)
-        actions = self.dqn_agent.act_batch(states)
+        actions = self.dqn_agent.act_on_batch(states)
         return actions
 
     def add_experiences(
@@ -188,11 +217,14 @@ class DQNSAgent:
             rewards=rewards,
             dones=dones,
         )
-        self.dqn_agent.update_memory_batch(batch)
+        self.dqn_agent.add_experiences_batch(batch)
 
     def train(self) -> dict:
         """
         Train the agent using the experiences in memory.
+        
+        It also updates and returns metrics dictionary with training
+        performance indicators.
 
         Returns
         -------
@@ -205,10 +237,8 @@ class DQNSAgent:
         if self.dqn_agent.memory.size < self.min_train_samples:
             return
 
-        metrics = self.dqn_agent.train()
-        if metrics:
-            metrics["train_steps"] = self.dqn_agent.train_steps
-        return metrics
+        self.metrics = self.dqn_agent.train()
+        return self.metrics
 
     def _check_states(self, states: np.ndarray) -> None:
         """

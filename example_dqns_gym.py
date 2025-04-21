@@ -37,21 +37,8 @@ sim.initialize(positions=p0)
 gui = MultiDroneViewerDQNS(sim, is_3d=False)
 
 while True:
-    metrics = sim.update()
+    sim.update()
     gui.update(force_render=False, verbose=False)
-
-    coverage = sim.area_coverage_ratio()
-    print(
-        f"Sim time: {sim.time:.2f} s, "
-        f"Area coverage: {coverage*100:.2f} %, "
-        f"Train steps: {sim.dqns_agent.dqn_agent.train_steps}, "
-        f"Memory size: {sim.dqns_agent.dqn_agent.memory.size}, ",
-        end="",
-    )
-    if metrics:
-        print(
-            f"Loss: {metrics["loss"]:.4e}, "
-            f"Accuracy: {metrics["accuracy"]*100:.4f} %"
-        )
-    else:
-        print()
+    
+    print(sim.simulation_status_str())
+    print(sim.training_status_str())

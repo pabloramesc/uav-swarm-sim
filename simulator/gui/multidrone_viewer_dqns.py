@@ -321,7 +321,7 @@ class MultiDroneViewerDQNS:
 
     def _need_render(self) -> bool:
         min_render_period = 1.0 / self.min_fps
-        return self.sim.time >= self.time or self.elapsed_time >= min_render_period
+        return self.sim.sim_time >= self.time or self.elapsed_time >= min_render_period
 
     def _reset_timers(self) -> None:
         self.t0 = time.time()
