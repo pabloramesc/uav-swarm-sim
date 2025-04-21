@@ -69,7 +69,7 @@ class DQNSCentralAgent:
         self.policy = EpsilonGreedyPolicy(
             epsilon=1.0 if self.training_mode else 0.0,
             epsilon_min=0.1 if self.training_mode else 0.0,
-            epsilon_decay=1e-4 if self.training_mode else 0.0,
+            epsilon_decay=1e-3 if self.training_mode else 0.0,
             decay_type="linear" if self.training_mode else "fixed",
         )
         self.dqn_agent = DQNAgent(

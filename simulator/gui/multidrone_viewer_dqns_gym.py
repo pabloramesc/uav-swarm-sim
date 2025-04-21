@@ -45,11 +45,13 @@ class MultiDroneViewerDQNS:
         self.ylim = ylim
         self.zlim = zlim
         self.min_fps = min_fps
+        self.max_fps = 60.0
         if aspect_ratio not in AspectRatios.__args__:
             raise ValueError("Aspect ratio must be 'auto' or 'equal'")
         self.aspect_ratio = aspect_ratio
 
         self.t0: float = None
+        self.fps: float = None
         self.last_render_time: float = None
 
         self.drone_points: Line2D = None
@@ -116,11 +118,16 @@ class MultiDroneViewerDQNS:
         if verbose:
             print(self.viewer_status_str())
 
+        current_fps = 1.0 / self.elapsed_time if self.elapsed_time > 0.0 else 0.0
+        self.fps = 0.9 * self.fps + 0.1 * current_fps
         self.last_render_time = self.time
 
     def viewer_status_str(self) -> str:
-        fps = 1.0 / self.elapsed_time if self.elapsed_time > 0.0 else 0.0
-        return f"Real time: {self.time:.2f} s, Sim time: {self.sim.sim_time:.2f} s, FPS: {fps:.2f}"
+        return (
+            f"Real time: {self.time:.2f} s, "
+            f"Sim time: {self.sim.sim_time:.2f} s, "
+            f"FPS: {self.fps:.2f}"
+        )
 
     def _initiate_plots(self) -> None:
         (self.drone_points,) = self.ax1.plot([], [], "ko", ms=2.0)
@@ -217,9 +224,11 @@ class MultiDroneViewerDQNS:
             self.drone_frame_image.set_data(state_frame)
 
     def _need_render(self) -> bool:
-        min_render_period = 1.0 / self.min_fps
-        return self.sim.sim_time >= self.time or self.elapsed_time >= min_render_period
+        if self.fps > self.max_fps:
+            return False
+        return self.sim.sim_time > self.time or self.fps < self.min_fps
 
     def _reset_timers(self) -> None:
         self.t0 = time.time()
+        self.fps = 0.0
         self.last_render_time = 0.0
