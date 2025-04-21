@@ -3,7 +3,6 @@ import numpy as np
 from .agents.drone import Drone
 from .environment import Environment
 from .math.path_loss_model import signal_strength
-from .position_control.base_position_control import PositionController
 from .position_control.dqns_position_control import DQNSConfig, DQNSPostionController
 from .swarming.dqns_agent import DQNSAgent
 
