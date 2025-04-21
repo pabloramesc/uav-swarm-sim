@@ -245,7 +245,7 @@ class Environment:
         lat, lon = geo[:, 0], geo[:, 1]
         return self.elevation_map.get_elevation(lat, lon)
 
-    def enu_to_geo(self, pos: np.ndarray) -> np.ndarray:
+    def enu2geo(self, pos: np.ndarray) -> np.ndarray:
         """
         Converts local ENU (East-North-Up) coordinates to geographic coordinates.
 
@@ -262,7 +262,7 @@ class Environment:
         """
         return enu2geo(pos, self.home)
 
-    def geo_to_enu(self, geo: np.ndarray) -> np.ndarray:
+    def geo2enu(self, geo: np.ndarray) -> np.ndarray:
         """
         Converts geographic coordinates to local ENU (East-North-Up) coordinates.
 

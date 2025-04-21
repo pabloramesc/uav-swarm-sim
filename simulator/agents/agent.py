@@ -81,7 +81,7 @@ class Agent(ABC):
             - vx, vy, vz: Velocity in m/s.
         """
         self._check_state(state)
-        self.state = state
+        self.state = np.copy(state)
         self.time = time
 
     @abstractmethod

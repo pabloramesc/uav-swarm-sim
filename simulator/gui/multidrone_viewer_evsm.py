@@ -256,8 +256,8 @@ class MultiDroneViewerEVSM:
             return
 
         bounds = self.sim.environment.elevation_map.bounds
-        south_west = self.sim.environment.geo_to_enu((bounds.bottom, bounds.left, 0.0))
-        north_east = self.sim.environment.geo_to_enu((bounds.top, bounds.right, 0.0))
+        south_west = self.sim.environment.geo2enu((bounds.bottom, bounds.left, 0.0))
+        north_east = self.sim.environment.geo2enu((bounds.top, bounds.right, 0.0))
         self.xlim = (south_west[0], north_east[0]) if self.xlim is None else self.xlim
         self.ylim = (south_west[1], north_east[1]) if self.ylim is None else self.ylim
         if self.is_3d and self.zlim is None:

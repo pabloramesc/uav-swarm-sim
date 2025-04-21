@@ -6,7 +6,8 @@ from .agents.drone import Drone
 from .environment import Environment
 from .math.path_loss_model import signal_strength
 from .position_control.dqns_position_control import DQNSConfig, DQNSPostionController
-from .swarming.dqns_agent import DQNSAgent
+from .swarming.dqns_central_agent import DQNSCentralAgent
+from .swarming.dqns_reward_manager import DQNSRewardManager
 
 
 class MultidroneGymDQNS:
@@ -39,12 +40,13 @@ class MultidroneGymDQNS:
         self.drone_states = np.zeros((self.num_drones, 6))  # px, py, pz, vx, vy, vz
         self.initial_states = np.zeros((self.num_drones, 6))
 
-        self.dqns_agent = DQNSAgent(
+        self.central_agent = DQNSCentralAgent(
             num_drones=self.num_drones,
             num_cells=self.config.num_cells,
             training_mode=True,
             model_path="dqns-model-01.keras",
         )
+        self.reward_manager = DQNSRewardManager(self.environment)
         self.last_update_time: float = None
         self.prev_actions: np.ndarray = None
         self.prev_frames: np.ndarray = None
@@ -113,24 +115,25 @@ class MultidroneGymDQNS:
         actions = self.compute_actions(frames)
         self.set_target_positions(actions)
 
-        rewards, dones = self.calculate_rewards_and_dones()
+        self.rewards, dones = self.reward_manager.update(self.drone_positions, self.sim_time)
+        self.reset_collided_drones(dones)
 
-        self.dqns_agent.add_experiences(
+        self.central_agent.add_experiences(
             states=self.prev_frames,
             next_states=frames,
             actions=self.prev_actions,
-            rewards=rewards,
+            rewards=self.rewards,
             dones=dones,
         )
 
-        self.dqns_agent.train()
+        self.central_agent.train()
 
         self.prev_frames = frames
         self.prev_actions = actions
         self.last_update_time = self.sim_time
 
     def compute_frames(self) -> np.ndarray:
-        frames = np.zeros(self.dqns_agent.states_shape, dtype=np.uint8)
+        frames = np.zeros(self.central_agent.states_shape, dtype=np.uint8)
         for i, drone in enumerate(self.drones):
             dqns: DQNSPostionController = self._get_drone_position_controller(drone)
             frame = dqns.get_frame()
@@ -138,7 +141,7 @@ class MultidroneGymDQNS:
         return frames
 
     def compute_actions(self, frames: np.ndarray) -> np.ndarray:
-        actions = self.dqns_agent.act(frames)
+        actions = self.central_agent.act(frames)
         return actions
 
     def set_target_positions(self, actions: np.ndarray) -> None:
@@ -146,29 +149,20 @@ class MultidroneGymDQNS:
             dqns: DQNSPostionController = self._get_drone_position_controller(drone)
             dqns.set_target_position(actions[i])
 
-    def calculate_rewards_and_dones(self) -> tuple[np.ndarray, np.ndarray]:
-        global_score = self.area_coverage() ** 2
-        rewards = np.ones(self.num_drones, dtype=np.float32) * global_score
-
-        inside = self.environment.is_inside(self.drone_positions)
-        collision = self.environment.is_collision(
-            self.drone_positions, check_altitude=False
-        )
-        dones = ~inside | collision
-
-        rewards[dones] = -1.0
-        # self.drone_states[dones, :] = self.initial_states[dones, :]
-        # self._set_drone_states()
-
+    def reset_collided_drones(self, dones: np.ndarray) -> None:
         done_indices = np.arange(self.num_drones)[dones]
-        for idx in done_indices:
-            drone: Drone = self.drones[idx]
-            drone.state = self.initial_states[idx]
+        for i in done_indices:
+            drone: Drone = self.drones[i]
+            indices = np.arange(self.num_drones)
+            neighbor_ids = indices[indices != i]
+            drone.initialize(
+                state=self.initial_states[i],
+                neighbor_states=self.drone_states[neighbor_ids],
+                neighbor_ids=neighbor_ids,
+            )
 
         if self.verbose and np.any(dones):
             print("⚠️ Reset drones to initial states:", done_indices)
-
-        return rewards, dones
 
     def area_coverage(self, num_points: int = 1000, rx_sens: float = -80.0) -> float:
         eval_points = np.zeros((num_points, 3))
@@ -200,11 +194,12 @@ class MultidroneGymDQNS:
 
     def training_status_str(self) -> str:
         return (
-            f"Train steps: {self.dqns_agent.train_steps}, "
-            f"Train speed: {self.dqns_agent.train_speed:.2f} sps, "
-            f"Memory size: {self.dqns_agent.memory_size}, "
-            f"Loss: {self.dqns_agent.loss:.4e}, "
-            f"Accuracy: {self.dqns_agent.accuracy*100:.2f} %"
+            f"Train steps: {self.central_agent.train_steps}, "
+            f"Train speed: {self.central_agent.train_speed:.2f} sps, "
+            f"Memory size: {self.central_agent.memory_size}, "
+            f"Epsilon: {self.central_agent.epsilon:.4f}, "
+            f"Loss: {self.central_agent.loss:.4e}, "
+            f"Accuracy: {self.central_agent.accuracy*100:.2f} %"
         )
 
     def _get_drone_states(self) -> None:

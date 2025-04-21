@@ -33,9 +33,9 @@ class PositionController(ABC):
         neighbor_ids: np.ndarray = None,
         time: float = None,
     ) -> np.ndarray:
-        self.state = state
-        self.neighbor_states = neighbor_states
-        self.neighbor_ids = neighbor_ids
+        self.state = np.copy(state)
+        self.neighbor_states = np.copy(neighbor_states)
+        self.neighbor_ids = np.copy(neighbor_ids)
         self.time = time
 
     @abstractmethod
@@ -65,7 +65,7 @@ class PositionController(ABC):
         np.ndarray
             Control output [fx, fy, fz].
         """
-        self.state = state
-        self.neighbor_states = neighbor_states
-        self.neighbor_ids = neighbor_ids
+        self.state = np.copy(state)
+        self.neighbor_states = np.copy(neighbor_states)
+        self.neighbor_ids = np.copy(neighbor_ids)
         self.time = time

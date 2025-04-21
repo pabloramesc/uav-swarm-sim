@@ -6,7 +6,7 @@ https://opensource.org/licenses/MIT
 """
 
 import numpy as np
-from simulator.gui.multidrone_viewer_dqns import MultiDroneViewerDQNS
+from simulator.gui.multidrone_viewer_dqns_gym import MultiDroneViewerDQNS
 from simulator.multidrone_gym_dqns import MultidroneGymDQNS
 from simulator.utils.mobility_helper import grid_positions
 
@@ -34,11 +34,14 @@ margin = 5.0
 p0 = grid_positions(num_drones, origin=[margin, margin], space=margin, altitude=0.0)
 sim.initialize(positions=p0)
 
-gui = MultiDroneViewerDQNS(sim, is_3d=False)
+gui = MultiDroneViewerDQNS(sim)
 
 while True:
     sim.update()
     gui.update(force_render=False, verbose=False)
     
+    print(gui.viewer_status_str())
     print(sim.simulation_status_str())
     print(sim.training_status_str())
+    if hasattr(sim, "rewards"):
+        print("Rewards:", " ".join(f"{r:.2f}" for r in sim.rewards))
