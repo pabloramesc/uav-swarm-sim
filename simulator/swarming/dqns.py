@@ -69,7 +69,7 @@ class DQNS:
         # neighbor_distances = relative_distances(position, neighbors)
         # is_visible = neighbor_distances < self.sense_radius
         # self.visible_neighbors = neighbors[is_visible]
-        self.visible_neighbors = np.concatenate([position[None, :], neighbors])
+        self.visible_neighbors = neighbors
 
     def update_cells_positions(self) -> np.ndarray:
         """
@@ -139,6 +139,15 @@ class DQNS:
         heatmap: np.ndarray = heatmap - heatmap.min()
         if np.max(heatmap) > 0.0:
             heatmap /= np.max(heatmap)
+            
+        # Add white dot at center
+        center = self.num_cells // 2
+        if self.num_cells % 2 == 0:
+            # Even number of cells: 2x2 dot
+            heatmap[center - 1 : center + 1, center - 1 : center + 1] = 1.0
+        else:
+            # Odd number of cells: 3x3 dot
+            heatmap[center - 1 : center + 2, center - 1 : center + 2] = 1.0
 
         return heatmap.astype(np.float32)
 

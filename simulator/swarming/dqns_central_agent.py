@@ -69,7 +69,7 @@ class DQNSCentralAgent:
         self.policy = EpsilonGreedyPolicy(
             epsilon=1.0 if self.training_mode else 0.0,
             epsilon_min=0.1 if self.training_mode else 0.0,
-            epsilon_decay=1e-3 if self.training_mode else 0.0,
+            epsilon_decay=1e-4 if self.training_mode else 0.0,
             decay_type="linear" if self.training_mode else "fixed",
         )
         self.dqn_agent = DQNAgent(
@@ -77,7 +77,7 @@ class DQNSCentralAgent:
             batch_size=64,
             gamma=0.95,
             policy=self.policy,
-            memory_size=100_000,
+            memory_size=500_000,
             update_steps=10_000,
             autosave_steps=1000,
             file_name=self.model_path,
@@ -86,7 +86,7 @@ class DQNSCentralAgent:
         self.dqn_agent.load_model(self.model_path, compile=True)
 
         self.train_metrics: dict = None
-        self.min_train_samples = 1000
+        self.min_train_samples = 10_000
         
     @property
     def drone_positions(self) -> np.ndarray:

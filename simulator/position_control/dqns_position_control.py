@@ -19,7 +19,7 @@ from .horizontal_position_control import HorizontalPositionController
 
 @dataclass
 class DQNSConfig(PositionControllerConfig):
-    num_cells: int = 100
+    num_cells: int = 64
     num_actions: int = 9
     visible_distance: float = 100.0  # in meters
     obstacle_distance: float = 10.0  # in meters
@@ -33,6 +33,9 @@ class DQNSPostionController(PositionController):
     def __init__(self, config: DQNSConfig, env: Environment) -> None:
         super().__init__(config, env)
         self.config = config
+        self.update_period = 0.1
+        
+        cell_size = 2 * config.visible_distance / config.num_cells
 
         self.dqns = DQNS(
             env=self.env,
@@ -41,16 +44,15 @@ class DQNSPostionController(PositionController):
             num_actions=config.num_actions,
         )
         self.altitude_hold = AltitudeController(
-            kp=config.max_acceleration / config.target_height,
+            kp=config.max_acceleration / cell_size,
             kd=config.max_acceleration / config.target_velocity,
         )
         self.position_controller = HorizontalPositionController(
-            kp=config.max_acceleration / config.visible_distance,
+            kp=config.max_acceleration / cell_size,
             kd=config.max_acceleration / config.target_velocity,
         )
 
         self.last_update_time: float = None
-        self.update_period = 1.0
         self.target_position = np.zeros(2)  # px, py
 
     def initialize(
@@ -62,6 +64,8 @@ class DQNSPostionController(PositionController):
     ) -> None:
         super().initialize(state, neighbor_states, neighbor_ids, time)
         self.dqns.update(self.state[0:2], self.neighbor_states[:, 0:2])
+        self.last_update_time: float = None
+        self.target_position = state[0:2]  # px, py
 
     def update(
         self,

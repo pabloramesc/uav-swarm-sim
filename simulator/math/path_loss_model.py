@@ -37,6 +37,9 @@ def signal_strength(
         - "total": Total received power from all transmitters.
         - "max": Maximum received power from a single transmitter.
     """
+    if tx_positions.shape[0] == 0:
+        return np.zeros(rx_positions.shape[0])
+        
     rx_power = _signal_strength_numba(tx_positions, rx_positions, f, n, tx_power)
 
     if mode == "total":

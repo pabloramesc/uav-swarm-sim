@@ -5,7 +5,7 @@ from simulator.math.distances import pairwise_distances
 
 class DQNSRewardManager:
 
-    def __init__(self, env: Environment, cell_size: float = 1.0) -> None:
+    def __init__(self, env: Environment, cell_size: float = 10.0) -> None:
         self.env = env
         self.cell_size = cell_size
 
@@ -13,12 +13,12 @@ class DQNSRewardManager:
         self.d_max = 100.0
         self.max_links = 6
 
-        self.w_dist = 0.7
-        self.w_conn = 0.3
-        self.w_expl = 0.5
+        self.w_dist = 1.0
+        self.w_conn = 0.0
+        self.w_expl = 0.0
 
         self.visited_cells: dict[tuple[int, int], float] = {}
-        self.expire_time = 60.0
+        self.expire_time = 600.0
 
     def update(
         self, drone_positions: np.ndarray, time: float

@@ -22,14 +22,10 @@ class MultidroneGymDQNS:
         self.dt = dt
         self.visible_distance = visible_distance
         self.verbose = verbose
+        self.update_period = 0.1
 
         self.environment = Environment()
-
-        self.real_t0: float = None
-        self.sim_time: float = None
-        self.sim_steps: int = None
-
-        self.config = DQNSConfig(num_cells=64, target_height=10.0)
+        self.config = DQNSConfig(num_cells=64, target_height=0.0)
 
         self.drones: list[Drone] = []
         for id in range(self.num_drones):
@@ -47,6 +43,11 @@ class MultidroneGymDQNS:
             model_path="dqns-model-01.keras",
         )
         self.reward_manager = DQNSRewardManager(self.environment)
+
+        self.real_t0: float = None
+        self.sim_time: float = None
+        self.sim_steps: int = None
+
         self.last_update_time: float = None
         self.prev_actions: np.ndarray = None
         self.prev_frames: np.ndarray = None
@@ -71,17 +72,19 @@ class MultidroneGymDQNS:
         """
         return self.drone_states[:, 3:6]
 
-    def initialize(self, positions: np.ndarray = None) -> None:
-        initial_states = np.zeros((self.num_drones, 6))
-        if positions is not None:
-            initial_states[:, 0:3] = positions
+    def initialize(self) -> None:
+        self.drone_states = np.zeros((self.num_drones, 6))
+        self.initial_states = np.zeros((self.num_drones, 6))
+
+        for i in range(self.num_drones):
+            self.initial_states[i, 0:2] = self._generate_random_position()
 
         for i, drone in enumerate(self.drones):
             indices = np.arange(self.num_drones)
             neighbor_indices = indices[indices != i]
             drone.initialize(
-                state=initial_states[i, :],
-                neighbor_states=initial_states[neighbor_indices, :],
+                state=self.initial_states[i, :],
+                neighbor_states=self.initial_states[neighbor_indices, :],
                 neighbor_ids=neighbor_indices,
                 time=0.0,
             )
@@ -115,7 +118,9 @@ class MultidroneGymDQNS:
         actions = self.compute_actions(frames)
         self.set_target_positions(actions)
 
-        self.rewards, dones = self.reward_manager.update(self.drone_positions, self.sim_time)
+        self.rewards, dones = self.reward_manager.update(
+            self.drone_positions, self.sim_time
+        )
         self.reset_collided_drones(dones)
 
         self.central_agent.add_experiences(
@@ -152,11 +157,18 @@ class MultidroneGymDQNS:
     def reset_collided_drones(self, dones: np.ndarray) -> None:
         done_indices = np.arange(self.num_drones)[dones]
         for i in done_indices:
-            drone: Drone = self.drones[i]
+            # Reset initial states to random position inside boundary
+            self.initial_states[i, :] = 0.0
+            self.initial_states[i, 0:2] = self._generate_random_position()
+
+            # Get neighbors indices (same as ids)
             indices = np.arange(self.num_drones)
             neighbor_ids = indices[indices != i]
+
+            # Initialize collided drone
+            drone: Drone = self.drones[i]
             drone.initialize(
-                state=self.initial_states[i],
+                state=self.initial_states[i, :],
                 neighbor_states=self.drone_states[neighbor_ids],
                 neighbor_ids=neighbor_ids,
             )
@@ -229,9 +241,14 @@ class MultidroneGymDQNS:
         if self.sim_time is None or self.last_update_time is None:
             raise Exception("Bad time initialization.")
         elapsed_time = self.sim_time - self.last_update_time
-        return elapsed_time > 1.0
+        return elapsed_time > self.update_period
 
     def _get_drone_position_controller(self, drone: Drone) -> DQNSPostionController:
         if not isinstance(drone.position_controller, DQNSPostionController):
             raise Exception(f"Drone {drone.id} position controller is not DQNS")
         return drone.position_controller
+
+    def _generate_random_position(self) -> np.ndarray:
+        px = np.random.uniform(*self.environment.boundary_xlim)
+        py = np.random.uniform(*self.environment.boundary_ylim)
+        return np.array([px, py])
