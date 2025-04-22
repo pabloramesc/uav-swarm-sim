@@ -1,6 +1,6 @@
 import numpy as np
 from simulator.environment import Environment
-from simulator.math.distances import pairwise_distances
+from simulator.math.distances import pairwise_self_distances
 
 
 class DQNSRewardManager:
@@ -23,7 +23,7 @@ class DQNSRewardManager:
     def update(
         self, drone_positions: np.ndarray, time: float
     ) -> tuple[np.ndarray, np.ndarray]:
-        distances = pairwise_distances(drone_positions)
+        distances = pairwise_self_distances(drone_positions)
         distances[distances <= 0.0] = np.inf
         nearest_distances = np.min(distances, axis=-1)
         connected_neighbors = np.sum(distances < self.d_max, axis=-1)

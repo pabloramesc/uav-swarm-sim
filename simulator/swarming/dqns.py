@@ -10,7 +10,7 @@ from typing import Literal
 import numpy as np
 
 from simulator.environment import Environment
-from simulator.math.distances import relative_distances
+from simulator.math.distances import distances_from_point, pairwise_cross_distances
 from simulator.math.path_loss_model import signal_strength
 
 
@@ -49,6 +49,7 @@ class DQNS:
         self.num_actions = num_actions
 
         self.position = np.zeros(2)
+        self.neighbors = np.zeros((0, 2))
         self.visible_neighbors = np.zeros((0, 2))
 
         self.cell_positions: np.ndarray = None
@@ -64,12 +65,18 @@ class DQNS:
         neighbors : np.ndarray
             A (N, 2) array with the horizontal positions of the neighbors.
         """
-        self.position = position
+        self.position = np.copy(position)
+        self.neighbors = np.copy(neighbors)
 
-        # neighbor_distances = relative_distances(position, neighbors)
-        # is_visible = neighbor_distances < self.sense_radius
-        # self.visible_neighbors = neighbors[is_visible]
-        self.visible_neighbors = neighbors
+    def update_visible_neighbors(self, add_central: bool = True) -> np.ndarray:
+        neighbor_distances = distances_from_point(self.position, self.neighbors)
+        is_visible = neighbor_distances < self.sense_radius
+        self.visible_neighbors = self.neighbors[is_visible]
+        if add_central:
+            self.visible_neighbors = np.vstack(
+                [self.position[None, :], self.visible_neighbors]
+            )
+        return self.visible_neighbors
 
     def update_cells_positions(self) -> np.ndarray:
         """
@@ -126,44 +133,35 @@ class DQNS:
         flat_cell_positions = self.cell_positions.reshape(-1, 2)
 
         # Compute the signal strength map for the visible neighbors
-        signal_map = signal_strength(
+        signals = signal_strength(
             self.visible_neighbors, flat_cell_positions, f=2.4e3, mode="max"
         )
         if units == "watts":
-            signal_map = 10 ** (signal_map / 10)  # Convert dBm to Watts
+            signals = 10 ** (signals / 10)  # Convert dBm to Watts
 
         # Reshape the signal map back to the grid shape
-        heatmap = signal_map.reshape(self.num_cells, self.num_cells)
+        matrix = signals.reshape(self.num_cells, self.num_cells)
 
         # Normalize the heatmap to values between 0 and 1
-        heatmap: np.ndarray = heatmap - heatmap.min()
-        if np.max(heatmap) > 0.0:
-            heatmap /= np.max(heatmap)
-            
-        # Add white dot at center
-        center = self.num_cells // 2
-        if self.num_cells % 2 == 0:
-            # Even number of cells: 2x2 dot
-            heatmap[center - 1 : center + 1, center - 1 : center + 1] = 1.0
-        else:
-            # Odd number of cells: 3x3 dot
-            heatmap[center - 1 : center + 2, center - 1 : center + 2] = 1.0
+        matrix: np.ndarray = matrix - matrix.min()
+        if np.max(matrix) > 0.0:
+            matrix /= np.max(matrix)
 
-        return heatmap.astype(np.float32)
+        return matrix.astype(np.float32)
 
     def coverage_matrix(self, rx_sense: float = -80) -> np.ndarray:
         # Flatten the cell positions for easier processing
         flat_cell_positions = self.cell_positions.reshape(-1, 2)
 
         # Compute the signal strength map for the visible neighbors
-        signal_map = signal_strength(
+        signals = signal_strength(
             self.visible_neighbors, flat_cell_positions, f=2.4e3, mode="max"
         )
 
         # Reshape the signal map back to the grid shape
-        heatmap = signal_map.reshape(self.num_cells, self.num_cells)
+        signals_map = signals.reshape(self.num_cells, self.num_cells)
 
-        return (heatmap > rx_sense).astype(np.float32)
+        return (signals_map > rx_sense).astype(np.float32)
 
     def neighbors_matrix(self) -> np.ndarray:
         """
@@ -185,6 +183,27 @@ class DQNS:
 
         return matrix
 
+    def collision_matrix(self) -> np.ndarray:
+        obstacles_matrix = self.obstacles_matrix()
+        neighbors_matrix = self.neighbors_matrix()
+        collision_matrix = np.clip(obstacles_matrix + neighbors_matrix, 0.0, 1.0)
+        return collision_matrix
+
+    def distances_matrix(self) -> np.ndarray:
+        flat_cell_positions = self.cell_positions.reshape(-1, 2)
+        distances = pairwise_cross_distances(
+            self.visible_neighbors, flat_cell_positions
+        )
+        matrix = distances.reshape(
+            self.visible_neighbors.shape[0], self.num_cells, self.num_cells
+        )
+        matrix: np.ndarray = np.min(matrix, axis=0)
+        matrix = matrix / self.sense_radius
+        matrix[matrix > 1.0] = 0.0
+        matrix = 1.0 - matrix
+        # heatmap = np.clip(heatmap, 0.0, 1.0)
+        return matrix
+
     def compute_state_frame(self) -> np.ndarray:
         """
         Generate a frame combining the signal matrix and the environment
@@ -200,11 +219,12 @@ class DQNS:
             A 3D array of shape (num_cells, num_cells, 2) with values scaled
             to 0-255.
         """
+        self.update_visible_neighbors()
         self.update_cells_positions()
-        neighbors_matrix = self.signal_matrix(units="dbm")
-        obstacles_matrix = self.obstacles_matrix()
+        distances_matrix = self.distances_matrix()
+        collision_matrix = self.collision_matrix()
 
-        frame = np.stack((neighbors_matrix, obstacles_matrix), axis=-1)
+        frame = np.stack((distances_matrix, collision_matrix), axis=-1)
         return (frame * 255.0).astype(np.uint8)
 
     def calculate_target_position(self, action: int) -> np.ndarray:

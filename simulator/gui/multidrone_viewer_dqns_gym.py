@@ -212,9 +212,9 @@ class MultiDroneViewerDQNS:
     def _plot_drone_frame(self, drone_id: int = 0) -> None:
         drone = self.sim.drones[drone_id]
         dqns = self.sim._get_drone_position_controller(drone).dqns
-        signal_matrix = dqns.signal_matrix(units="dbm")
-        obstacles_matrix = dqns.obstacles_matrix()
-        state_frame = np.clip(signal_matrix + obstacles_matrix, 0.0, 1.0)
+        distances_matrix = dqns.distances_matrix()
+        collision_matrix = dqns.collision_matrix()
+        state_frame = np.clip(0.5 * distances_matrix + 1.0 * collision_matrix, 0.0, 1.0)
 
         if self.drone_frame_image is None:
             self.drone_frame_image = self.ax2.imshow(

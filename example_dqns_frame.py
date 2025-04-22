@@ -34,10 +34,8 @@ neighbors = np.random.uniform((xlim[0], ylim[0]), (xlim[1], ylim[1]), (50, 2))
 # Update DQNS
 dqns.update(position=uav_position, neighbors=neighbors)
 
-# Generate matrices
-environment_matrix = dqns.obstacles_matrix()
-neighbor_matrix = dqns.neighbors_matrix()
-signal_matrix = dqns.signal_matrix(units="dbm")
+# Generate frame
+frame = dqns.compute_state_frame()
 
 # Plot the matrices and the real layout
 fig, axes = plt.subplots(2, 2)
@@ -84,19 +82,22 @@ axes[0, 0].legend()
 axes[0, 0].grid()
 
 # Environment Matrix
+environment_matrix = np.clip(np.sum(frame, axis=-1), 0, 255).astype("uint8")
 axes[0, 1].imshow(environment_matrix, origin="lower")
 axes[0, 1].set_title("Environment Matrix")
 axes[0, 1].set_xlabel("X")
 axes[0, 1].set_ylabel("Y")
 
-# Neighbor Matrix
-axes[1, 0].imshow(neighbor_matrix, origin="lower")
-axes[1, 0].set_title("Neighbor Matrix")
+# Collision Matrix
+collision_matrix = frame[..., 1]
+axes[1, 0].imshow(collision_matrix, origin="lower")
+axes[1, 0].set_title("Collision Matrix")
 axes[1, 0].set_xlabel("X")
 axes[1, 0].set_ylabel("Y")
 
-# Signal Matrix
-axes[1, 1].imshow(signal_matrix, origin="lower")
+# Distances Matrix
+distances_matrix = frame[..., 0]
+axes[1, 1].imshow(distances_matrix, origin="lower")
 axes[1, 1].set_title("Signal Matrix")
 axes[1, 1].set_xlabel("X")
 axes[1, 1].set_ylabel("Y")
