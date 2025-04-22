@@ -199,9 +199,8 @@ class DQNS:
         )
         matrix: np.ndarray = np.min(matrix, axis=0)
         matrix = matrix / self.sense_radius
-        matrix[matrix > 1.0] = 0.0
+        matrix = np.clip(matrix, 0.0, 1.0)
         matrix = 1.0 - matrix
-        # heatmap = np.clip(heatmap, 0.0, 1.0)
         return matrix
 
     def compute_state_frame(self) -> np.ndarray:
@@ -221,10 +220,11 @@ class DQNS:
         """
         self.update_visible_neighbors()
         self.update_cells_positions()
-        distances_matrix = self.distances_matrix()
+        # distances_matrix = self.distances_matrix()
         collision_matrix = self.collision_matrix()
 
-        frame = np.stack((distances_matrix, collision_matrix), axis=-1)
+        # frame = np.stack((distances_matrix, collision_matrix), axis=-1)
+        frame = collision_matrix[..., None]
         return (frame * 255.0).astype(np.uint8)
 
     def calculate_target_position(self, action: int) -> np.ndarray:

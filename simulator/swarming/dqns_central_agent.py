@@ -11,7 +11,7 @@ from datetime import datetime
 import numpy as np
 import keras.api as kr
 
-from dqn import DQNAgent, EpsilonGreedyPolicy, ExperiencesBatch
+from dqn import DQNAgent, EpsilonGreedyPolicy, ExperiencesBatch, PriorityReplayBuffer
 
 
 class DQNSCentralAgent:
@@ -50,8 +50,8 @@ class DQNSCentralAgent:
         self.num_cells = num_cells
         self.num_actions = num_actions
 
-        self.state_shape = (self.num_cells, self.num_cells, 2)
-        self.states_shape = (self.num_drones, self.num_cells, self.num_cells, 2)
+        self.state_shape = (self.num_cells, self.num_cells, 1)
+        self.states_shape = (self.num_drones, self.num_cells, self.num_cells, 1)
 
         if not training_mode and model_path is None:
             raise Exception("Model path must be provided in no training mode.")
@@ -72,18 +72,21 @@ class DQNSCentralAgent:
             epsilon_decay=1e-4 if self.training_mode else 0.0,
             decay_type="linear" if self.training_mode else "fixed",
         )
+        self.memory = PriorityReplayBuffer(max_size=500_000, beta_annealing=0.0)
         self.dqn_agent = DQNAgent(
             model=None,
             batch_size=64,
             gamma=0.95,
             policy=self.policy,
-            memory_size=500_000,
+            # memory_size=500_000,
+            memory=self.memory,
             update_steps=10_000,
             autosave_steps=1000,
             file_name=self.model_path,
             verbose=self.training_mode,
         )
         self.dqn_agent.load_model(self.model_path, compile=True)
+        self.dqn_agent.model.summary()
 
         self.train_metrics: dict = None
         self.min_train_samples = 10_000

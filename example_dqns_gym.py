@@ -10,7 +10,7 @@ from simulator.gui.multidrone_viewer_dqns_gym import MultiDroneViewerDQNS
 from simulator.multidrone_gym_dqns import MultidroneGymDQNS
 
 dt = 0.1
-num_drones = 25
+num_drones = 16
 
 xy_min = (-200.0, -200.0)
 xy_max = (+200.0, +200.0)

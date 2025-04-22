@@ -40,7 +40,7 @@ class MultidroneGymDQNS:
             num_drones=self.num_drones,
             num_cells=self.config.num_cells,
             training_mode=True,
-            model_path="dqns-model-01.keras",
+            model_path="dqns-model-02.keras",
         )
         self.reward_manager = DQNSRewardManager(self.environment)
 

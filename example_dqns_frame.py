@@ -29,7 +29,7 @@ dqns = DQNS(env, num_cells=100, sense_radius=100.0)
 
 # Define UAV position and neighbors
 uav_position = np.array([0.0, 0.0])
-neighbors = np.random.uniform((xlim[0], ylim[0]), (xlim[1], ylim[1]), (50, 2))
+neighbors = np.random.uniform((xlim[0], ylim[0]), (xlim[1], ylim[1]), (16, 2))
 
 # Update DQNS
 dqns.update(position=uav_position, neighbors=neighbors)
