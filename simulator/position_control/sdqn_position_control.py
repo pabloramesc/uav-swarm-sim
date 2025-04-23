@@ -63,7 +63,7 @@ class SDQNPostionController(PositionController):
         time: float = None,
     ) -> None:
         super().initialize(state, neighbor_states, neighbor_ids, time)
-        self.dqns.update(self.state[0:2], self.neighbor_states[:, 0:2])
+        self.dqns.update(self.state[0:2], self.neighbor_states[:, 0:2], time)
         self.last_update_time: float = None
         self.target_position = state[0:2]  # px, py
 
@@ -98,7 +98,7 @@ class SDQNPostionController(PositionController):
         super().update(state, neighbor_states, neighbor_ids, time)
 
         if self._needs_update(time):
-            self.dqns.update(state[0:2], neighbor_states[:, 0:2])
+            self.dqns.update(state[0:2], neighbor_states[:, 0:2], time)
 
         control = np.zeros(3)
 

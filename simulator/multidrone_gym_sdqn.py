@@ -29,8 +29,8 @@ class MultidroneGymSDQN:
 
         self.drones: list[Drone] = []
         for id in range(self.num_drones):
-            dqns = SDQNPostionController(self.config, self.environment)
-            drone = Drone(id, self.environment, dqns)
+            controller = SDQNPostionController(self.config, self.environment)
+            drone = Drone(id, self.environment, controller)
             self.drones.append(drone)
 
         self.drone_states = np.zeros((self.num_drones, 6))  # px, py, pz, vx, vy, vz
@@ -39,6 +39,7 @@ class MultidroneGymSDQN:
         self.central_agent = CentralAgent(
             num_drones=self.num_drones,
             num_cells=self.config.num_cells,
+            num_channels=controller.dqns.frame_shape[-1],
             training_mode=True,
             model_path=model_path,
         )

@@ -12,7 +12,7 @@ import numpy as np
 from simulator.environment import Environment
 from simulator.math.distances import distances_from_point, pairwise_cross_distances
 from simulator.math.path_loss_model import signal_strength
-from .utils import distances_to_obstacles, gaussian_decay
+from .utils import distances_to_obstacles, gaussian_decay, VisitedCells
 
 
 class FrameGenerator:
@@ -43,19 +43,27 @@ class FrameGenerator:
         """
         self.env = env
 
-        self.num_cells = num_cells
         self.sense_radius = sense_radius
-        self.cell_size = 2 * sense_radius / num_cells
-
+        self.num_cells = num_cells
         self.num_actions = num_actions
 
+        self.cell_size = 2 * sense_radius / num_cells
+
+        self.frame_shape = (self.num_cells, self.num_cells, 2)
+
+        self.time = 0.0
         self.position = np.zeros(2)
         self.neighbors = np.zeros((0, 2))
         self.visible_neighbors = np.zeros((0, 2))
 
         self.cell_positions: np.ndarray = None
 
-    def update(self, position: np.ndarray, neighbors: np.ndarray) -> None:
+        self.visited_cells = VisitedCells(cell_size=100.0)
+        self.expire_time = 60.0
+
+    def update(
+        self, position: np.ndarray, neighbors: np.ndarray, time: float = None
+    ) -> None:
         """
         Update the drone's position, visible neighbors, and frame.
 
@@ -69,21 +77,18 @@ class FrameGenerator:
         self.position = np.copy(position)
         self.neighbors = np.copy(neighbors)
 
-    def update_visible_neighbors(self) -> np.ndarray:
+        if time is not None:
+            self.time = time
+            self.update_visited_cells()
+
+    def update_visible_neighbors(self) -> None:
         neighbor_distances = distances_from_point(self.position, self.neighbors)
         is_visible = neighbor_distances < self.sense_radius
         self.visible_neighbors = self.neighbors[is_visible]
-        return self.visible_neighbors
 
-    def update_cells_positions(self) -> np.ndarray:
+    def update_cells_positions(self) -> None:
         """
-        Generates and updates the positions of the cells in the sensing grid.
-
-        Returns
-        -------
-        np.ndarray
-            An array of shape (num_cells, num_cells, 2) containing the
-            positions of each cell.
+        Updates the positions of the cells in the sensing grid.
         """
         dx = np.linspace(-self.sense_radius, +self.sense_radius, self.num_cells)
         dy = np.linspace(-self.sense_radius, +self.sense_radius, self.num_cells)
@@ -91,7 +96,10 @@ class FrameGenerator:
         ys = dy + self.position[1]
         x_grid, y_grid = np.meshgrid(xs, ys)
         self.cell_positions = np.stack((x_grid, y_grid), axis=-1)
-        return self.cell_positions
+
+    def update_visited_cells(self) -> None:
+        self.visited_cells.set_cell_time(self.position, self.time)
+        self.visited_cells.set_cells_time(self.neighbors, self.time)
 
     def obstacles_matrix(self) -> np.ndarray:
         """
@@ -160,7 +168,7 @@ class FrameGenerator:
 
         return (signals_map > rx_sense).astype(np.float32)
 
-    def neighbors_matrix(self) -> np.ndarray:
+    def neighbors_binary_map(self) -> np.ndarray:
         """
         Generate a binary matrix indicating the presence of visible neighbors
         in each cell.
@@ -182,7 +190,7 @@ class FrameGenerator:
 
     def collision_matrix(self) -> np.ndarray:
         obstacles_matrix = self.obstacles_matrix()
-        neighbors_matrix = self.neighbors_matrix()
+        neighbors_matrix = self.neighbors_binary_map()
         collision_matrix = np.clip(obstacles_matrix + neighbors_matrix, 0.0, 1.0)
         return collision_matrix
 
@@ -205,23 +213,41 @@ class FrameGenerator:
         obstacles_distances = distances_to_obstacles(self.env, flat_cell_positions)
         obstacles_heatmap = obstacles_distances.reshape(self.num_cells, self.num_cells)
         return gaussian_decay(obstacles_heatmap, 10.0)
-    
+
     def neighbors_repulsion_heatmap(self) -> np.ndarray:
         if self.visible_neighbors.shape[0] == 0:
             return np.zeros((self.num_cells, self.num_cells))
         flat_cell_positions = self.cell_positions.reshape(-1, 2)
-        neighbor_distances = pairwise_cross_distances(self.visible_neighbors, flat_cell_positions)
+        neighbor_distances = pairwise_cross_distances(
+            self.visible_neighbors, flat_cell_positions
+        )
         nearest_distances = np.min(neighbor_distances, axis=0)
         neighbors_heatmap = nearest_distances.reshape(self.num_cells, self.num_cells)
         return gaussian_decay(neighbors_heatmap, 10.0)
-    
+
     def collision_risk_heatmap(self) -> np.ndarray:
         obstacles_heatmap = self.obstacles_repulsion_heatmap()
         neighbors_heatmap = self.neighbors_repulsion_heatmap()
-        collision_heatmap = obstacles_heatmap + neighbors_heatmap
+        collision_heatmap = np.maximum(obstacles_heatmap, neighbors_heatmap)
         collision_heatmap = self.set_center_cells(collision_heatmap)
         return np.clip(collision_heatmap, 0.0, 1.0)
-    
+
+    def visited_cells_time_map(self) -> np.ndarray:
+        flat_cell_positions = self.cell_positions.reshape(-1, 2)
+        last_visited_times = self.visited_cells.get_cells_time(flat_cell_positions)
+        
+        elapsed_times = (self.time - last_visited_times) / self.expire_time
+        
+        is_inside = self.env.is_inside(flat_cell_positions)
+        elapsed_times[~is_inside] = 0.0
+        
+        elapsed_times_map = elapsed_times.reshape(self.num_cells, self.num_cells)
+        elapsed_times_map = self.set_center_cells(elapsed_times_map)
+        
+        neighbors_map = self.neighbors_binary_map()
+        
+        return np.clip(elapsed_times_map + neighbors_map, 0.0, 1.0)
+
     def set_center_cells(self, matrix: np.ndarray) -> np.ndarray:
         """
         Set the central 2x2 (for even-sized matrices) or 3x3 (for odd-sized matrices)
@@ -240,9 +266,9 @@ class FrameGenerator:
         center = self.num_cells // 2
 
         if self.num_cells % 2 == 0:  # Even-sized matrix
-            matrix[center - 1:center + 1, center - 1:center + 1] = 1.0
+            matrix[center - 1 : center + 1, center - 1 : center + 1] = 1.0
         else:  # Odd-sized matrix
-            matrix[center - 1:center + 2, center - 1:center + 2] = 1.0
+            matrix[center - 1 : center + 2, center - 1 : center + 2] = 1.0
 
         return matrix
 
@@ -263,8 +289,9 @@ class FrameGenerator:
         """
         self.update_cells_positions()
         self.update_visible_neighbors()
-        frame = np.zeros((self.num_cells, self.num_cells, 1))
+        frame = np.zeros(self.frame_shape)
         frame[..., 0] = self.collision_risk_heatmap()
+        frame[..., 1] = self.visited_cells_time_map()
         return (frame * 255.0).astype(np.uint8)
 
     def calculate_target_position(self, action: int) -> np.ndarray:

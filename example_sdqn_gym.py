@@ -17,7 +17,7 @@ xy_min = (-200.0, -200.0)
 xy_max = (+200.0, +200.0)
 
 config = SDQNConfig(num_cells=64, num_actions=9, visible_distance=100.0, target_height=0.0)
-sim = MultidroneGymSDQN(num_drones, dt, config, model_path="sdqn-model-01.keras")
+sim = MultidroneGymSDQN(num_drones, dt, config, model_path="sdqn-model-02.keras")
 sim.environment.set_rectangular_boundary(xy_min, xy_max)
 
 for _ in range(5):

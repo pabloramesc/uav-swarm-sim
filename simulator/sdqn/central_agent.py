@@ -26,6 +26,7 @@ class CentralAgent:
         num_drones: int,
         num_cells: int = 100,
         num_actions: int = 9,
+        num_channels: int = 1,
         training_mode: bool = False,
         model_path: str = None,
     ):
@@ -49,9 +50,10 @@ class CentralAgent:
         self.num_drones = num_drones
         self.num_cells = num_cells
         self.num_actions = num_actions
+        self.num_channels = num_channels
 
-        self.state_shape = (self.num_cells, self.num_cells, 1)
-        self.states_shape = (self.num_drones, self.num_cells, self.num_cells, 1)
+        self.state_shape = (self.num_cells, self.num_cells, self.num_channels)
+        self.states_shape = (self.num_drones, *self.state_shape)
 
         if not training_mode and model_path is None:
             raise Exception("Model path must be provided in no training mode.")

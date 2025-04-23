@@ -56,3 +56,17 @@ class VisitedCells:
 
     def reset(self) -> None:
         self.cells.clear()
+
+    def get_cells_time(self, positions: np.ndarray) -> np.ndarray:
+        cell_indices = (positions // self.cell_size).astype(int)
+        unique_cells, inverse_indices = np.unique(
+            cell_indices, axis=0, return_inverse=True
+        )
+        times = np.array([self.cells.get(tuple(cell), 0.0) for cell in unique_cells])
+        return times[inverse_indices]
+
+    def set_cells_time(self, positions: np.ndarray, time: float) -> None:
+        cell_indices = (positions // self.cell_size).astype(int)
+        unique_cells = np.unique(cell_indices, axis=0)
+        for cell in unique_cells:
+            self.cells[tuple(cell)] = time

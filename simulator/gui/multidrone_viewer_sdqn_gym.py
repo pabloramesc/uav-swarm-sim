@@ -55,12 +55,14 @@ class MultiDroneViewerSDQN:
         self.last_render_time: float = None
 
         self.drone_points: Line2D = None
-        self.signal_heatmap_image: AxesImage = None
-        self.drone_frame_image: AxesImage = None
+        self.signal_heatmap_img: AxesImage = None
+        self.collision_heatmap_img: AxesImage = None
+        self.visited_cells_img: AxesImage = None
 
         self.fig = plt.figure(figsize=fig_size)
-        self.ax1 = self.fig.add_subplot(121)
-        self.ax2 = self.fig.add_subplot(122)
+        self.ax1 = self.fig.add_subplot(131)
+        self.ax2 = self.fig.add_subplot(132)
+        self.ax3 = self.fig.add_subplot(133)
 
         self.reset()
 
@@ -72,6 +74,10 @@ class MultiDroneViewerSDQN:
     def elapsed_time(self) -> float:
         return self.time - self.last_render_time
 
+    @property
+    def current_fps(self) -> float:
+        return 1.0 / self.elapsed_time if self.elapsed_time > 0.0 else self.max_fps
+
     def reset(self) -> None:
         """
         Resets the viewer to its initial state.
@@ -81,6 +87,7 @@ class MultiDroneViewerSDQN:
         """
         self.ax1.clear()
         self.ax2.clear()
+        self.ax3.clear()
 
         self._reset_timers()
         self._calculate_axis_limits()
@@ -111,15 +118,17 @@ class MultiDroneViewerSDQN:
             return
 
         self._plot_signal_heatmap()
-        self._plot_drone_frame()
         self._update_drone_points()
+
+        self._plot_drone_collision_frame()
+        self._plot_drone_exploration_frame()
+
         plt.pause(0.01)
 
         if verbose:
             print(self.viewer_status_str())
 
-        current_fps = 1.0 / self.elapsed_time if self.elapsed_time > 0.0 else 0.0
-        self.fps = 0.9 * self.fps + 0.1 * current_fps
+        self.fps = 0.9 * self.fps + 0.1 * self.current_fps
         self.last_render_time = self.time
 
     def viewer_status_str(self) -> str:
@@ -172,9 +181,13 @@ class MultiDroneViewerSDQN:
         self.ax1.set_aspect(self.aspect_ratio)
         self.ax1.grid(True)
 
-        self.ax2.set_title("Single Drone Frame")
+        self.ax2.set_title("Drone Collision Heatmap")
         self.ax2.set_xlabel("X (pixels)")
         self.ax2.set_ylabel("Y (pixels)")
+
+        self.ax3.set_title("Drone Last Visited Cells")
+        self.ax3.set_xlabel("X (pixels)")
+        self.ax3.set_ylabel("Y (pixels)")
 
         self.fig.tight_layout()
 
@@ -198,8 +211,8 @@ class MultiDroneViewerSDQN:
         )
 
         # Plot the heatmap
-        if self.signal_heatmap_image is None:
-            self.signal_heatmap_image = self.ax1.imshow(
+        if self.signal_heatmap_img is None:
+            self.signal_heatmap_img = self.ax1.imshow(
                 heatmap,
                 extent=[self.xlim[0], self.xlim[1], self.ylim[0], self.ylim[1]],
                 origin="lower",
@@ -207,21 +220,28 @@ class MultiDroneViewerSDQN:
                 alpha=0.7,
             )
         else:
-            self.signal_heatmap_image.set_data(heatmap)
+            self.signal_heatmap_img.set_data(heatmap)
 
-    def _plot_drone_frame(self, drone_id: int = 0) -> None:
-        frame = self.sim.frames[drone_id, ...]
-        if self.drone_frame_image is None:
-            self.drone_frame_image = self.ax2.imshow(
+    def _plot_drone_collision_frame(self, drone_id: int = 0) -> None:
+        frame = self.sim.frames[drone_id, ..., 0]
+        if self.collision_heatmap_img is None:
+            self.collision_heatmap_img = self.ax2.imshow(
                 frame, origin="lower", cmap="gray"
             )
         else:
-            self.drone_frame_image.set_data(frame)
+            self.collision_heatmap_img.set_data(frame)
+
+    def _plot_drone_exploration_frame(self, drone_id: int = 0) -> None:
+        frame = self.sim.frames[drone_id, ..., 1]
+        if self.visited_cells_img is None:
+            self.visited_cells_img = self.ax3.imshow(frame, origin="lower")
+        else:
+            self.visited_cells_img.set_data(frame)
 
     def _need_render(self) -> bool:
         if self.fps > self.max_fps:
             return False
-        return self.sim.sim_time > self.time or self.fps < self.min_fps
+        return self.sim.sim_time > self.time or self.current_fps < self.min_fps
 
     def _reset_timers(self) -> None:
         self.t0 = time.time()
