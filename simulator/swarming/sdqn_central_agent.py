@@ -14,7 +14,7 @@ import keras.api as kr
 from dqn import DQNAgent, EpsilonGreedyPolicy, ExperiencesBatch, PriorityReplayBuffer
 
 
-class DQNSCentralAgent:
+class SDQNCentralAgent:
     """
     Deep Q-Learning Swarming Agent (DQNSAgent).
 
@@ -69,18 +69,18 @@ class DQNSCentralAgent:
         self.policy = EpsilonGreedyPolicy(
             epsilon=1.0 if self.training_mode else 0.0,
             epsilon_min=0.1 if self.training_mode else 0.0,
-            epsilon_decay=1e-4 if self.training_mode else 0.0,
+            epsilon_decay=1e-5 if self.training_mode else 0.0,
             decay_type="linear" if self.training_mode else "fixed",
         )
         self.memory = PriorityReplayBuffer(max_size=500_000, beta_annealing=0.0)
         self.dqn_agent = DQNAgent(
             model=None,
             batch_size=64,
-            gamma=0.95,
+            gamma=0.99,
             policy=self.policy,
             # memory_size=500_000,
             memory=self.memory,
-            update_steps=10_000,
+            update_steps=5_000,
             autosave_steps=1000,
             file_name=self.model_path,
             verbose=self.training_mode,
@@ -89,38 +89,38 @@ class DQNSCentralAgent:
         self.dqn_agent.model.summary()
 
         self.train_metrics: dict = None
-        self.min_train_samples = 10_000
-        
+        self.min_train_samples = 100_000
+
     @property
     def drone_positions(self) -> np.ndarray:
         return self.drone_states[:, 0:2]
-        
+
     @property
     def train_steps(self) -> int:
         return self.dqn_agent.train_steps
-    
+
     @property
     def train_elapsed(self) -> float:
         return self.dqn_agent.train_elapsed
-    
+
     @property
     def train_speed(self) -> float:
         return self.dqn_agent.train_speed or np.nan
-    
+
     @property
     def memory_size(self) -> int:
         return self.dqn_agent.memory.size
-    
+
     @property
     def epsilon(self) -> float:
         return self.policy.epsilon
-    
+
     @property
     def accuracy(self) -> float:
         if self.train_metrics and "accuracy" in self.train_metrics:
             return self.train_metrics["accuracy"]
         return np.nan
-    
+
     @property
     def loss(self) -> float:
         if self.train_metrics and "loss" in self.train_metrics:
@@ -223,7 +223,7 @@ class DQNSCentralAgent:
     def train(self) -> dict:
         """
         Train the agent using the experiences in memory.
-        
+
         It also updates and returns metrics dictionary with training
         performance indicators.
 

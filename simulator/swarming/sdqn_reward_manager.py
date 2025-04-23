@@ -3,12 +3,13 @@ from simulator.environment import Environment
 from simulator.math.distances import pairwise_self_distances
 
 
-class DQNSRewardManager:
+class SDQNRewardManager:
 
     def __init__(self, env: Environment, cell_size: float = 10.0) -> None:
         self.env = env
         self.cell_size = cell_size
 
+        self.d_obs = 10.0
         self.d_ideal = 50.0
         self.d_max = 100.0
         self.max_links = 6
@@ -52,7 +53,7 @@ class DQNSRewardManager:
         return np.array([x0, y0])
 
     def distance_rewards(self, d: np.ndarray) -> np.ndarray:
-        rewards = invexp_distance_reward(d, d_lim=10.0)
+        rewards = np.exp(-d**2/self.d_obs**2)
         return rewards
 
     def connectivity_rewards(self, connected_neighbors: np.ndarray) -> np.ndarray:
@@ -81,27 +82,11 @@ class DQNSRewardManager:
         inside = self.env.is_inside(positions)
         collision = self.env.is_collision(positions, check_altitude=False)
         return ~inside | collision
+    
+    def _get_obstacles_distances(self, positions: np.ndarray) -> np.ndarray:
+        obstacles = self.env.boundary_and_obstacles
+        distances = np.zeros((len(obstacles), positions.shape[0]))
+        for i, obs in enumerate(obstacles):
+            distances[i] = obs.distance(positions)
+        return np.min()
 
-
-def linear_distance_reward(d: np.ndarray, d_ideal: float, d_max: float) -> np.ndarray:
-    reward = np.where(
-        d <= d_ideal,
-        2.0 * d / d_ideal - 1.0,
-        np.clip(1.0 - (d - d_ideal) / (d_max - d_ideal), 0.0, 1.0),
-    )
-    return reward
-
-
-def invexp_distance_reward(d: np.ndarray, d_lim: float) -> np.ndarray:
-    reward = -np.exp(-d / d_lim)
-    return reward
-
-
-def linear_links_reward(n: np.ndarray, n_max: int) -> np.ndarray:
-    reward = np.clip(n / n_max, 0.0, 1.0)
-    return reward
-
-
-def satexp_links_reward(n: np.ndarray, n_typ: int) -> np.ndarray:
-    reward = 1.0 - np.exp(-n / n_typ)
-    return reward

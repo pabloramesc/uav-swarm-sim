@@ -5,12 +5,12 @@ import numpy as np
 from .agents.drone import Drone
 from .environment import Environment
 from .math.path_loss_model import signal_strength
-from .position_control.dqns_position_control import DQNSConfig, DQNSPostionController
-from .swarming.dqns_central_agent import DQNSCentralAgent
-from .swarming.dqns_reward_manager import DQNSRewardManager
+from .position_control.sdqn_position_control import SDQNConfig, SDQNPostionController
+from .swarming.sdqn_central_agent import SDQNCentralAgent
+from .swarming.sdqn_reward_manager import SDQNRewardManager
 
 
-class MultidroneGymDQNS:
+class MultidroneGymSDQN:
     def __init__(
         self,
         num_drones: int,
@@ -25,24 +25,24 @@ class MultidroneGymDQNS:
         self.update_period = 0.1
 
         self.environment = Environment()
-        self.config = DQNSConfig(num_cells=64, target_height=0.0)
+        self.config = SDQNConfig(num_cells=64, target_height=0.0)
 
         self.drones: list[Drone] = []
         for id in range(self.num_drones):
-            dqns = DQNSPostionController(self.config, self.environment)
+            dqns = SDQNPostionController(self.config, self.environment)
             drone = Drone(id, self.environment, dqns)
             self.drones.append(drone)
 
         self.drone_states = np.zeros((self.num_drones, 6))  # px, py, pz, vx, vy, vz
         self.initial_states = np.zeros((self.num_drones, 6))
 
-        self.central_agent = DQNSCentralAgent(
+        self.central_agent = SDQNCentralAgent(
             num_drones=self.num_drones,
             num_cells=self.config.num_cells,
             training_mode=True,
             model_path="dqns-model-02.keras",
         )
-        self.reward_manager = DQNSRewardManager(self.environment)
+        self.reward_manager = SDQNRewardManager(self.environment)
 
         self.real_t0: float = None
         self.sim_time: float = None
@@ -140,7 +140,7 @@ class MultidroneGymDQNS:
     def compute_frames(self) -> np.ndarray:
         frames = np.zeros(self.central_agent.states_shape, dtype=np.uint8)
         for i, drone in enumerate(self.drones):
-            dqns: DQNSPostionController = self._get_drone_position_controller(drone)
+            dqns: SDQNPostionController = self._get_drone_position_controller(drone)
             frame = dqns.get_frame()
             frames[i] = frame
         return frames
@@ -151,7 +151,7 @@ class MultidroneGymDQNS:
 
     def set_target_positions(self, actions: np.ndarray) -> None:
         for i, drone in enumerate(self.drones):
-            dqns: DQNSPostionController = self._get_drone_position_controller(drone)
+            dqns: SDQNPostionController = self._get_drone_position_controller(drone)
             dqns.set_target_position(actions[i])
 
     def reset_collided_drones(self, dones: np.ndarray) -> None:
@@ -243,8 +243,8 @@ class MultidroneGymDQNS:
         elapsed_time = self.sim_time - self.last_update_time
         return elapsed_time > self.update_period
 
-    def _get_drone_position_controller(self, drone: Drone) -> DQNSPostionController:
-        if not isinstance(drone.position_controller, DQNSPostionController):
+    def _get_drone_position_controller(self, drone: Drone) -> SDQNPostionController:
+        if not isinstance(drone.position_controller, SDQNPostionController):
             raise Exception(f"Drone {drone.id} position controller is not DQNS")
         return drone.position_controller
 

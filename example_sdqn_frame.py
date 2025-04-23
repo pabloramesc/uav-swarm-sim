@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from simulator.environment import CircularObstacle, Environment, RectangularBoundary
-from simulator.swarming.dqns import DQNS
+from simulator.swarming.sdqn import DQNS
 
 # Define the environment
 xlim = np.array([-200.0, +200.0])
@@ -89,18 +89,18 @@ axes[0, 1].set_xlabel("X")
 axes[0, 1].set_ylabel("Y")
 
 # Collision Matrix
-collision_matrix = frame[..., 1]
+collision_matrix = frame[..., 0]
 axes[1, 0].imshow(collision_matrix, origin="lower")
 axes[1, 0].set_title("Collision Matrix")
 axes[1, 0].set_xlabel("X")
 axes[1, 0].set_ylabel("Y")
 
-# Distances Matrix
-distances_matrix = frame[..., 0]
-axes[1, 1].imshow(distances_matrix, origin="lower")
-axes[1, 1].set_title("Signal Matrix")
-axes[1, 1].set_xlabel("X")
-axes[1, 1].set_ylabel("Y")
+# # Distances Matrix
+# distances_matrix = frame[..., 0]
+# axes[1, 1].imshow(distances_matrix, origin="lower")
+# axes[1, 1].set_title("Signal Matrix")
+# axes[1, 1].set_xlabel("X")
+# axes[1, 1].set_ylabel("Y")
 
 # Adjust layout and show the plot
 plt.tight_layout()

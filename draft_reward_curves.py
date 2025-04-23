@@ -11,7 +11,7 @@ def linear_distance_reward(d: np.ndarray, d_ideal: float, d_max: float) -> np.nd
     return reward
 
 def invexp_distance_reward(d: np.ndarray, d_lim: float) -> np.ndarray:
-    reward = -np.exp(-d/d_lim)
+    reward = -np.exp(-d**2/d_lim**2)
     return reward
 
 

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from simulator.environment import Environment
-from simulator.swarming.dqns import DQNS
+from simulator.swarming.sdqn import DQNS
 
 from .altitude_control import AltitudeController
 from .base_position_control import PositionController, PositionControllerConfig
@@ -18,7 +18,7 @@ from .horizontal_position_control import HorizontalPositionController
 
 
 @dataclass
-class DQNSConfig(PositionControllerConfig):
+class SDQNConfig(PositionControllerConfig):
     num_cells: int = 64
     num_actions: int = 9
     visible_distance: float = 100.0  # in meters
@@ -29,8 +29,8 @@ class DQNSConfig(PositionControllerConfig):
     target_height: float = 100.0  # in meters (AGL - Above Ground Level)
 
 
-class DQNSPostionController(PositionController):
-    def __init__(self, config: DQNSConfig, env: Environment) -> None:
+class SDQNPostionController(PositionController):
+    def __init__(self, config: SDQNConfig, env: Environment) -> None:
         super().__init__(config, env)
         self.config = config
         self.update_period = 0.1

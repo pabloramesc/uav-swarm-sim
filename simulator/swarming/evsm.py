@@ -196,12 +196,13 @@ class EVSM:
         """
         Calculates distances and directions to avoidance regions.
         """
-        num_regions = len(self.env.all_obstacles)
-        distances = np.zeros((num_regions,))
-        directions = np.zeros((num_regions, 2))
-        for i, region in enumerate(self.env.all_obstacles):
-            distances[i] = region.distance(self.position)
-            directions[i, :] = region.direction(self.position)
+        obstacles = self.env.boundary_and_obstacles
+        num_obstacles = len(obstacles)
+        distances = np.zeros((num_obstacles,))
+        directions = np.zeros((num_obstacles, 2))
+        for i, obs in enumerate(obstacles):
+            distances[i] = obs.distance(self.position)
+            directions[i, :] = obs.direction(self.position)
         return distances, directions
 
     def is_edge_robot(self) -> bool:
@@ -224,7 +225,7 @@ class EVSM:
         bool
             True if the robot is near an obstacle, False otherwise.
         """
-        for region in self.env.all_obstacles:
+        for region in self.env.boundary_and_obstacles:
             if region.distance(self.position) < self.d_obs:
                 return True
         return False

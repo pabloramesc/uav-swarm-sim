@@ -14,14 +14,14 @@ from matplotlib.image import AxesImage
 from matplotlib.lines import Line2D
 from numpy.typing import ArrayLike
 
-from simulator.multidrone_gym_dqns import MultidroneGymDQNS
+from simulator.multidrone_gym_sdqn import MultidroneGymSDQN
 
 from ..math.path_loss_model import signal_strength, signal_strength_map
 
 AspectRatios = Literal["auto", "equal"]
 
 
-class MultiDroneViewerDQNS:
+class MultiDroneViewerSDQN:
     """
     A viewer for visualizing the MultiDroneSimulator in a 2D environment.
 
@@ -32,7 +32,7 @@ class MultiDroneViewerDQNS:
 
     def __init__(
         self,
-        sim: MultidroneGymDQNS,
+        sim: MultidroneGymSDQN,
         xlim: tuple[float, float] = None,
         ylim: tuple[float, float] = None,
         zlim: tuple[float, float] = None,

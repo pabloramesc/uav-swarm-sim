@@ -55,9 +55,9 @@ class Environment:
         )
 
     @property
-    def all_obstacles(self) -> list[Obstacle]:
+    def boundary_and_obstacles(self) -> list[Obstacle]:
         """
-        A list of all osbtacles, including the boundary.
+        A list of all obstacles, including the boundary as first element.
         """
         return [self.boundary] + self.obstacles
 
