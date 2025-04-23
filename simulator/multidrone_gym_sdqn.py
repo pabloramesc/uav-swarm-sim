@@ -6,8 +6,8 @@ from .agents.drone import Drone
 from .environment import Environment
 from .math.path_loss_model import signal_strength
 from .position_control.sdqn_position_control import SDQNConfig, SDQNPostionController
-from .swarming.sdqn_central_agent import SDQNCentralAgent
-from .swarming.sdqn_reward_manager import SDQNRewardManager
+from .sdqn.central_agent import CentralAgent
+from .sdqn.reward_manager import RewardManager
 
 
 class MultidroneGymSDQN:
@@ -15,17 +15,17 @@ class MultidroneGymSDQN:
         self,
         num_drones: int,
         dt: float = 0.01,
-        visible_distance: float = 100.0,
+        config: SDQNConfig = None,
+        model_path: str = None,
         verbose: bool = True,
     ) -> None:
         self.num_drones = num_drones
+        self.config = config or SDQNConfig()
         self.dt = dt
-        self.visible_distance = visible_distance
         self.verbose = verbose
         self.update_period = 0.1
 
         self.environment = Environment()
-        self.config = SDQNConfig(num_cells=64, target_height=0.0)
 
         self.drones: list[Drone] = []
         for id in range(self.num_drones):
@@ -36,21 +36,29 @@ class MultidroneGymSDQN:
         self.drone_states = np.zeros((self.num_drones, 6))  # px, py, pz, vx, vy, vz
         self.initial_states = np.zeros((self.num_drones, 6))
 
-        self.central_agent = SDQNCentralAgent(
+        self.central_agent = CentralAgent(
             num_drones=self.num_drones,
             num_cells=self.config.num_cells,
             training_mode=True,
-            model_path="dqns-model-02.keras",
+            model_path=model_path,
         )
-        self.reward_manager = SDQNRewardManager(self.environment)
+        self.model_path = self.central_agent.model_path
+        
+        self.reward_manager = RewardManager(self.environment)
 
         self.real_t0: float = None
         self.sim_time: float = None
         self.sim_steps: int = None
 
         self.last_update_time: float = None
+        
         self.prev_actions: np.ndarray = None
         self.prev_frames: np.ndarray = None
+        
+        self.frames: np.ndarray = None
+        self.actions: np.ndarray = None
+        self.rewards: np.ndarray = None
+        self.dones: np.ndarray = None
 
     @property
     def real_time(self) -> float:
@@ -95,6 +103,10 @@ class MultidroneGymSDQN:
         self.prev_frames = self.compute_frames()
         self.prev_actions = self.compute_actions(self.prev_frames)
         self.set_target_positions(self.prev_actions)
+        self.frames = self.prev_frames
+        self.actions = self.prev_actions
+        self.rewards = np.zeros(self.num_drones)
+        self.dones = np.zeros(self.num_drones, dtype=bool)
 
         self.sim_time = 0.0
         self.sim_steps = 0
@@ -114,27 +126,27 @@ class MultidroneGymSDQN:
         if not self._needs_update():
             return None
 
-        frames = self.compute_frames()
-        actions = self.compute_actions(frames)
-        self.set_target_positions(actions)
+        self.frames = self.compute_frames()
+        self.actions = self.compute_actions(self.frames)
+        self.set_target_positions(self.actions)
 
-        self.rewards, dones = self.reward_manager.update(
+        self.rewards, self.dones = self.reward_manager.update(
             self.drone_positions, self.sim_time
         )
-        self.reset_collided_drones(dones)
+        self.reset_collided_drones(self.dones)
 
         self.central_agent.add_experiences(
             states=self.prev_frames,
-            next_states=frames,
+            next_states=self.frames,
             actions=self.prev_actions,
             rewards=self.rewards,
-            dones=dones,
+            dones=self.dones,
         )
 
         self.central_agent.train()
 
-        self.prev_frames = frames
-        self.prev_actions = actions
+        self.prev_frames = self.frames
+        self.prev_actions = self.actions
         self.last_update_time = self.sim_time
 
     def compute_frames(self) -> np.ndarray:

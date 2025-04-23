@@ -6,8 +6,9 @@ https://opensource.org/licenses/MIT
 """
 
 import numpy as np
-from simulator.gui.multidrone_viewer_dqns_gym import MultiDroneViewerSDQN
+from simulator.gui.multidrone_viewer_sdqn_gym import MultiDroneViewerSDQN
 from simulator.multidrone_gym_sdqn import MultidroneGymSDQN
+from simulator.position_control.sdqn_position_control import SDQNConfig
 
 dt = 0.1
 num_drones = 16
@@ -15,7 +16,8 @@ num_drones = 16
 xy_min = (-200.0, -200.0)
 xy_max = (+200.0, +200.0)
 
-sim = MultidroneGymSDQN(num_drones, dt)
+config = SDQNConfig(num_cells=64, num_actions=9, visible_distance=100.0, target_height=0.0)
+sim = MultidroneGymSDQN(num_drones, dt, config, model_path="sdqn-model-01.keras")
 sim.environment.set_rectangular_boundary(xy_min, xy_max)
 
 for _ in range(5):
@@ -31,13 +33,13 @@ for _ in range(5):
 
 sim.initialize()
 
-# gui = MultiDroneViewerDQNS(sim)
+gui = MultiDroneViewerSDQN(sim)
 
 while True:
     sim.update()
-    # gui.update(force_render=False, verbose=False)
+    gui.update(force_render=False, verbose=False)
     
-    # print(gui.viewer_status_str())
+    print(gui.viewer_status_str())
     print(sim.simulation_status_str())
     print(sim.training_status_str())
     if hasattr(sim, "rewards"):

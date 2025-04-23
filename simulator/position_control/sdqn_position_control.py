@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from simulator.environment import Environment
-from simulator.swarming.sdqn import DQNS
+from simulator.sdqn.frame_generator import FrameGenerator
 
 from .altitude_control import AltitudeController
 from .base_position_control import PositionController, PositionControllerConfig
@@ -37,7 +37,7 @@ class SDQNPostionController(PositionController):
         
         cell_size = 2 * config.visible_distance / config.num_cells
 
-        self.dqns = DQNS(
+        self.dqns = FrameGenerator(
             env=self.env,
             sense_radius=config.visible_distance,
             num_cells=config.num_cells,

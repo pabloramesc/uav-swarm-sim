@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from simulator.environment import CircularObstacle, Environment, RectangularBoundary
-from simulator.swarming.sdqn import DQNS
+from simulator.sdqn.frame_generator import FrameGenerator
 
 # Define the environment
 xlim = np.array([-200.0, +200.0])
@@ -24,18 +24,18 @@ env = Environment(
     ],
 )
 
-# Initialize DQNS
-dqns = DQNS(env, num_cells=100, sense_radius=100.0)
+# Initialize SDQN
+sdqn = FrameGenerator(env, num_cells=100, sense_radius=100.0)
 
 # Define UAV position and neighbors
 uav_position = np.array([0.0, 0.0])
 neighbors = np.random.uniform((xlim[0], ylim[0]), (xlim[1], ylim[1]), (16, 2))
 
-# Update DQNS
-dqns.update(position=uav_position, neighbors=neighbors)
+# Update SDQN
+sdqn.update(position=uav_position, neighbors=neighbors)
 
 # Generate frame
-frame = dqns.compute_state_frame()
+frame = sdqn.compute_state_frame()
 
 # Plot the matrices and the real layout
 fig, axes = plt.subplots(2, 2)
@@ -60,7 +60,7 @@ rect = plt.Rectangle(
 axes[0, 0].add_artist(rect)
 
 # Plot sense area
-circle = plt.Circle(uav_position, dqns.sense_radius, color="red", alpha=0.1)
+circle = plt.Circle(uav_position, sdqn.sense_radius, color="red", alpha=0.1)
 axes[0, 0].add_artist(circle)
 
 # Plot obstacles

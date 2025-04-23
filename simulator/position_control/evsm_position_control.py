@@ -13,7 +13,7 @@ from simulator.environment.environment import Environment
 
 from .altitude_control import AltitudeController
 from .base_position_control import PositionController, PositionControllerConfig
-from ..swarming.evsm import EVSM
+from ..swarming.evsm_algorithm import EVSM
 
 
 @dataclass
