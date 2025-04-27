@@ -217,8 +217,8 @@ class Environment:
             collisions = obstacle_collisions | below_ground
         else:
             collisions = obstacle_collisions
-            
-        return collisions if len(collisions) > 1 else collisions.item()
+        
+        return collisions if collisions.size > 1 else collisions.item()
 
     def get_elevation(self, pos: np.ndarray) -> np.ndarray:
         """

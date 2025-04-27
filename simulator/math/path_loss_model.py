@@ -39,7 +39,10 @@ def signal_strength(
     """
     if tx_positions.shape[0] == 0:
         return np.zeros(rx_positions.shape[0])
-        
+    
+    tx_positions = np.atleast_2d(tx_positions)
+    rx_positions = np.atleast_2d(rx_positions)
+    
     rx_power = _signal_strength_numba(tx_positions, rx_positions, f, n, tx_power)
 
     if mode == "total":

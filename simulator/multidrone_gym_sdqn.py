@@ -18,6 +18,7 @@ class MultidroneGymSDQN:
         config: SDQNConfig = None,
         model_path: str = None,
         verbose: bool = True,
+        train: bool = True,
     ) -> None:
         self.num_drones = num_drones
         self.config = config or SDQNConfig()
@@ -40,7 +41,7 @@ class MultidroneGymSDQN:
             num_drones=self.num_drones,
             num_cells=self.config.num_cells,
             num_channels=controller.dqns.frame_shape[-1],
-            training_mode=True,
+            training_mode=train,
             model_path=model_path,
         )
         self.model_path = self.central_agent.model_path

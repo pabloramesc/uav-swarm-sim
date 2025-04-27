@@ -63,7 +63,7 @@ class SDQNPostionController(PositionController):
         time: float = None,
     ) -> None:
         super().initialize(state, neighbor_states, neighbor_ids, time)
-        self.dqns.update(self.state[0:2], self.neighbor_states[:, 0:2], time)
+        self.dqns.reset(self.state[0:2], self.neighbor_states[:, 0:2], time)
         self.last_update_time: float = None
         self.target_position = state[0:2]  # px, py
 
@@ -124,7 +124,8 @@ class SDQNPostionController(PositionController):
         self.target_position = self.dqns.calculate_target_position(action)
 
     def _needs_update(self, time: float) -> bool:
-        if time is None or self.last_update_time is None:
-            return True
-        elapsed_time = time - self.last_update_time
-        return elapsed_time > self.update_period
+        # if time is None or self.last_update_time is None:
+        #     return True
+        # elapsed_time = time - self.last_update_time
+        # return elapsed_time > self.update_period
+        return True

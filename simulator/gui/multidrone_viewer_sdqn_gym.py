@@ -55,14 +55,16 @@ class MultiDroneViewerSDQN:
         self.last_render_time: float = None
 
         self.drone_points: Line2D = None
-        self.signal_heatmap_img: AxesImage = None
-        self.collision_heatmap_img: AxesImage = None
-        self.visited_cells_img: AxesImage = None
+        self.im1: AxesImage = None
+        self.im2: AxesImage = None
+        self.im3: AxesImage = None
+        self.im4: AxesImage = None
 
         self.fig = plt.figure(figsize=fig_size)
-        self.ax1 = self.fig.add_subplot(131)
-        self.ax2 = self.fig.add_subplot(132)
-        self.ax3 = self.fig.add_subplot(133)
+        self.ax1 = self.fig.add_subplot(221)
+        self.ax2 = self.fig.add_subplot(222)
+        self.ax3 = self.fig.add_subplot(223)
+        self.ax4 = self.fig.add_subplot(224)
 
         self.reset()
 
@@ -122,6 +124,7 @@ class MultiDroneViewerSDQN:
 
         self._plot_drone_collision_frame()
         self._plot_drone_exploration_frame()
+        self._plot_drone_flow_map_frame()
 
         plt.pause(0.01)
 
@@ -185,9 +188,13 @@ class MultiDroneViewerSDQN:
         self.ax2.set_xlabel("X (pixels)")
         self.ax2.set_ylabel("Y (pixels)")
 
-        self.ax3.set_title("Drone Last Visited Cells")
+        self.ax3.set_title("Drone RSSI Heatmap")
         self.ax3.set_xlabel("X (pixels)")
         self.ax3.set_ylabel("Y (pixels)")
+
+        self.ax4.set_title("Drone Motion Map")
+        self.ax4.set_xlabel("X (pixels)")
+        self.ax4.set_ylabel("Y (pixels)")
 
         self.fig.tight_layout()
 
@@ -211,8 +218,8 @@ class MultiDroneViewerSDQN:
         )
 
         # Plot the heatmap
-        if self.signal_heatmap_img is None:
-            self.signal_heatmap_img = self.ax1.imshow(
+        if self.im1 is None:
+            self.im1 = self.ax1.imshow(
                 heatmap,
                 extent=[self.xlim[0], self.xlim[1], self.ylim[0], self.ylim[1]],
                 origin="lower",
@@ -220,23 +227,35 @@ class MultiDroneViewerSDQN:
                 alpha=0.7,
             )
         else:
-            self.signal_heatmap_img.set_data(heatmap)
+            self.im1.set_data(heatmap)
 
     def _plot_drone_collision_frame(self, drone_id: int = 0) -> None:
         frame = self.sim.frames[drone_id, ..., 0]
-        if self.collision_heatmap_img is None:
-            self.collision_heatmap_img = self.ax2.imshow(
-                frame, origin="lower", cmap="gray"
+        if self.im2 is None:
+            self.im2 = self.ax2.imshow(
+                frame, origin="lower", cmap="gray", vmin=0, vmax=255
             )
         else:
-            self.collision_heatmap_img.set_data(frame)
+            self.im2.set_data(frame)
 
     def _plot_drone_exploration_frame(self, drone_id: int = 0) -> None:
         frame = self.sim.frames[drone_id, ..., 1]
-        if self.visited_cells_img is None:
-            self.visited_cells_img = self.ax3.imshow(frame, origin="lower")
+        # frame = (frame / 127.5) - 1.0
+        if self.im3 is None:
+            self.im3 = self.ax3.imshow(
+                frame, origin="lower", cmap="bwr", vmin=0, vmax=255
+            )
         else:
-            self.visited_cells_img.set_data(frame)
+            self.im3.set_data(frame)
+
+    def _plot_drone_flow_map_frame(self, drone_id: int = 0) -> None:
+        frame = self.sim.frames[drone_id, ..., 2]
+        if self.im4 is None:
+            self.im4 = self.ax4.imshow(
+                frame, origin="lower", cmap="viridis", vmin=0, vmax=255
+            )
+        else:
+            self.im4.set_data(frame)
 
     def _need_render(self) -> bool:
         if self.fps > self.max_fps:

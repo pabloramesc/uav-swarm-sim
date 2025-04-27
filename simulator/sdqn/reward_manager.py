@@ -2,12 +2,14 @@ import numpy as np
 
 from simulator.environment import Environment
 from simulator.math.distances import pairwise_self_distances
+from simulator.math.path_loss_model import signal_strength
 
 from .utils import (
     gaussian_decay,
     saturated_exponential,
     distances_to_obstacles,
     VisitedCells,
+    rssi_to_signal_quality,
 )
 
 
@@ -22,11 +24,11 @@ class RewardManager:
         self.d_max = 100.0
         self.max_links = 6
 
-        self.w_dist = 1.0
-        self.w_conn = 0.1
-        self.w_expl = 1.0
+        self.w_coll = 1.0
+        self.w_conn = 0.0
+        self.w_expl = 0.1
 
-        self.visited_cells = VisitedCells(cell_size=100.0)
+        self.visited_cells = VisitedCells(cell_size=50.0)
         self.expire_time = 60.0
 
     def update(
@@ -38,22 +40,25 @@ class RewardManager:
         nearest_distances = np.min(pairwise_distances, axis=-1)
         connected_neighbors = np.sum(pairwise_distances < self.d_max, axis=0)
 
-        r_dist = self.collision_rewards(drone_positions, nearest_distances)
+        r_coll = self.collision_penalty(drone_positions, nearest_distances)
         r_conn = self.connectivity_rewards(connected_neighbors)
         r_expl = self.exploration_rewards(drone_positions, time)
+        # r_expl = self.coverage_rewards(drone_positions) + r_coll
+        # r_expl = self.distance_rewards(nearest_distances) + r_coll
+        # r_expl[connected_neighbors == 0] = 0.0
 
         self._update_visited_cells(drone_positions, time)
 
-        rewards = self.w_dist * r_dist + self.w_conn * r_conn + self.w_expl * r_expl
-        # rewards = np.clip(rewards, -1.0, +1.0)
-        
+        rewards = self.w_coll * r_coll + self.w_conn * r_conn + self.w_expl * r_expl
+        rewards = np.clip(rewards, -1.0, +1.0)
+
         # dones = self.is_collision(drone_positions)
-        dones = r_dist <= -0.99 # almost -1
+        dones = r_coll <= -0.9  # almost -1
         rewards[dones] = -10.0
 
         return rewards, dones
 
-    def collision_rewards(
+    def collision_penalty(
         self, drone_positions: np.ndarray, nearest_distances: np.ndarray
     ) -> np.ndarray:
         neighbor_repulsion_rewards = -gaussian_decay(
@@ -71,7 +76,7 @@ class RewardManager:
         return np.clip(rewards, -1.0, 0.0)
 
     def connectivity_rewards(self, connected_neighbors: np.ndarray) -> np.ndarray:
-        rewards = saturated_exponential(connected_neighbors, tau=3)
+        rewards = saturated_exponential(connected_neighbors, tau=1) - 1.0
         return rewards
 
     def exploration_rewards(self, positions: np.ndarray, time: float) -> np.ndarray:
@@ -79,6 +84,21 @@ class RewardManager:
         elapsed_times = time - last_visited_times
         elapsed_times /= self.expire_time
         return np.clip(elapsed_times, 0.0, 1.0)
+
+    def coverage_rewards(self, positions: np.ndarray) -> np.ndarray:
+        rssi = np.zeros(positions.shape[0])
+        for i, pos in enumerate(positions):
+            neighbor_positions = np.delete(positions, i, axis=0)
+            rssi[i] = signal_strength(
+                tx_positions=neighbor_positions, rx_positions=pos, f=2.4e3, mode="max"
+            )
+        quality = rssi_to_signal_quality(rssi)
+        rewards = (1.0 - quality / 100.0) ** 10
+        return rewards
+
+    def distance_rewards(self, nearest_distances: np.ndarray) -> np.ndarray:
+        rewards = 1.0 - gaussian_decay(nearest_distances, sigma=self.d_max)
+        return np.clip(rewards, 0.0, 1.0)
 
     def is_collision(self, positions: np.ndarray) -> np.ndarray:
         inside = self.env.is_inside(positions)

@@ -19,6 +19,15 @@ def distances_to_obstacles(env: Environment, pos: np.ndarray) -> np.ndarray:
     return np.min(distances, axis=0)
 
 
+def rssi_to_signal_quality(
+    rssi: np.ndarray, vmin: float = -90.0, vmax: float = -30.0
+) -> np.ndarray:
+    quality = 100.0 / (vmax - vmin) * (rssi - vmin)
+    quality[rssi <= vmin] = 0.0
+    quality[rssi >= vmax] = 100.0
+    return quality
+
+
 class VisitedCells:
 
     def __init__(self, cell_size: float = 1.0):

@@ -71,7 +71,7 @@ class CentralAgent:
         self.policy = EpsilonGreedyPolicy(
             epsilon=1.0 if self.training_mode else 0.0,
             epsilon_min=0.1 if self.training_mode else 0.0,
-            epsilon_decay=1e-4 if self.training_mode else 0.0,
+            epsilon_decay=1e-5 if self.training_mode else 0.0,
             decay_type="linear" if self.training_mode else "fixed",
         )
         self.memory = PriorityReplayBuffer(max_size=500_000, beta_annealing=0.0)
