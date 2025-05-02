@@ -4,12 +4,14 @@ Copyright (c) 2025 Pablo Ramirez Escudero
 This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
+import matplotlib
+matplotlib.use('Agg')
 
 from matplotlib.animation import FFMpegWriter, FuncAnimation
 
 from simulator.gui.multidrone_viewer_evsm import MultiDroneViewerEVSM
 from simulator.multidrone_simulator_evsm import MultiDroneSimulatorEVSM
-from simulator.swarming import EVSMConfig
+from simulator.position_control.evsm_position_control import EVSMConfig
 from simulator.utils.mobility_helper import grid_positions
 
 # Configuración de la simulación
@@ -20,7 +22,7 @@ config = EVSMConfig(
     obstacle_distance=10.0,
     max_acceleration=10.0,
     target_velocity=15.0,
-    target_altitude=10.0,
+    target_height=1.0,
 )
 
 # Inicializar simulador y entorno
@@ -36,7 +38,7 @@ sim.initialize(positions=p0)
 gui = MultiDroneViewerEVSM(sim, fig_size=(12, 6))
 
 # Configuración para exportar a MP4
-output_filename = "evsm_simulation.mp4"
+output_filename = "evsm_simulation_02.mp4"
 fps = 10
 duration = 120.0  # Duración del video en segundos
 num_frames = int(fps * duration)
@@ -44,14 +46,6 @@ num_frames = int(fps * duration)
 
 # Función para actualizar cada frame
 def update_frame(frame: int) -> None:
-    """
-    Actualiza el estado de la simulación y el visualizador para un frame.
-
-    Parameters
-    ----------
-    frame : int
-        Índice del frame actual.
-    """
     sim.update()  # Avanzar la simulación
     gui.update(force_render=True, verbose=True)  # Actualizar el visualizador
 

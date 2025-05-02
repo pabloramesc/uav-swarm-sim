@@ -20,7 +20,7 @@ config = SDQNConfig(
     num_cells=64, num_actions=9, visible_distance=100.0, target_height=0.0
 )
 sim = MultidroneGymSDQN(
-    num_drones, dt, config, model_path="sdqn-model-04.keras", train=True
+    num_drones, dt, config, model_path="sdqn-model-04.keras", train=False
 )
 sim.environment.set_rectangular_boundary(xy_min, xy_max)
 
@@ -37,14 +37,14 @@ for _ in range(0):
 
 sim.initialize()
 
-# gui = MultiDroneViewerSDQN(sim)
+gui = MultiDroneViewerSDQN(sim)
 
 
 while True:
     sim.update()
-    # gui.update(force_render=False, verbose=False)
+    gui.update(force_render=False, verbose=False)
 
-    # print(gui.viewer_status_str())
+    print(gui.viewer_status_str())
     print(sim.simulation_status_str())
     print(sim.training_status_str())
     if hasattr(sim, "rewards"):

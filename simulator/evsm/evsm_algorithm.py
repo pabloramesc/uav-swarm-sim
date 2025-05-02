@@ -9,7 +9,7 @@ import numpy as np
 
 from simulator.environment.environment import Environment
 from simulator.math.angles import SweepAngle
-from .evsm_numba import (
+from .numba_helpers import (
     obstacles_force,
     control_force,
     damping_force,

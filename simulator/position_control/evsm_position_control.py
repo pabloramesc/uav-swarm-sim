@@ -10,10 +10,10 @@ from dataclasses import dataclass
 import numpy as np
 
 from simulator.environment.environment import Environment
+from simulator.evsm.evsm_algorithm import EVSM
 
 from .altitude_control import AltitudeController
 from .base_position_control import PositionController, PositionControllerConfig
-from ..swarming.evsm_algorithm import EVSM
 
 
 @dataclass
@@ -98,8 +98,8 @@ class EVSMPositionController(PositionController):
             # kd=config.agent_mass / 1.0,
             kd=config.max_acceleration / config.target_velocity,
         )
-        
-    def initialize(self, state, neighbor_states, neighbor_ids = None, time = None):
+
+    def initialize(self, state, neighbor_states, neighbor_ids=None, time=None):
         return super().initialize(state, neighbor_states, neighbor_ids, time)
 
     def update(

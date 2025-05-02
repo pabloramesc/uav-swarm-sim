@@ -7,12 +7,16 @@ https://opensource.org/licenses/MIT
 
 import os
 
+import contextily as ctx
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
-from rasterio.coords import BoundingBox
 from matplotlib.axes import Axes
 from mpl_toolkits.mplot3d import Axes3D
+from PIL import Image
+from rasterio.coords import BoundingBox
+import geopandas as gpd
+from shapely.geometry import box  # Add this import
 
 
 class ElevationMap:
@@ -22,7 +26,7 @@ class ElevationMap:
         self.resolution: tuple[float, float] = None
         self.elevation_data: np.ndarray = None
 
-        # Cargar el archivo DEM
+        # Load the DEM file
         self.load_dem(self.dem_path)
 
     @property
@@ -40,27 +44,9 @@ class ElevationMap:
             self.elevation_data = dem.read(1)
 
     def get_elevation(self, lat: np.ndarray, lon: np.ndarray) -> np.ndarray:
-        """
-        Gets the elevation for one or more geographic coordinates.
-
-        Parameters
-        ----------
-        lat : np.ndarray
-            Latitude(s) in degrees. Can be a scalar or a 1D array of length N.
-        lon : np.ndarray
-            Longitude(s) in degrees. Can be a scalar or a 1D array of length N.
-
-        Returns
-        -------
-        np.ndarray
-            Elevation(s) in meters. Returns a scalar if inputs are scalars,
-            or a 1D array of length N if inputs are arrays.
-        """
-        # Ensure lat and lon are numpy arrays
         lat = np.atleast_1d(lat)
         lon = np.atleast_1d(lon)
 
-        # Check if coordinates are within bounds
         in_bounds = (
             (self.bounds.left <= lon)
             & (lon <= self.bounds.right)
@@ -68,24 +54,103 @@ class ElevationMap:
             & (lat <= self.bounds.top)
         )
 
-        # Initialize elevation array with zeros
         elevations = np.zeros_like(lat, dtype=float)
-
-        # Process only the coordinates within bounds
         valid_indices = np.where(in_bounds)[0]
         if valid_indices.size > 0:
             valid_lat = lat[valid_indices]
             valid_lon = lon[valid_indices]
 
-            # Compute row and column indices for valid coordinates
             cols = ((valid_lon - self.bounds.left) / self.resolution[0]).astype(int)
             rows = ((self.bounds.top - valid_lat) / self.resolution[1]).astype(int)
 
-            # Get elevation values for valid coordinates
+            cols = np.clip(cols, 0, self.elevation_data.shape[1] - 1)
+            rows = np.clip(rows, 0, self.elevation_data.shape[0] - 1)
+
             elevations[valid_indices] = self.elevation_data[rows, cols]
 
-        # Return scalar if input was scalar, otherwise return array
         return elevations if elevations.size > 1 else elevations.item()
+
+    def _generate_grid(
+        self, output_resolution: tuple[int, int]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        width, height = output_resolution
+        lon = np.linspace(self.bounds.left, self.bounds.right, width)
+        lat = np.linspace(self.bounds.top, self.bounds.bottom, height)
+        return np.meshgrid(lon, lat)
+
+    def _normalize_elevation(self, elevation_grid: np.ndarray) -> np.ndarray:
+        return (elevation_grid - self.min_elevation) / (
+            self.max_elevation - self.min_elevation
+        )
+
+    def _fetch_satellite_image(self) -> np.ndarray:
+        """
+        Fetch the satellite image for the elevation map bounds and crop it to match the elevation data.
+        """
+        # Convert bounds from EPSG:4326 (degrees) to EPSG:3857 (meters)
+        bounds_box = box(
+            self.bounds.left, self.bounds.bottom, self.bounds.right, self.bounds.top
+        )
+        gdf = gpd.GeoDataFrame(geometry=[bounds_box], crs="EPSG:4326").to_crs(epsg=3857)
+        bounds_3857 = gdf.total_bounds  # [x_min, x_max, y_min, y_max] in EPSG:3857
+
+        # Fetch the satellite image using the converted bounds
+        img, ext = ctx.bounds2img(
+            *bounds_3857, zoom=14, source=ctx.providers.Esri.WorldImagery
+        )
+
+        # Crop the satellite image to match the elevation bounds
+        x_min, x_max, y_min, y_max = ext  # ext is in EPSG:3857
+        lon_extent = np.linspace(
+            x_min, x_max, img.shape[1]
+        )  # X-axis (longitude in meters)
+        lat_extent = np.linspace(
+            y_max, y_min, img.shape[0]
+        )  # Y-axis (latitude in meters, inverted)
+
+        # Find indices for cropping
+        lon_idx = np.where(
+            (lon_extent >= bounds_3857[0]) & (lon_extent <= bounds_3857[1])
+        )[0]
+        lat_idx = np.where(
+            (lat_extent >= bounds_3857[2]) & (lat_extent <= bounds_3857[3])
+        )[0]
+
+        # Crop the image
+        cropped_img = img[
+            np.min(lat_idx) : np.max(lat_idx) + 1, np.min(lon_idx) : np.max(lon_idx) + 1
+        ]
+
+        return cropped_img
+
+    def save_satellite_image(self, image_path: str = None) -> None:
+        if image_path is None:
+            directory, _ = os.path.split(self.dem_path)
+            image_path = os.path.join(directory, "satellite_image.png")
+
+        img = self._fetch_satellite_image()
+        img_pil = Image.fromarray(img)
+        img_pil.save(image_path)
+        print("Satellite image saved to", image_path)
+
+    def save_elevation_image(
+        self, image_path: str = None, output_resolution: tuple[int, int] = (1000, 1000)
+    ) -> None:
+        if image_path is None:
+            directory, _ = os.path.split(self.dem_path)
+            image_path = os.path.join(directory, "elevation_image.png")
+
+        lon_grid, lat_grid = self._generate_grid(output_resolution)
+        elevations = self.get_elevation(lat_grid.ravel(), lon_grid.ravel())
+        elevation_grid = elevations.reshape(output_resolution[1], output_resolution[0])
+        normalized_data = self._normalize_elevation(elevation_grid)
+
+        plt.figure(figsize=(10, 10 * (output_resolution[1] / output_resolution[0])))
+        plt.imshow(normalized_data, cmap="terrain")
+        plt.axis("off")
+        plt.savefig(image_path, bbox_inches="tight", pad_inches=0)
+        plt.close()
+        print("Elevation image saved to", image_path)
 
     def plot(self, ax: Axes = None, show: bool = False):
         """
@@ -199,6 +264,7 @@ if __name__ == "__main__":
 
     # Crear el objeto ElevationMap
     elevation_map = ElevationMap(file_path)
+    print(elevation_map.bounds)
 
     # Consultar la altitud en una coordenada específica
     latitude = 41.3851  # Latitud de Barcelona

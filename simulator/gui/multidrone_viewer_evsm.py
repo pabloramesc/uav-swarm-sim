@@ -119,7 +119,7 @@ class MultiDroneViewerEVSM:
         if not (force_render or self._need_render()):
             return
 
-        self._plot_tx_heatmap()
+        self._plot_rssi_heatmap()
         self._update_links_lines()
         self._update_drone_points()
         plt.pause(0.01)
@@ -322,7 +322,7 @@ class MultiDroneViewerEVSM:
                 alpha=0.7,
             )
 
-    def _plot_tx_heatmap(self) -> None:
+    def _plot_rssi_heatmap(self) -> None:
         """
         Plots the 2D transmitter power heatmap in real time.
         """
