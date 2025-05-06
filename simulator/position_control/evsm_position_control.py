@@ -45,6 +45,7 @@ class EVSMConfig(PositionControllerConfig):
     max_acceleration: float = 10.0  # 1 g aprox. 9.81 m/s^2
     target_velocity: float = 15.0  # between 5-25 m/S
     target_height: float = 100.0  # in meters (AGL - Above Ground Level)
+    max_height_error: float = 100.0
     ln_rate: float = 1.0
 
 
@@ -94,7 +95,7 @@ class EVSMPositionController(PositionController):
         )
 
         self.altitude_hold = AltitudeController(
-            kp=config.max_acceleration / config.target_height,
+            kp=config.max_acceleration / config.max_height_error,
             # kd=config.agent_mass / 1.0,
             kd=config.max_acceleration / config.target_velocity,
         )

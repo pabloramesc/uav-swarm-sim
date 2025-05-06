@@ -4,8 +4,8 @@ Copyright (c) 2025 Pablo Ramirez Escudero
 This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
-import matplotlib
-matplotlib.use('Agg')
+# import matplotlib
+# matplotlib.use('Agg')
 
 from matplotlib.animation import FFMpegWriter, FuncAnimation
 
@@ -16,22 +16,23 @@ from simulator.utils.mobility_helper import grid_positions
 
 # Configuración de la simulación
 dt = 0.1
-num_drones = 60
+num_drones = 36
 config = EVSMConfig(
-    separation_distance=50.0,
+    separation_distance=100.0,
     obstacle_distance=10.0,
     max_acceleration=10.0,
-    target_velocity=15.0,
-    target_height=1.0,
+    target_velocity=25.0,
+    target_height=10.0,
+    ln_rate=2.0,
 )
 
 # Inicializar simulador y entorno
 sim = MultiDroneSimulatorEVSM(num_drones, dt, config=config)
-sim.environment.set_rectangular_boundary([-200.0, -100.0], [+200.0, +100.0])
-sim.environment.add_circular_obstacle([25.0, 25.0], 25.0)
-sim.environment.add_rectangular_obstacle([-125.0, -50.0], [-100.0, +50.0])
-sim.environment.add_rectangular_obstacle([100.0, -50.0], [150.0, 0.0])
-p0 = grid_positions(num_drones, origin=[-50.0, -50.0], space=5.0, altitude=0.0)
+sim.environment.set_rectangular_boundary([-200.0, -200.0], [+200.0, +200.0])
+sim.environment.add_circular_obstacle([50.0, 50.0], 50.0)
+sim.environment.add_rectangular_obstacle([-150.0, 0.0], [-100.0, +100.0])
+sim.environment.add_rectangular_obstacle([50.0, -100.0], [100.0, -50.0])
+p0 = grid_positions(num_drones, origin=[-150.0, -150.0], space=5.0, altitude=0.0)
 sim.initialize(positions=p0)
 
 # Inicializar visualizador
