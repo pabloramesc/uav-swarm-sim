@@ -1,3 +1,8 @@
 {
-    "cSpell.enabled": false
+    "cSpell.enabled": false,
+    "cmake.sourceDirectory": "/home/pablo/workspace/uav-swarm-sim/network_sim/ns-3",
+    "files.associations": {
+        "*.py": "python",
+        "ostream": "cpp"
+    }
 }
