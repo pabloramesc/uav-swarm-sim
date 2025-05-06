@@ -12,6 +12,7 @@ public:
     
     int ReadSocket(uint8_t *buffer, size_t size);
     void SendToRemote(const uint8_t *data, size_t size);
+    void Close();
 
 private:
     void SetupSocket();

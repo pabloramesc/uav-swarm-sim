@@ -9,9 +9,17 @@ NodesManager::NodesManager() {}
 
 NodesManager::~NodesManager() {}
 
+void NodesManager::Clear() {
+    m_sockets.clear();
+    m_nodes.clear();
+#if DEBUG
+    cout << "[NS3:NodesManager] DEBUG: All nodes and sockets registry cleared." << endl;
+#endif
+}
+
 void NodesManager::RegisterNode(int nodeId, Ptr<Node> node, uint16_t port, bool bcast) {
     if (m_nodes.find(nodeId) != m_nodes.end()) {
-        NS_FATAL_ERROR("[NodesManager] Node ID " << nodeId << " is already registered.");
+        NS_FATAL_ERROR("[NS3:NodesManager] ERROR: Node ID " << nodeId << " is already registered.");
     }
 
     Ptr<Socket> socket = Socket::CreateSocket(node, UdpSocketFactory::GetTypeId());
@@ -23,7 +31,7 @@ void NodesManager::RegisterNode(int nodeId, Ptr<Node> node, uint16_t port, bool 
     m_sockets[nodeId] = socket;
 
 #if DEBUG
-    cout << "[NodesManager] Node " << nodeId << " and socket registered." << endl;
+    cout << "[NS3:NodesManager] DEBUG: Node " << nodeId << " and socket registered." << endl;
 #endif
 }
 
@@ -32,28 +40,28 @@ void NodesManager::SetNodeRxCallback(int nodeId, Callback<void, Ptr<Socket>> cal
     if (it != m_sockets.end()) {
         it->second->SetRecvCallback(callback);
     } else {
-        NS_FATAL_ERROR("[NodesManager] Node ID " << nodeId << " not found when setting callback.");
+        NS_FATAL_ERROR("[NS3:NodesManager] ERROR: Node ID " << nodeId << " not found when setting callback.");
     }
 }
 
 void NodesManager::SetNodePosition(int nodeId, const Vector &pos) {
     auto it = m_nodes.find(nodeId);
     if (it == m_nodes.end()) {
-        NS_FATAL_ERROR("[NodesManager] Node " << nodeId << " not found in registry.");
+        NS_FATAL_ERROR("[NS3:NodesManager] ERROR: Node " << nodeId << " not found in registry.");
         return;
     }
 
     Ptr<Node> node = it->second;
     Ptr<MobilityModel> mobility = node->GetObject<MobilityModel>();
     if (mobility == nullptr) {
-        NS_FATAL_ERROR("[NodesManager] MobilityModel not found for Node " << nodeId);
+        NS_FATAL_ERROR("[NS3:NodesManager] ERROR: MobilityModel not found for Node " << nodeId);
         return;
     }
 
     mobility->SetPosition(pos);
 
 #if DEBUG
-    cout << "[NodesManager] Node " << nodeId << " position set to ("
+    cout << "[NS3:NodesManager] DEBUG: Node " << nodeId << " position set to ("
          << pos.x << ", " << pos.y << ", " << pos.z << ")" << endl;
 #endif
 }
@@ -61,21 +69,21 @@ void NodesManager::SetNodePosition(int nodeId, const Vector &pos) {
 Vector NodesManager::GetNodePosition(int nodeId) const {
     auto it = m_nodes.find(nodeId);
     if (it == m_nodes.end()) {
-        NS_FATAL_ERROR("[NodesManager] Node " << nodeId << " not found in registry.");
+        NS_FATAL_ERROR("[NS3:NodesManager] ERROR: Node " << nodeId << " not found in registry.");
         return Vector(0.0, 0.0, 0.0); // Return a default Vector
     }
 
     Ptr<Node> node = it->second;
     Ptr<MobilityModel> mobility = node->GetObject<MobilityModel>();
     if (mobility == nullptr) {
-        NS_FATAL_ERROR("[NodesManager] Mobility model not found for Node " << nodeId);
+        NS_FATAL_ERROR("[NS3:NodesManager] ERROR: Mobility model not found for Node " << nodeId);
         return Vector(0.0, 0.0, 0.0); // Return a default Vector
     }
 
     Vector pos = mobility->GetPosition();
 
 #if DEBUG
-    cout << "[NodesManager] Node " << nodeId << " position is ("
+    cout << "[NS3:NodesManager] DEBUG: Node " << nodeId << " position is ("
          << pos.x << ", " << pos.y << ", " << pos.z << ")" << endl;
 #endif
 
@@ -85,7 +93,7 @@ Vector NodesManager::GetNodePosition(int nodeId) const {
 void NodesManager::SendPacket(int nodeId, Ipv4Address destAddr, const uint8_t *data, size_t size) {
     auto it = m_sockets.find(nodeId);
     if (it == m_sockets.end()) {
-        NS_FATAL_ERROR("[NodesManager] Node ID " << nodeId << " not found in socket registry.");
+        NS_FATAL_ERROR("[NS3:NodesManager] ERROR: Node ID " << nodeId << " not found in socket registry.");
         return;
     }
 
@@ -99,9 +107,9 @@ void NodesManager::SendPacket(int nodeId, Ipv4Address destAddr, const uint8_t *d
     Ipv4Address srcAddr = ipv4->GetAddress(1, 0).GetLocal();
 
     string msg((char *)data, size);
-    cout << "[NodesManager] At " << Simulator::Now().GetSeconds() << "s "
-         << "Node " << socket->GetNode()->GetId() << " (" << srcAddr << ") "
-         << "sent: '" << msg << "' to " << destAddr << endl;
+    cout << "[NS3:NodesManager] DEBUG: At " << Simulator::Now().GetSeconds() << "s "
+         << "Node " << socket->GetNode()->GetId() << " sent from " << srcAddr
+         << " to " << destAddr << " msg: " << msg << endl;
 #endif
 }
 
@@ -112,7 +120,7 @@ int NodesManager::GetNumNodes() const {
 Ptr<Node> NodesManager::GetNode(int nodeId) const {
     auto it = m_nodes.find(nodeId);
     if (it == m_nodes.end()) {
-        NS_FATAL_ERROR("[NodesManager] Node ID " << nodeId << " not found.");
+        NS_FATAL_ERROR("[NS3:NodesManager] ERROR: Node ID " << nodeId << " not found.");
     }
     return it->second;
 }

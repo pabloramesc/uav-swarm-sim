@@ -24,6 +24,8 @@ public:
     int GetNumNodes() const;
     Ptr<Node> GetNode(int nodeId) const;
 
+    void Clear();
+
 private:
     map<int, Ptr<Node>> m_nodes;     // Node registry
     map<int, Ptr<Socket>> m_sockets; // Socket registry

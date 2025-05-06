@@ -19,12 +19,12 @@ using namespace ns3;
 SimBridge::SimBridge(float pollingInterval)
     : m_pollingInterval(pollingInterval),
       m_ipcSocket("127.0.0.1", 9000),
-      m_nodesManager() {
-    PollSocket();
+      m_nodesManager(),
+      m_running(false) {
 }
 
 SimBridge::~SimBridge() {
-    StopSimulation();
+    if (!m_running) StopSimulation();
 }
 
 void SimBridge::PollSocket() {
@@ -36,23 +36,32 @@ void SimBridge::PollSocket() {
         }
 
 #if DEBUG
-        string msg((char *)m_buffer, numBytes);
-        cout << "[SimBridge] At " << Simulator::Now().GetSeconds() << " s received: " << msg << endl;
+        cout << "[NS3:SimBridge] DEBUG: At " << Simulator::Now().GetSeconds()
+             << " s received " << numBytes << " bytes. Processing..." << endl;
 #endif
 
         ProcessCommand(numBytes);
+        if (!m_running) break;
     }
 
-    Simulator::Schedule(Seconds(m_pollingInterval), &SimBridge::PollSocket, this);
+    if (m_running) {
+        Simulator::Schedule(Seconds(m_pollingInterval), &SimBridge::PollSocket, this);
+    }
 }
 
-void SimBridge::StartSimulation() {
-    Simulator::Run();
+void SimBridge::StartPolling() {
+    Simulator::ScheduleNow(&SimBridge::PollSocket, this);
+    m_running = true;
 }
 
 void SimBridge::StopSimulation() {
+    m_running = false;
+    m_ipcSocket.Close();
+    m_nodesManager.Clear();
     Simulator::Stop();
-    Simulator::Destroy();
+#if DEBUG
+    cout << "[NS3:SimBridge] DEBUG: Simulation stopped successfully." << endl;
+#endif
 }
 
 void SimBridge::RegisterNode(int nodeId, Ptr<Node> node) {
@@ -75,7 +84,7 @@ void SimBridge::RxCallback(Ptr<Socket> socket) {
     Ipv4Address ipv4From = inetFrom.GetIpv4();
 
 #if DEBUG
-    cout << "[RxCallback] At " << Simulator::Now().GetSeconds() << "s "
+    cout << "[RxCallback] DEBUG: At " << Simulator::Now().GetSeconds() << "s "
          << "Node " << node->GetId() << " (" << ipv4Addr << ") "
          << "received: '" << msg << "' from " << ipv4From << endl;
 #endif
@@ -85,7 +94,7 @@ void SimBridge::RxCallback(Ptr<Socket> socket) {
 
 void SimBridge::ProcessCommand(int numBytes) {
     if (numBytes <= 0) {
-        cerr << "[SimBridge] Empty package received. Ignoring." << endl;
+        cerr << "[NS3:SimBridge] ERROR: Empty package received. Ignoring." << endl;
         return;
     }
 
@@ -113,55 +122,63 @@ void SimBridge::ProcessCommand(int numBytes) {
         break;
 
     default:
-        cerr << "[SimBridge] Unknown command code received: " << (int)commandCode << ". Ignoring." << endl;
+        cerr << "[NS3:SimBridge] ERROR: Unknown command code received: " << (int)commandCode << ". Ignoring." << endl;
         break;
     }
 }
 
 void SimBridge::HandleDoNothing(int numBytes) {
     if (numBytes > 1) {
-        cout << "[SimBridge] CMD_DO_NOTHING received with more than 1 byte. No action taken." << endl;
+        cerr << "[NS3:SimBridge] ERROR: Received CMD_DO_NOTHING with more than 1 byte. Ignoring." << endl;
         return;
     }
-    cout << "[SimBridge] CMD_DO_NOTHING received. No action taken." << endl;
+#if DEBUG
+    cout << "[NS3:SimBridge] DEBUG: Executing CMD_DO_NOTHING. Sending heartbeat response." << endl;
+#endif
+    ReplyDoNothing();
 }
 
 void SimBridge::HandleSetPositions(int numBytes) {
     if (numBytes < 1 + 13) { // At least 1 byte for command + 1 node entry (1 byte for id + 3x4 bytes for position)
-        cout << "[SimBridge] CMD_SET_POSITIONS received with insufficient data." << endl;
+        cout << "[NS3:SimBridge] ERROR: Received CMD_SET_POSITIONS with insufficient data." << endl;
         return;
     }
 
     int offset = 1;                   // Start after the command byte
     while (offset + 13 <= numBytes) { // Ensure there is enough data for [id, px, py, pz]
         int nodeId = (int)m_buffer[offset];
-        double x = (double)m_buffer[offset + 1];
-        double y = (double)m_buffer[offset + 5];
-        double z = (double)m_buffer[offset + 9];
+        offset += 1;
 
-        m_nodesManager.SetNodePosition(nodeId, Vector(x, y, z));
+        float x = 0.0f, y = 0.0f, z = 0.0f;
+        memcpy(&x, &m_buffer[offset], sizeof(float));
+        offset += sizeof(float);
+        memcpy(&y, &m_buffer[offset], sizeof(float));
+        offset += sizeof(float);
+        memcpy(&z, &m_buffer[offset], sizeof(float));
+        offset += sizeof(float);
 
 #if DEBUG
-        cout << "[SimBridge] CMD_SET_POSITIONS: Node " << nodeId
-             << " position set to (" << x << ", " << y << ", " << z << ")" << endl;
+        cout << "[NS3:SimBridge] DEBUG: Node " << nodeId
+             << " new position is (" << x << ", " << y << ", " << z << ")" << endl;
 #endif
 
-        offset += 13; // Move to the next node entry
+        m_nodesManager.SetNodePosition(nodeId, Vector(x, y, z));
     }
 
     if (offset != numBytes) {
-        NS_FATAL_ERROR("[SimBridge] CMD_SET_POSITIONS received with extra or malformed data.");
+        cerr << "[NS3:SimBridge] ERROR: Set positions received with extra or malformed data. Expected "
+             << numBytes << " bytes but got " << offset << endl;
     }
 }
 
 void SimBridge::HandleRequestPositions(int numBytes) {
     if (numBytes > 1) {
-        cout << "[SimBridge] CMD_REQUEST_POSITIONS received with more than 1 byte. No action taken." << endl;
+        cout << "[NS3:SimBridge] ERROR: Positions request received with more than 1 byte. Ignoring." << endl;
         return;
     }
 
 #if DEBUG
-    cout << "[SimBridge] CMD_REQUEST_POSITIONS received. Replying with all positions." << endl;
+    cout << "[NS3:SimBridge] DEBUG: Positions request received. Replying with all positions." << endl;
 #endif
 
     ReplyAllPositions();
@@ -170,30 +187,43 @@ void SimBridge::HandleRequestPositions(int numBytes) {
 
 void SimBridge::HandleStopSimulation(int numBytes) {
     if (numBytes > 1) {
-        cout << "[SimBridge] CMD_STOP_SIMULATION received with more than 1 byte. No action taken." << endl;
+        cout << "[NS3:SimBridge] ERROR: Stop simulation received with more than 1 byte. Ignoring." << endl;
         return;
     }
-    cout << "[SimBridge] CMD_STOP_SIMULATION received. Stopping simulation." << endl;
+    cout << "[NS3:SimBridge] DEBUG: Stopping simulation." << endl;
     StopSimulation();
 }
 
 void SimBridge::HandleIngressPacket(int numBytes) {
-    if (numBytes < 13) { // 1 byte for command + 4 bytes for nodeId + 4 bytes for srcAddr + 4 bytes for destAddr
-        NS_FATAL_ERROR("[SimBridge] CMD_INGRESS_PACKET received with insufficient data.");
+    if (numBytes < 13) { // 1 byte for command + 1 byte for nodeId + 4 bytes for srcAddr + 4 bytes for destAddr
+        NS_FATAL_ERROR("[NS3:SimBridge] ERROR: Ingress packet received with insufficient data.");
         return;
     }
 
     int nodeId = (int)m_buffer[1];
-    // uint32_t srcAddr = (uint32_t)m_buffer[5];
-    uint32_t destAddr = (uint32_t)m_buffer[9];
+    uint32_t srcAddr, destAddr;
 
-    size_t payloadSize = numBytes - 13; // Remaining bytes are the payload
+    // Convert bytes to uint32_t with byte-order inversion
+    memcpy(&srcAddr, &m_buffer[2], sizeof(uint32_t));
+    srcAddr = ntohl(srcAddr); // Convert from network byte order to host byte order
+
+    memcpy(&destAddr, &m_buffer[6], sizeof(uint32_t));
+    destAddr = ntohl(destAddr); // Convert from network byte order to host byte order
+
+    size_t payloadSize = numBytes - 10; // Remaining bytes are the payload
     if (payloadSize == 0) {
-        NS_FATAL_ERROR("[SimBridge] CMD_INGRESS_PACKET received with no payload.");
+        NS_FATAL_ERROR("[NS3:SimBridge] ERROR: Ingress packet received with no payload.");
         return;
     }
 
-    m_nodesManager.SendPacket(nodeId, Ipv4Address(destAddr), &m_buffer[13], payloadSize);
+#if DEBUG
+    cout << "[NS3:SimBridge] DEBUG: Ingress packet received. Node " << nodeId
+         << ", Source Address: " << Ipv4Address(srcAddr)
+         << ", Destination Address: " << Ipv4Address(destAddr)
+         << ", Payload Size: " << payloadSize << " bytes." << endl;
+#endif
+
+    m_nodesManager.SendPacket(nodeId, Ipv4Address(destAddr), &m_buffer[10], payloadSize);
 }
 
 void SimBridge::ReplyDoNothing() {
@@ -213,31 +243,30 @@ void SimBridge::ReplyAllPositions() {
     for (int nodeId = 0; nodeId < numNodes; ++nodeId) {
 
         if (offset + 13 > BUFFER_SIZE) {
-            NS_FATAL_ERROR("[SimBridge] Buffer overflow while preparing REPLY_ALL_POSITIONS.");
+            NS_FATAL_ERROR("[NS3:SimBridge] ERROR: Buffer overflow while preparing REPLY_ALL_POSITIONS.");
             return;
         }
 
         Vector pos = m_nodesManager.GetNodePosition(nodeId);
+        float px = static_cast<float>(pos.x);
+        float py = static_cast<float>(pos.y);
+        float pz = static_cast<float>(pos.z);
 
         response[offset++] = (uint8_t)nodeId;
-        memcpy(&response[offset], &pos.x, sizeof(double));
-        offset += sizeof(double);
-        memcpy(&response[offset], &pos.y, sizeof(double));
-        offset += sizeof(double);
-        memcpy(&response[offset], &pos.z, sizeof(double));
-        offset += sizeof(double);
+        memcpy(&response[offset], &px, sizeof(float));
+        offset += sizeof(float);
+        memcpy(&response[offset], &py, sizeof(float));
+        offset += sizeof(float);
+        memcpy(&response[offset], &pz, sizeof(float));
+        offset += sizeof(float);
 
 #if DEBUG
-        cout << "[SimBridge] REPLY_ALL_POSITIONS: Node " << nodeId
-             << " position is (" << pos.x << ", " << pos.y << ", " << pos.z << ")" << endl;
+        cout << "[NS3:SimBridge] DEBUG: Node " << nodeId << " position is "
+             << pos.x << ", " << pos.y << ", " << pos.z << endl;
 #endif
     }
 
     m_ipcSocket.SendToRemote(response, offset);
-
-#if DEBUG
-    cout << "[SimBridge] REPLY_ALL_POSITIONS sent with " << offset << " bytes." << endl;
-#endif
 }
 
 void SimBridge::ReplyEgressPacket(int nodeId, Ipv4Address srcAddr, Ipv4Address destAddr, const uint8_t *data, size_t size) {
@@ -245,7 +274,7 @@ void SimBridge::ReplyEgressPacket(int nodeId, Ipv4Address srcAddr, Ipv4Address d
     size_t responseSize = 13 + size; // 1 byte for command + 4 bytes for nodeId + 4 bytes for srcAddr + 4 bytes for destAddr + payload
 
     if (responseSize > sizeof(response)) {
-        NS_FATAL_ERROR("[SimBridge] Response size exceeds buffer limit.");
+        NS_FATAL_ERROR("[NS3:SimBridge] ERROR: Response size exceeds buffer limit.");
         return;
     }
 
@@ -255,10 +284,12 @@ void SimBridge::ReplyEgressPacket(int nodeId, Ipv4Address srcAddr, Ipv4Address d
     *reinterpret_cast<uint32_t *>(&response[9]) = destAddr.Get();
     memcpy(&response[13], data, size);
 
-    m_ipcSocket.SendToRemote(response, responseSize);
-
-    cout << "[SimBridge] REPLY_EGRESS_PACKET: Node " << nodeId
+#if DEBUG
+    cout << "[NS3:SimBridge] DEBUG: Node " << nodeId
          << " sent a response from " << srcAddr
          << " to " << destAddr
          << " with payload size " << size << " bytes." << endl;
+#endif
+
+    m_ipcSocket.SendToRemote(response, responseSize);
 }

@@ -70,8 +70,9 @@ int main(int argc, char *argv[]) {
     for (uint32_t i = 0; i < allNodes.GetN(); ++i) {
         bridge.RegisterNode(i, allNodes.Get(i));
     }
+    bridge.StartPolling();
 
-    bridge.StartSimulation();
-
+    Simulator::Run();
+    Simulator::Destroy();
     return 0;
 }

@@ -17,7 +17,7 @@ enum SimCommandCode {
     CMD_SET_POSITIONS = 0x01,
     CMD_REQUEST_POSITIONS = 0x02,
     CMD_INGRESS_PACKET = 0x03,
-    CMD_STOP_SIMULATION = 0x04,
+    CMD_STOP_SIMULATION = 0xFF,
     REPLY_ALL_POSITIONS = 0xA1,
     REPLY_EGRESS_PACKET = 0xA2,
 };
@@ -28,7 +28,7 @@ public:
     ~SimBridge();
 
     void RegisterNode(int nodeId, Ptr<Node> node);
-    void StartSimulation();
+    void StartPolling();
     void StopSimulation();
 
 private:
@@ -52,6 +52,8 @@ private:
 
     IpcSocket m_ipcSocket;
     NodesManager m_nodesManager;
+
+    bool m_running;
 };
 
 #endif // SIM_BRIDGE_H
