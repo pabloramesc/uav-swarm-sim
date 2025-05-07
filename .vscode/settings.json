@@ -5,5 +5,8 @@
         "*.py": "python",
         "ostream": "cpp",
         "iostream": "cpp"
-    }
+    },
+    "python.analysis.extraPaths": [
+        "/home/pablo/workspace/uav-swarm-sim/network_sim/ns-3"
+    ]
 }

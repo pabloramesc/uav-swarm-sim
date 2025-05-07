@@ -1,7 +1,10 @@
-from .ipc_socket import IpcSocket, IpcMessage
-import time
-import numpy as np
 import logging
+import time
+from collections import deque
+
+import numpy as np
+
+from .ipc_socket import IpcMessage, IpcSocket
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -21,6 +24,7 @@ class SimBridge:
 
     def __init__(self):
         self.sock = IpcSocket(addr="127.0.0.1", port=9001, ns3_port=9000)
+        self.replies: list[IpcMessage] = []
 
     def is_ns3_running(self) -> bool:
         logging.debug("Sending CMD_DO_NOTHING to NS-3...")
@@ -136,6 +140,22 @@ class SimBridge:
         packet += data  # Append the payload
 
         self.sock.send_to_ns3(packet)
+
+    def read_available_replies(self):
+        while True:
+            msg = self.sock.read_socket()
+            if msg is None:
+                break
+            self.replies.append(msg)
+
+    def pop_egress_packets(self) -> list[IpcMessage]:
+        egress_packest = []
+        for idx in range(len(self.replies)):
+            msg = self.replies[idx]
+            if msg.data[0] == REPLY_EGRESS_PACKET:
+                egress_packest.append(msg)
+                self.replies.pop(idx)
+        return egress_packest
 
     def _validate_node_id(self, node_id: int) -> None:
         if not isinstance(node_id, int) or node_id < 0 or node_id > 255:

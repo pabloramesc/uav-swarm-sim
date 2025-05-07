@@ -5,6 +5,9 @@
 
 #define DEBUG true
 
+#define PORT 12345
+#define BCAST true
+
 NodesManager::NodesManager() {}
 
 NodesManager::~NodesManager() {}
@@ -17,28 +20,32 @@ void NodesManager::Clear() {
 #endif
 }
 
-void NodesManager::RegisterNode(int nodeId, Ptr<Node> node, uint16_t port, bool bcast) {
+void NodesManager::RegisterNode(int nodeId, Ptr<Node> node) {
     if (m_nodes.find(nodeId) != m_nodes.end()) {
         NS_FATAL_ERROR("[NS3:NodesManager] ERROR: Node ID " << nodeId << " is already registered.");
     }
 
     Ptr<Socket> socket = Socket::CreateSocket(node, UdpSocketFactory::GetTypeId());
-    InetSocketAddress localAddress(Ipv4Address::GetAny(), port);
+    InetSocketAddress localAddress(Ipv4Address::GetAny(), PORT);
     socket->Bind(localAddress);
-    socket->SetAllowBroadcast(bcast);
+    socket->SetAllowBroadcast(BCAST);
 
     m_nodes[nodeId] = node;
     m_sockets[nodeId] = socket;
 
 #if DEBUG
-    cout << "[NS3:NodesManager] DEBUG: Node " << nodeId << " and socket registered." << endl;
+    Ptr<Ipv4> ipv4 = node->GetObject<Ipv4>();
+    Ipv4Address addr = ipv4->GetAddress(1, 0).GetLocal();
+    cout << "[NS3:NodesManager] DEBUG: Node " << nodeId
+         << " (" << addr << ") and socket registered." << endl;
 #endif
 }
 
 void NodesManager::SetNodeRxCallback(int nodeId, Callback<void, Ptr<Socket>> callback) {
     auto it = m_sockets.find(nodeId);
     if (it != m_sockets.end()) {
-        it->second->SetRecvCallback(callback);
+        Ptr<Socket> socket = it->second;
+        socket->SetRecvCallback(callback);
     } else {
         NS_FATAL_ERROR("[NS3:NodesManager] ERROR: Node ID " << nodeId << " not found when setting callback.");
     }
@@ -99,17 +106,17 @@ void NodesManager::SendPacket(int nodeId, Ipv4Address destAddr, const uint8_t *d
 
     Ptr<Socket> socket = it->second;
     Ptr<Packet> packet = Create<Packet>(data, size);
-    socket->Connect(InetSocketAddress(destAddr));
+    InetSocketAddress remoteAddr = InetSocketAddress(destAddr, PORT);
+    socket->Connect(remoteAddr);
     socket->Send(packet);
 
 #if DEBUG
     Ptr<Ipv4> ipv4 = socket->GetNode()->GetObject<Ipv4>();
     Ipv4Address srcAddr = ipv4->GetAddress(1, 0).GetLocal();
-
     string msg((char *)data, size);
     cout << "[NS3:NodesManager] DEBUG: At " << Simulator::Now().GetSeconds() << "s "
-         << "Node " << socket->GetNode()->GetId() << " sent from " << srcAddr
-         << " to " << destAddr << " msg: " << msg << endl;
+         << "Node " << socket->GetNode()->GetId() << " (" << srcAddr << ") "
+         << "sent to " << destAddr << " msg: " << msg << endl;
 #endif
 }
 

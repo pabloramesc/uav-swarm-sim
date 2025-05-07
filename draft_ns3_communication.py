@@ -5,7 +5,7 @@ from swarm_sim.sim_bridge.sim_bridge import SimBridge
 import numpy as np
 
 # Run update_net_sim.sh at the beginning
-subprocess.run(["sh", "update_code.sh"], cwd="./network_sim", check=True)
+# subprocess.run(["sh", "update_code.sh"], cwd="./network_sim", check=True)
 
 # Launch the NS3 simulation
 ns3_process = subprocess.Popen(
@@ -16,7 +16,7 @@ bridge = SimBridge()
 time.sleep(5.0)
 
 while not bridge.is_ns3_running():
-    pass
+    time.sleep(5.0)
 
 print("NS-3 process is running.")
 time.sleep(1.0)
@@ -39,6 +39,10 @@ for node_id, pos in positions.items():
 time.sleep(1.0)
 
 bridge.send_packet(node_id=0, src_addr="0.0.0.0", dest_addr="10.0.2.1", data=b"Hello NS-3!")
+time.sleep(1.0)
+
+bridge.read_available_replies()
+packets = bridge.pop_egress_packets()
 time.sleep(1.0)
 
 bridge.stop()

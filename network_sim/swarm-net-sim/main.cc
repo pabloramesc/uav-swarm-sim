@@ -9,6 +9,41 @@
 
 using namespace ns3;
 
+void ReceivePacket(Ptr<Socket> socket) {
+    Address from;
+    Ptr<Packet> packet = socket->RecvFrom(from);
+    uint8_t buffer[1024];
+    packet->CopyData(buffer, packet->GetSize());
+    std::string msg((char *)buffer);
+
+    Ptr<Node> node = socket->GetNode();
+    Ptr<Ipv4> ipv4 = node->GetObject<Ipv4>();
+    Ipv4Address ipv4Addr = ipv4->GetAddress(1, 0).GetLocal();
+
+    InetSocketAddress inetFrom = InetSocketAddress::ConvertFrom(from);
+    Ipv4Address ipv4From = inetFrom.GetIpv4();
+
+    std::cout << "Nodo " << node->GetId() << " (" << ipv4Addr << ") recibió: '"
+              << msg << "' desde " << ipv4From << std::endl;
+}
+
+void SendPacket(Ptr<Socket> socket, Ipv4Address destAddr) {
+    InetSocketAddress remoteAddr = InetSocketAddress(destAddr, 12345);
+    // source->SetAllowBroadcast(true);
+    socket->Connect(remoteAddr);
+
+    Ptr<Node> node = socket->GetNode();
+    std::string msg = "Hello from " + std::to_string(node->GetId());
+    Ptr<Packet> packet = Create<Packet>((uint8_t *)msg.c_str(), msg.length() + 1);
+    socket->Send(packet);
+
+    Ptr<Ipv4> ipv4 = node->GetObject<Ipv4>();
+    Ipv4Address ipv4Addr = ipv4->GetAddress(1, 0).GetLocal();
+
+    std::cout << "Nodo " << node->GetId() << " (" << ipv4Addr << ") envió: '"
+              << msg << "' a " << destAddr << std::endl;
+}
+
 int main(int argc, char *argv[]) {
     uint32_t nGCS = 1;
     uint32_t nUAV = 5;
@@ -54,6 +89,8 @@ int main(int argc, char *argv[]) {
     mobility.Install(allNodes);
 
     AodvHelper aodv;
+    Ipv4ListRoutingHelper list;
+    list.Add(aodv, 100);
     InternetStackHelper stack;
     stack.SetRoutingHelper(aodv);
     stack.Install(allNodes);
@@ -66,11 +103,24 @@ int main(int argc, char *argv[]) {
     ipv4.SetBase("10.0.0.0", "255.255.0.0", "0.0.3.1");
     Ipv4InterfaceContainer userIfaces = ipv4.Assign(userDevices);
 
-    SimBridge bridge(0.1);
+    // Ipv4InterfaceContainer allIfaces;
+    // allIfaces.Add(gcsIfaces);
+    // allIfaces.Add(uavIfaces);
+    // allIfaces.Add(userIfaces);
+
+    SimBridge bridge(0.01);
     for (uint32_t i = 0; i < allNodes.GetN(); ++i) {
         bridge.RegisterNode(i, allNodes.Get(i));
     }
     bridge.StartPolling();
+
+    // Ptr<Node> node = allNodes.Get(0);
+    // Ptr<Socket> socket = Socket::CreateSocket(node, UdpSocketFactory::GetTypeId());
+    // InetSocketAddress local = InetSocketAddress(Ipv4Address::GetAny(), 12345);
+    // socket->Bind(local);
+    // socket->SetRecvCallback(MakeCallback(&ReceivePacket));
+    // socket->SetAllowBroadcast(true);
+    // Simulator::Schedule(Seconds(1.0), &SendPacket, socket, Ipv4Address("10.0.2.1"));
 
     Simulator::Run();
     Simulator::Destroy();

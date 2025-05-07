@@ -24,7 +24,7 @@ SimBridge::SimBridge(float pollingInterval)
 }
 
 SimBridge::~SimBridge() {
-    if (!m_running) StopSimulation();
+    if (m_running) StopSimulation();
 }
 
 void SimBridge::PollSocket() {
@@ -65,7 +65,7 @@ void SimBridge::StopSimulation() {
 }
 
 void SimBridge::RegisterNode(int nodeId, Ptr<Node> node) {
-    m_nodesManager.RegisterNode(nodeId, node, 12345, true);
+    m_nodesManager.RegisterNode(nodeId, node);
     m_nodesManager.SetNodeRxCallback(nodeId, MakeCallback(&SimBridge::RxCallback, this));
 }
 
@@ -73,8 +73,9 @@ void SimBridge::RxCallback(Ptr<Socket> socket) {
     Address from;
     Ptr<Packet> packet = socket->RecvFrom(from);
     uint8_t buffer[BUFFER_SIZE];
-    packet->CopyData(buffer, packet->GetSize());
-    string msg((char *)buffer);
+    uint32_t size = packet->GetSize();
+    packet->CopyData(buffer, size);
+    string msg((char *)buffer, size);
 
     Ptr<Node> node = socket->GetNode();
     Ptr<Ipv4> ipv4 = node->GetObject<Ipv4>();
@@ -84,9 +85,9 @@ void SimBridge::RxCallback(Ptr<Socket> socket) {
     Ipv4Address ipv4From = inetFrom.GetIpv4();
 
 #if DEBUG
-    cout << "[RxCallback] DEBUG: At " << Simulator::Now().GetSeconds() << "s "
+    cout << "[NS3:RxCallback] DEBUG: At " << Simulator::Now().GetSeconds() << "s "
          << "Node " << node->GetId() << " (" << ipv4Addr << ") "
-         << "received: '" << msg << "' from " << ipv4From << endl;
+         << "received from " << ipv4From << " msg: " << msg << endl;
 #endif
 
     ReplyEgressPacket(node->GetId(), ipv4From, ipv4Addr, buffer, packet->GetSize());
@@ -158,8 +159,8 @@ void SimBridge::HandleSetPositions(int numBytes) {
         offset += sizeof(float);
 
 #if DEBUG
-        cout << "[NS3:SimBridge] DEBUG: Node " << nodeId
-             << " new position is (" << x << ", " << y << ", " << z << ")" << endl;
+        cout << "[NS3:SimBridge] DEBUG: Node " << nodeId << " "
+             << "new position is (" << x << ", " << y << ", " << z << ")" << endl;
 #endif
 
         m_nodesManager.SetNodePosition(nodeId, Vector(x, y, z));

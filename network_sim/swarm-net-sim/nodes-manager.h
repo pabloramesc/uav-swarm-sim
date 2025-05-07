@@ -14,7 +14,7 @@ public:
     NodesManager();
     ~NodesManager();
 
-    void RegisterNode(int nodeId, Ptr<Node> node, uint16_t port = 12345, bool bcast = true);
+    void RegisterNode(int nodeId, Ptr<Node> node);
     void SetNodeRxCallback(int nodeId, Callback<void, Ptr<Socket>>);
 
     void SetNodePosition(int nodeId, const Vector &pos);
