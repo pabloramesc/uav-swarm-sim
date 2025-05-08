@@ -21,6 +21,7 @@ class SimNode:
     type_id: int
     type: NODE_TYPE
     addr: str = "0.0.0.0"
+    position: np.ndarray = None
 
 
 class NetworkSimulator:
@@ -29,7 +30,7 @@ class NetworkSimulator:
         self.num_gcs = num_gcs
         self.num_uavs = num_uavs
         self.num_users = num_users
-        
+
         self.nodes: list[SimNode] = []
         self.node_packets: dict[int, list[SimPacket]] = {}
         self._create_nodes()
@@ -41,39 +42,55 @@ class NetworkSimulator:
         return len(self.nodes)
 
     def launch_simulator(self, max_attempts: int = 1, verbose: bool = True) -> None:
-        for attempt in range(1, max_attempts + 1):
+        attempt = 1
+        while attempt <= max_attempts:
             try:
                 if verbose:
                     print(
-                        "Initializing NS-3 simulator... "
-                        f"(attempt {attempt}/{max_attempts})"
+                        f"Initializing NS-3 simulator... (attempt {attempt}/{max_attempts})"
                     )
 
                 self._launch_ns3_simulator()
+                time.sleep(1.0)
+                self._verify_ns3_connection(max_attempts=5)
+                self._verify_ns3_nodes()
+
                 if verbose:
                     print(
                         f"NS-3 simulator launched for {self.num_nodes} nodes "
                         f"({self.num_gcs} GCSs, {self.num_uavs} UAVs, and {self.num_users} users)."
                     )
 
-                self._verify_ns3_connection()
-                self._verify_ns3_nodes()
+                return
 
             except Exception:
-                if verbose:
-                    print(
-                        f"Failed to launch NS-3 simulator. Retrying..."
-                        if attempt < max_attempts
-                        else "All attempts failed. Skipping."
-                    )
+                if verbose and attempt < max_attempts:
+                    print(f"Failed to launch NS-3 simulator. Retrying...")
+                    self._terminate_ns3_simulator(verbose=verbose)
+                attempt += 1
+
+        if attempt > max_attempts:
+            raise Exception("All simulator launch attempts failed.")
 
     def set_node_positions(self, positions: np.ndarray) -> None:
         if positions.shape != (self.num_nodes, 3):
             raise ValueError(
                 f"Positions must be a numpy array with shape ({self.num_nodes}, 3)"
             )
-        node_id_pos = {id: pos for id, pos in enumerate(positions)}
+        node_id_pos: dict[int, np.ndarray] = {}
+        for node_id, node_pos in enumerate(positions):
+            self.nodes[node_id].position = node_pos
+            node_id_pos[node_id] = node_pos
         self.bridge.set_node_positions(node_id_pos)
+
+    def verify_node_positions(self) -> None:
+        node_id_pos = self.bridge.get_node_positions()
+        for node_id, ns3_pos in node_id_pos.items():
+            local_pos = self.nodes[node_id].position
+            if not np.allclose(local_pos, ns3_pos):
+                raise Exception(
+                    f"Node {node_id} local position ({local_pos}) does not match NS-3 position ({ns3_pos})"
+                )
 
     def send_packet(self, packet: SimPacket) -> None:
         self.bridge.send_ingress_packet(packet)
@@ -83,6 +100,7 @@ class NetworkSimulator:
         for packet in packets:
             self._validate_node_id(packet.node_id)
             self.node_packets[packet.node_id].append(packet)
+        return
 
     def get_node_packets(self, node_id: int, delete: bool = False) -> list[SimPacket]:
         self._validate_node_id(node_id)
@@ -102,18 +120,9 @@ class NetworkSimulator:
     def stop_simulator(self, timeout: float = 1.0, verbose: bool = True) -> None:
         if verbose:
             print("Terminating NS-3 simulator...")
-
         self.bridge.stop_ns3()
         time.sleep(timeout)
-
-        if self.ns3_process.poll() is None:  # Check if the process is still running
-            if verbose:
-                print("NS-3 process is still running. Terminating...")
-            self.ns3_process.terminate()  # Send termination signal
-            self.ns3_process.wait(timeout)  # Wait for the process to terminate
-
-        if verbose:
-            print("NS-3 process terminated.")
+        self._terminate_ns3_simulator(timeout, verbose)
 
     def ip_address_to_node_id(self, ip_address: str) -> int:
         """
@@ -189,6 +198,18 @@ class NetworkSimulator:
         self.ns3_process = subprocess.Popen(
             ["./ns3", "run", sim_cmd], cwd="./network_sim/ns-3"
         )
+
+    def _terminate_ns3_simulator(
+        self, timeout: float = 1.0, verbose: bool = True
+    ) -> None:
+        if self.ns3_process.poll() is None:  # Check if the process is still running
+            if verbose:
+                print("NS-3 process is still running. Terminating...")
+            self.ns3_process.terminate()  # Send termination signal
+            self.ns3_process.wait(timeout)  # Wait for the process to terminate
+
+        if verbose:
+            print("NS-3 process terminated.")
 
     def _verify_ns3_connection(self, max_attempts: int = 2) -> None:
         is_running = False

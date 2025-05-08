@@ -15,7 +15,7 @@ from .ipc_socket import IpcMessage, IpcSocket
 
 # Create a logger for this module
 logger = logging.getLogger("SIM:SimBridge")
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.NOTSET)
 handler = logging.StreamHandler()
 formatter = logging.Formatter("[%(name)s] %(levelname)s: %(message)s")
 handler.setFormatter(formatter)
@@ -52,7 +52,10 @@ class SimPacket:
 class SimBridge:
 
     def __init__(self):
-        self.sock = IpcSocket(addr="127.0.0.1", port=9001, ns3_port=9000)
+        self.sock = IpcSocket(
+            addr="127.0.0.1", port=9001, ns3_port=9000, buffer_size=1000
+        )
+        self.sock.start_reading()
 
     def is_ns3_running(self, timeout: float = 1.0) -> bool:
         logger.debug("Sending CMD_DO_NOTHING to NS-3...")
@@ -62,7 +65,7 @@ class SimBridge:
 
         time.sleep(timeout)
 
-        ipc_msg = self.sock.read_socket()
+        ipc_msg = self.sock.get_last_message()
 
         if ipc_msg is None:
             logger.debug("No package received from NS-3")
@@ -115,7 +118,7 @@ class SimBridge:
 
         time.sleep(timeout)
 
-        ipc_msg = self.sock.read_socket()
+        ipc_msg = self.sock.get_last_message()
 
         if ipc_msg is None:
             logger.debug("No response received.")
@@ -159,7 +162,7 @@ class SimBridge:
 
         time.sleep(timeout)  # Wait for the response
 
-        ipc_msg = self.sock.read_socket()
+        ipc_msg = self.sock.get_last_message()
 
         if ipc_msg is None:
             logger.debug("No response received.")
@@ -223,13 +226,9 @@ class SimBridge:
 
     def read_egress_packets(self) -> list[SimPacket]:
         packets: list[SimPacket] = []
-        while True:
-            ipc_msg = self.sock.read_socket()
+        messages = self.sock.get_all_messages()
 
-            if ipc_msg is None:
-                logger.debug("No messages pending in socket.")
-                break
-
+        for ipc_msg in messages:
             msg = self._ipc_message_to_sim_message(ipc_msg)
 
             if msg.command == REPLY_EGRESS_PACKET:

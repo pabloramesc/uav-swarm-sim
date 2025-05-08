@@ -3,7 +3,7 @@
 #include "ns3/internet-module.h"
 #include "ns3/mobility-module.h"
 
-#define DEBUG true
+#define DEBUG false
 
 #define PORT 12345
 #define BCAST true

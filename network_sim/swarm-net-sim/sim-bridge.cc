@@ -14,7 +14,7 @@
 using namespace std;
 using namespace ns3;
 
-#define DEBUG true
+#define DEBUG false
 
 SimBridge::SimBridge(float pollingInterval)
     : m_pollingInterval(pollingInterval),
@@ -75,9 +75,9 @@ void SimBridge::RxCallback(Ptr<Socket> socket) {
     uint8_t buffer[BUFFER_SIZE];
     uint32_t size = packet->GetSize();
     packet->CopyData(buffer, size);
-    string msg((char *)buffer, size);
 
     Ptr<Node> node = socket->GetNode();
+
     Ptr<Ipv4> ipv4 = node->GetObject<Ipv4>();
     Ipv4Address ipv4Addr = ipv4->GetAddress(1, 0).GetLocal();
 
@@ -85,12 +85,13 @@ void SimBridge::RxCallback(Ptr<Socket> socket) {
     Ipv4Address ipv4From = inetFrom.GetIpv4();
 
 #if DEBUG
+    string msg((char *)buffer, size);
     cout << "[NS3:RxCallback] DEBUG: At " << Simulator::Now().GetSeconds() << "s "
          << "Node " << node->GetId() << " (" << ipv4Addr << ") "
          << "received from " << ipv4From << " msg: " << msg << endl;
 #endif
 
-    ReplyEgressPacket(node->GetId(), ipv4From, ipv4Addr, buffer, packet->GetSize());
+    ReplyEgressPacket(node->GetId(), ipv4From, ipv4Addr, buffer, size);
 }
 
 void SimBridge::ProcessCommand(int numBytes) {

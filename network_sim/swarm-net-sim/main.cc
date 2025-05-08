@@ -5,49 +5,15 @@
 #include "ns3/network-module.h"
 #include "ns3/wifi-module.h"
 
-#include "sim-bridge.h" // Asegúrate de que este header esté en tu include path
+#include "sim-bridge.h"
 
 using namespace ns3;
 
-// void ReceivePacket(Ptr<Socket> socket) {
-//     Address from;
-//     Ptr<Packet> packet = socket->RecvFrom(from);
-//     uint8_t buffer[1024];
-//     packet->CopyData(buffer, packet->GetSize());
-//     std::string msg((char *)buffer);
-
-//     Ptr<Node> node = socket->GetNode();
-//     Ptr<Ipv4> ipv4 = node->GetObject<Ipv4>();
-//     Ipv4Address ipv4Addr = ipv4->GetAddress(1, 0).GetLocal();
-
-//     InetSocketAddress inetFrom = InetSocketAddress::ConvertFrom(from);
-//     Ipv4Address ipv4From = inetFrom.GetIpv4();
-
-//     std::cout << "Nodo " << node->GetId() << " (" << ipv4Addr << ") recibió: '"
-//               << msg << "' desde " << ipv4From << std::endl;
-// }
-
-// void SendPacket(Ptr<Socket> socket, Ipv4Address destAddr) {
-//     InetSocketAddress remoteAddr = InetSocketAddress(destAddr, 12345);
-//     // source->SetAllowBroadcast(true);
-//     socket->Connect(remoteAddr);
-
-//     Ptr<Node> node = socket->GetNode();
-//     std::string msg = "Hello from " + std::to_string(node->GetId());
-//     Ptr<Packet> packet = Create<Packet>((uint8_t *)msg.c_str(), msg.length() + 1);
-//     socket->Send(packet);
-
-//     Ptr<Ipv4> ipv4 = node->GetObject<Ipv4>();
-//     Ipv4Address ipv4Addr = ipv4->GetAddress(1, 0).GetLocal();
-
-//     std::cout << "Nodo " << node->GetId() << " (" << ipv4Addr << ") envió: '"
-//               << msg << "' a " << destAddr << std::endl;
-// }
-
 int main(int argc, char *argv[]) {
-    uint32_t nGCS = 1;
-    uint32_t nUAV = 5;
-    uint32_t nUser = 3;
+    // --- Command-line arguments ---
+    uint32_t nGCS = 1; // Number of Ground Control Station nodes
+    uint32_t nUAV = 5; // Number of UAV nodes
+    uint32_t nUser = 3; // Number of User nodes
 
     CommandLine cmd;
     cmd.AddValue("nGCS", "Number of GCS nodes", nGCS);
@@ -55,39 +21,60 @@ int main(int argc, char *argv[]) {
     cmd.AddValue("nUser", "Number of User nodes", nUser);
     cmd.Parse(argc, argv);
 
+    // --- Real time configuration ---
     GlobalValue::Bind("SimulatorImplementationType", StringValue("ns3::RealtimeSimulatorImpl"));
     Config::SetDefault("ns3::RealtimeSimulatorImpl::SynchronizationMode", StringValue("BestEffort"));
     Time::SetResolution(Time::NS);
 
-    NodeContainer gcsNodes;
-    NodeContainer uavNodes;
-    NodeContainer userNodes;
+    // --- Node creation ---
+    NodeContainer gcsNodes, uavNodes, userNodes, allNodes;
     gcsNodes.Create(nGCS);
     uavNodes.Create(nUAV);
     userNodes.Create(nUser);
-
-    NodeContainer allNodes;
     allNodes.Add(gcsNodes);
     allNodes.Add(uavNodes);
     allNodes.Add(userNodes);
 
+    // --- WiFi configuration ---
     WifiHelper wifi;
     wifi.SetStandard(WIFI_STANDARD_80211b);
+    wifi.SetRemoteStationManager("ns3::ConstantRateWifiManager",
+                                 "DataMode", StringValue("DsssRate1Mbps"),
+                                 "ControlMode", StringValue("DsssRate1Mbps"));
+
     WifiMacHelper mac;
     mac.SetType("ns3::AdhocWifiMac");
 
-    YansWifiPhyHelper phy;
+    // --- WiFi channel configuration ---
     YansWifiChannelHelper channel = YansWifiChannelHelper::Default();
-    phy.SetChannel(channel.Create());
+    Ptr<YansWifiChannel> wifiChannel = channel.Create();
 
+    Ptr<LogDistancePropagationLossModel> lossModel = CreateObject<LogDistancePropagationLossModel>();
+    lossModel->SetPathLossExponent(2.4); // Free space: 2.0, urban: ~3.0–4.0
+    lossModel->SetReference(1.0, 40.05); // Reference distance (m) and loss (dB)
+
+    Ptr<PropagationDelayModel> delayModel = CreateObject<ConstantSpeedPropagationDelayModel>();
+    wifiChannel->SetPropagationLossModel(lossModel);
+    wifiChannel->SetPropagationDelayModel(delayModel);
+
+    YansWifiPhyHelper phy;
+    phy.SetChannel(wifiChannel);
+    // phy.Set("TxPowerStart", DoubleValue(30.0));
+    // phy.Set("TxPowerEnd", DoubleValue(30.0));
+    // phy.Set("RxGain", DoubleValue(0));
+    // phy.Set("TxGain", DoubleValue(0));
+
+    // --- Device installation ---
     NetDeviceContainer gcsDevices = wifi.Install(phy, mac, gcsNodes);
     NetDeviceContainer uavDevices = wifi.Install(phy, mac, uavNodes);
     NetDeviceContainer userDevices = wifi.Install(phy, mac, userNodes);
 
+    // --- Mobility configuration ---
     MobilityHelper mobility;
     mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
     mobility.Install(allNodes);
 
+    // --- AODV routing configuration ---
     AodvHelper aodv;
     Ipv4ListRoutingHelper list;
     list.Add(aodv, 100);
@@ -95,6 +82,7 @@ int main(int argc, char *argv[]) {
     stack.SetRoutingHelper(aodv);
     stack.Install(allNodes);
 
+    // --- IP address assignment ---
     Ipv4AddressHelper ipv4;
     ipv4.SetBase("10.0.0.0", "255.255.0.0", "0.0.1.1");
     Ipv4InterfaceContainer gcsIfaces = ipv4.Assign(gcsDevices);
@@ -103,26 +91,16 @@ int main(int argc, char *argv[]) {
     ipv4.SetBase("10.0.0.0", "255.255.0.0", "0.0.3.1");
     Ipv4InterfaceContainer userIfaces = ipv4.Assign(userDevices);
 
-    // Ipv4InterfaceContainer allIfaces;
-    // allIfaces.Add(gcsIfaces);
-    // allIfaces.Add(uavIfaces);
-    // allIfaces.Add(userIfaces);
-
-    SimBridge bridge(0.01);
+    // --- SimBridge setup ---
+    SimBridge bridge(0.01); // Polling interval
     for (uint32_t i = 0; i < allNodes.GetN(); ++i) {
         bridge.RegisterNode(i, allNodes.Get(i));
     }
     bridge.StartPolling();
 
-    // Ptr<Node> node = allNodes.Get(0);
-    // Ptr<Socket> socket = Socket::CreateSocket(node, UdpSocketFactory::GetTypeId());
-    // InetSocketAddress local = InetSocketAddress(Ipv4Address::GetAny(), 12345);
-    // socket->Bind(local);
-    // socket->SetRecvCallback(MakeCallback(&ReceivePacket));
-    // socket->SetAllowBroadcast(true);
-    // Simulator::Schedule(Seconds(1.0), &SendPacket, socket, Ipv4Address("10.0.2.1"));
-
+    // --- Simulation execution ---
     Simulator::Run();
     Simulator::Destroy();
+
     return 0;
 }
