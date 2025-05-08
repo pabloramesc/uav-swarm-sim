@@ -1,6 +1,6 @@
 import subprocess
 import time
-from swarm_sim.network.sim_bridge import SimBridge
+from swarm_sim.network.sim_bridge import SimBridge, SimPacket
 
 import numpy as np
 
@@ -9,7 +9,8 @@ subprocess.run(["sh", "update_code.sh"], cwd="./network_sim", check=True)
 
 # Launch the NS3 simulation
 ns3_process = subprocess.Popen(
-    ["./ns3", "run", "scratch/swarm-net-sim/main"], cwd="./network_sim/ns-3"
+    ["./ns3", "run", "scratch/swarm-net-sim/main --nGCS=2 --nUAV=3 --nUser=4"],
+    cwd="./network_sim/ns-3",
 )
 
 bridge = SimBridge()
@@ -34,19 +35,29 @@ bridge.set_node_positions(
 time.sleep(1.0)
 
 positions = bridge.get_node_positions()
-for node_id, pos in positions.items():
-    print(f"Node {node_id} position: {pos}")
+for node_id, node_pos in positions.items():
+    print(f"Node {node_id} position: {node_pos}")
 time.sleep(1.0)
 
-bridge.send_packet(node_id=0, src_addr="0.0.0.0", dst_addr="10.0.2.1", data=b"Hello NS-3!")
-bridge.send_packet(node_id=0, src_addr="0.0.0.0", dst_addr="10.0.2.2", data=b"Hello NS-3!")
-bridge.send_packet(node_id=0, src_addr="0.0.0.0", dst_addr="10.0.2.3", data=b"Hello NS-3!")
+addresses = bridge.get_node_addresses()
+for node_id, ip_addr in addresses.items():
+    print(f"Node {node_id} has IP address {ip_addr}")
+
+bridge.send_ingress_packet(
+    SimPacket(node_id=0, src_addr="0.0.0.0", dst_addr="10.0.2.1", data=b"Hello NS-3!")
+)
+bridge.send_ingress_packet(
+    SimPacket(node_id=0, src_addr="0.0.0.0", dst_addr="10.0.2.2", data=b"Hello NS-3!")
+)
+bridge.send_ingress_packet(
+    SimPacket(node_id=0, src_addr="0.0.0.0", dst_addr="10.0.2.3", data=b"Hello NS-3!")
+)
 time.sleep(1.0)
 
-bridge.update_egress_packets()
+bridge.read_egress_packets()
 time.sleep(1.0)
 
-bridge.stop()
+bridge.stop_ns3()
 time.sleep(1.0)
 
 # Ensure the NS-3 process is terminated

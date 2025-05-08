@@ -9,40 +9,40 @@
 
 using namespace ns3;
 
-void ReceivePacket(Ptr<Socket> socket) {
-    Address from;
-    Ptr<Packet> packet = socket->RecvFrom(from);
-    uint8_t buffer[1024];
-    packet->CopyData(buffer, packet->GetSize());
-    std::string msg((char *)buffer);
+// void ReceivePacket(Ptr<Socket> socket) {
+//     Address from;
+//     Ptr<Packet> packet = socket->RecvFrom(from);
+//     uint8_t buffer[1024];
+//     packet->CopyData(buffer, packet->GetSize());
+//     std::string msg((char *)buffer);
 
-    Ptr<Node> node = socket->GetNode();
-    Ptr<Ipv4> ipv4 = node->GetObject<Ipv4>();
-    Ipv4Address ipv4Addr = ipv4->GetAddress(1, 0).GetLocal();
+//     Ptr<Node> node = socket->GetNode();
+//     Ptr<Ipv4> ipv4 = node->GetObject<Ipv4>();
+//     Ipv4Address ipv4Addr = ipv4->GetAddress(1, 0).GetLocal();
 
-    InetSocketAddress inetFrom = InetSocketAddress::ConvertFrom(from);
-    Ipv4Address ipv4From = inetFrom.GetIpv4();
+//     InetSocketAddress inetFrom = InetSocketAddress::ConvertFrom(from);
+//     Ipv4Address ipv4From = inetFrom.GetIpv4();
 
-    std::cout << "Nodo " << node->GetId() << " (" << ipv4Addr << ") recibió: '"
-              << msg << "' desde " << ipv4From << std::endl;
-}
+//     std::cout << "Nodo " << node->GetId() << " (" << ipv4Addr << ") recibió: '"
+//               << msg << "' desde " << ipv4From << std::endl;
+// }
 
-void SendPacket(Ptr<Socket> socket, Ipv4Address destAddr) {
-    InetSocketAddress remoteAddr = InetSocketAddress(destAddr, 12345);
-    // source->SetAllowBroadcast(true);
-    socket->Connect(remoteAddr);
+// void SendPacket(Ptr<Socket> socket, Ipv4Address destAddr) {
+//     InetSocketAddress remoteAddr = InetSocketAddress(destAddr, 12345);
+//     // source->SetAllowBroadcast(true);
+//     socket->Connect(remoteAddr);
 
-    Ptr<Node> node = socket->GetNode();
-    std::string msg = "Hello from " + std::to_string(node->GetId());
-    Ptr<Packet> packet = Create<Packet>((uint8_t *)msg.c_str(), msg.length() + 1);
-    socket->Send(packet);
+//     Ptr<Node> node = socket->GetNode();
+//     std::string msg = "Hello from " + std::to_string(node->GetId());
+//     Ptr<Packet> packet = Create<Packet>((uint8_t *)msg.c_str(), msg.length() + 1);
+//     socket->Send(packet);
 
-    Ptr<Ipv4> ipv4 = node->GetObject<Ipv4>();
-    Ipv4Address ipv4Addr = ipv4->GetAddress(1, 0).GetLocal();
+//     Ptr<Ipv4> ipv4 = node->GetObject<Ipv4>();
+//     Ipv4Address ipv4Addr = ipv4->GetAddress(1, 0).GetLocal();
 
-    std::cout << "Nodo " << node->GetId() << " (" << ipv4Addr << ") envió: '"
-              << msg << "' a " << destAddr << std::endl;
-}
+//     std::cout << "Nodo " << node->GetId() << " (" << ipv4Addr << ") envió: '"
+//               << msg << "' a " << destAddr << std::endl;
+// }
 
 int main(int argc, char *argv[]) {
     uint32_t nGCS = 1;
