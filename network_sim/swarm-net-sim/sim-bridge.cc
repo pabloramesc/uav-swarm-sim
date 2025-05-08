@@ -114,6 +114,10 @@ void SimBridge::ProcessCommand(int numBytes) {
         HandleRequestPositions(numBytes);
         break;
 
+    case CMD_REQUEST_ADDRESSES:
+        HandleRequestAddresses(numBytes);
+        break;
+
     case CMD_INGRESS_PACKET:
         HandleIngressPacket(numBytes);
         break;
@@ -272,7 +276,7 @@ void SimBridge::ReplyAllPositions() {
 
 void SimBridge::ReplyEgressPacket(int nodeId, Ipv4Address srcAddr, Ipv4Address destAddr, const uint8_t *data, size_t size) {
     uint8_t response[1024];
-    size_t responseSize = 13 + size; // 1 byte for command + 4 bytes for nodeId + 4 bytes for srcAddr + 4 bytes for destAddr + payload
+    size_t responseSize = 10 + size; // 1 byte for command + 1 byte for nodeId + 4 bytes for srcAddr + 4 bytes for destAddr + payload
 
     if (responseSize > sizeof(response)) {
         NS_FATAL_ERROR("[NS3:SimBridge] ERROR: Response size exceeds buffer limit.");
@@ -280,17 +284,58 @@ void SimBridge::ReplyEgressPacket(int nodeId, Ipv4Address srcAddr, Ipv4Address d
     }
 
     response[0] = REPLY_EGRESS_PACKET; // Command code for egress packet
-    *reinterpret_cast<int *>(&response[1]) = nodeId;
-    *reinterpret_cast<uint32_t *>(&response[5]) = srcAddr.Get();
-    *reinterpret_cast<uint32_t *>(&response[9]) = destAddr.Get();
-    memcpy(&response[13], data, size);
+    response[1] = (uint8_t)nodeId;
+    *reinterpret_cast<uint32_t *>(&response[2]) = htonl(srcAddr.Get());
+    *reinterpret_cast<uint32_t *>(&response[6]) = htonl(destAddr.Get());
+    memcpy(&response[10], data, size);
 
 #if DEBUG
     cout << "[NS3:SimBridge] DEBUG: Node " << nodeId
-         << " sent a response from " << srcAddr
-         << " to " << destAddr
+         << " sent a response from " << srcAddr << " to " << destAddr
          << " with payload size " << size << " bytes." << endl;
 #endif
 
     m_ipcSocket.SendToRemote(response, responseSize);
+}
+
+void SimBridge::HandleRequestAddresses(int numBytes) {
+    if (numBytes > 1) {
+        cerr << "[NS3:SimBridge] ERROR: CMD_REQUEST_ADDRESSES received with extra data. Ignoring." << endl;
+        return;
+    }
+
+#if DEBUG
+    cout << "[NS3:SimBridge] DEBUG: Handling CMD_REQUEST_ADDRESSES. Replying with all node addresses." << endl;
+#endif
+
+    ReplyAllAddresses();
+}
+
+void SimBridge::ReplyAllAddresses() {
+    uint8_t response[BUFFER_SIZE];
+    size_t offset = 0;
+
+    response[offset++] = REPLY_ALL_ADDRESSES; // Add the reply command code
+
+    int numNodes = m_nodesManager.GetNumNodes();
+    for (int nodeId = 0; nodeId < numNodes; nodeId++) {
+        Ipv4Address ipAddr = m_nodesManager.GetNodeIpAddress(nodeId);
+
+        if (offset + 5 > BUFFER_SIZE) { // Ensure there is enough space for 1 byte (nodeId) + 4 bytes (ipAddr)
+            NS_FATAL_ERROR("[NS3:SimBridge] ERROR: Buffer overflow while preparing REPLY_ALL_ADDRESSES.");
+            return;
+        }
+
+        response[offset++] = static_cast<uint8_t>(nodeId); // Add nodeId (1 byte)
+        uint32_t ipAddrRaw = htonl(ipAddr.Get());
+        memcpy(&response[offset], &ipAddrRaw, sizeof(uint32_t)); // Add ipAddr (4 bytes)
+        offset += sizeof(uint32_t);
+    }
+
+    m_ipcSocket.SendToRemote(response, offset);
+
+#if DEBUG
+    cout << "[NS3:SimBridge] DEBUG: Sent REPLY_ALL_ADDRESSES with " << (offset - 1) / 5
+         << " entries (" << offset << " bytes)." << endl;
+#endif
 }

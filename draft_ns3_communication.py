@@ -1,11 +1,11 @@
 import subprocess
 import time
-from swarm_sim.sim_bridge.sim_bridge import SimBridge
+from swarm_sim.network.sim_bridge import SimBridge
 
 import numpy as np
 
 # Run update_net_sim.sh at the beginning
-# subprocess.run(["sh", "update_code.sh"], cwd="./network_sim", check=True)
+subprocess.run(["sh", "update_code.sh"], cwd="./network_sim", check=True)
 
 # Launch the NS3 simulation
 ns3_process = subprocess.Popen(
@@ -38,11 +38,12 @@ for node_id, pos in positions.items():
     print(f"Node {node_id} position: {pos}")
 time.sleep(1.0)
 
-bridge.send_packet(node_id=0, src_addr="0.0.0.0", dest_addr="10.0.2.1", data=b"Hello NS-3!")
+bridge.send_packet(node_id=0, src_addr="0.0.0.0", dst_addr="10.0.2.1", data=b"Hello NS-3!")
+bridge.send_packet(node_id=0, src_addr="0.0.0.0", dst_addr="10.0.2.2", data=b"Hello NS-3!")
+bridge.send_packet(node_id=0, src_addr="0.0.0.0", dst_addr="10.0.2.3", data=b"Hello NS-3!")
 time.sleep(1.0)
 
-bridge.read_available_replies()
-packets = bridge.pop_egress_packets()
+bridge.update_egress_packets()
 time.sleep(1.0)
 
 bridge.stop()

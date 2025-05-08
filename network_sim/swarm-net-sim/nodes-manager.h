@@ -23,6 +23,7 @@ public:
 
     int GetNumNodes() const;
     Ptr<Node> GetNode(int nodeId) const;
+    Ipv4Address GetNodeIpAddress(int nodeId) const;
 
     void Clear();
 

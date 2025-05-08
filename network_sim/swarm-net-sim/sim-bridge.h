@@ -17,9 +17,11 @@ enum SimCommandCode {
     CMD_SET_POSITIONS = 0x01,
     CMD_REQUEST_POSITIONS = 0x02,
     CMD_INGRESS_PACKET = 0x03,
+    CMD_REQUEST_ADDRESSES = 0x04,
     CMD_STOP_SIMULATION = 0xFF,
     REPLY_ALL_POSITIONS = 0xA1,
     REPLY_EGRESS_PACKET = 0xA2,
+    REPLY_ALL_ADDRESSES = 0xA3,
 };
 
 class SimBridge {
@@ -40,11 +42,13 @@ private:
     void HandleDoNothing(int numBytes);
     void HandleSetPositions(int numBytes);
     void HandleRequestPositions(int numBytes);
+    void HandleRequestAddresses(int numBytes);
     void HandleIngressPacket(int numBytes);
     void HandleStopSimulation(int numBytes);
 
     void ReplyDoNothing();
     void ReplyAllPositions();
+    void ReplyAllAddresses();
     void ReplyEgressPacket(int nodeId, Ipv4Address srcAddr, Ipv4Address destAddr, const uint8_t *data, size_t size);
 
     float m_pollingInterval;

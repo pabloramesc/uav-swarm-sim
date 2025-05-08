@@ -131,3 +131,25 @@ Ptr<Node> NodesManager::GetNode(int nodeId) const {
     }
     return it->second;
 }
+
+Ipv4Address NodesManager::GetNodeIpAddress(int nodeId) const {
+    auto it = m_nodes.find(nodeId);
+    if (it == m_nodes.end()) {
+        NS_FATAL_ERROR("[NS3:NodesManager] ERROR: Node ID " << nodeId << " not found in registry.");
+    }
+
+    Ptr<Node> node = it->second;
+    Ptr<Ipv4> ipv4 = node->GetObject<Ipv4>();
+    if (ipv4 == nullptr) {
+        NS_FATAL_ERROR("[NS3:NodesManager] ERROR: Ipv4 object not found for Node " << nodeId);
+    }
+
+    // Assuming interface 1 is used for the primary IP address
+    Ipv4Address ipAddr = ipv4->GetAddress(1, 0).GetLocal();
+
+#if DEBUG
+    cout << "[NS3:NodesManager] DEBUG: Node " << nodeId << " has IP address " << ipAddr << endl;
+#endif
+
+    return ipAddr;
+}
