@@ -26,10 +26,13 @@ class SimNode:
 
 class NetworkSimulator:
 
-    def __init__(self, num_gcs: int, num_uavs: int, num_users: int):
+    def __init__(
+        self, num_gcs: int, num_uavs: int, num_users: int, verbose: bool = True
+    ):
         self.num_gcs = num_gcs
         self.num_uavs = num_uavs
         self.num_users = num_users
+        self.verbose = verbose
 
         self.nodes: list[SimNode] = []
         self.node_packets: dict[int, list[SimPacket]] = {}
@@ -127,15 +130,6 @@ class NetworkSimulator:
     def ip_address_to_node_id(self, ip_address: str) -> int:
         """
         Convert an IP address to a node ID.
-
-        Args:
-            ip_address (str): The IP address to convert.
-
-        Returns:
-            int: The corresponding node ID.
-
-        Raises:
-            ValueError: If the IP address does not match any node.
         """
         for node in self.nodes:
             if node.addr == ip_address:
@@ -145,18 +139,26 @@ class NetworkSimulator:
     def node_id_to_ip_address(self, node_id: int) -> str:
         """
         Convert a node ID to an IP address.
-
-        Args:
-            node_id (int): The node ID to convert.
-
-        Returns:
-            str: The corresponding IP address.
-
-        Raises:
-            ValueError: If the node ID is invalid.
         """
         self._validate_node_id(node_id)
         return self.nodes[node_id].addr
+
+    def node_id_to_type_id(self, node_id: int) -> tuple[NODE_TYPE, int]:
+        """
+        Convert a node ID to its type and type_id.
+        """
+        self._validate_node_id(node_id)
+        node = self.nodes[node_id]
+        return node.type, node.type_id
+
+    def type_id_to_node_id(self, node_type: NODE_TYPE, type_id: int) -> int:
+        """
+        Convert a node type and type_id to its node ID.
+        """
+        for node in self.nodes:
+            if node.type == node_type and node.type_id == type_id:
+                return node.node_id
+        raise ValueError(f"No node found with type '{node_type}' and type_id {type_id}")
 
     def _create_nodes(self) -> None:
         self.nodes: list[SimNode] = []
@@ -234,6 +236,8 @@ class NetworkSimulator:
                     f"NS-3 node addr {addr} does not match local node addr {node.addr}"
                 )
             self._validate_node_type_address(node.type, node.addr)
+            if self.verbose:
+                print(f"Node {id} successfully created:", node)
 
     def _validate_node_id(self, id: int) -> None:
         if id < 0:
