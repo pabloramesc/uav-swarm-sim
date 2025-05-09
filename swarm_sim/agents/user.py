@@ -7,8 +7,11 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from simulator.agents import Agent
-from simulator.environment import Environment
+from ..environment import Environment
+from ..mobility.random_walk import SurfaceRandomWalker
+from ..network.network_interface import NetworkInterface, SimPacket
+from ..network.network_packets import PositionPacket
+from .agent import Agent, AgentType
 
 
 class User(Agent):
@@ -18,21 +21,32 @@ class User(Agent):
     The user agent performs a random walk within the environment.
     """
 
-    def __init__(self, id: int, env: Environment):
+    def __init__(
+        self,
+        global_id: int,
+        type_id: int,
+        env: Environment,
+        net: NetworkInterface = None,
+        tx_interval: float = 1.0,
+    ):
         """
         Initializes the user agent with a unique ID, maximum speed, and maximum acceleration.
 
-        Parameters
-        ----------
-        id : int
-            Unique identifier for the user agent.
-        env : Environment
-            The simulation environment the agent interacts with.
         """
-        super().__init__(id=id, type="user", env=env)
-        self.max_speed = 1.0  # Maximum horizontal speed in m/s
-        self.max_climb_rate = 0.2  # Maximum ascent/descent rate in m/s
-        self.turning_rate = 0.3  # Controls how quickly the agent can change direction
+        super().__init__(
+            global_id=global_id, type_id=type_id, agent_type="user", env=env, net=net
+        )
+        self.random_walk = SurfaceRandomWalker(env)
+        
+        self.tx_interval = tx_interval
+        self.last_tx_time = 0.0
+        self.next_tx_time = 0.0 + self.tx_interval
+
+    def initialize(self, state: np.ndarray, time: float = 0.0) -> None:
+        super().initialize(state, time)
+        self.random_walk.initialize(self.state)
+        self.last_tx_time = time
+        self.next_tx_time = time + self.tx_interval * np.random.normal(1.0, 0.1)
 
     def update(self, dt: float = 0.01) -> None:
         """
@@ -44,83 +58,24 @@ class User(Agent):
             The time step in seconds (default is 0.01).
         """
         super().update(dt)
-        self.random_walk(dt)
+        self.state = self.random_walk(dt)
 
-    def random_walk(self, dt: float = 0.01) -> None:
-        """
-        Performs a random walk by generating random velocity changes and avoiding obstacles.
+        if self.time >= self.next_tx_time:
+            self.broadcast_position()
+            self.last_tx_time = self.time
+            self.next_tx_time = self.time + self.tx_interval * np.random.normal(
+                1.0, 0.1
+            )
 
-        The random walk is constrained by the maximum speed and incorporates smooth
-        direction changes and obstacle avoidance.
-
-        Parameters
-        ----------
-        dt : float, optional
-            The time step in seconds (default is 0.01).
-        """
-        # Generate a random velocity change
-        random_direction = np.random.uniform(-1, 1, size=2)  # Random 2D direction
-        random_direction /= np.linalg.norm(random_direction)  # Normalize direction
-        random_velocity = random_direction * np.random.uniform(
-            0.0, self.max_speed
-        )  # Scale by max speed
-
-        # Smoothly blend current velocity with the random velocity
-        smooth_velocity = (1 - self.turning_rate) * self.state[3:5] + (
-            self.turning_rate * random_velocity
+    def broadcast_position(self) -> None:
+        payload = PositionPacket()
+        payload.set_packet_id(self.global_id, self.network.tx_packet_counter)
+        payload.set_timestamp(self.time)
+        payload.set_position(self.position)
+        packet = SimPacket(
+            node_id=self.global_id,
+            src_addr=self.network.get_ip(),
+            dst_addr="10.0.255.255",
+            data=payload.serialize(),
         )
-
-        # Add obstacle avoidance force
-        avoidance_force = self._calculate_obstacle_avoidance()
-        total_velocity = smooth_velocity + avoidance_force * dt
-
-        # Limit the horizontal velocity to the maximum speed
-        horizontal_speed = np.linalg.norm(total_velocity)
-        if horizontal_speed > self.max_speed:
-            total_velocity *= self.max_speed / horizontal_speed
-
-        # Update horizontal velocity and position
-        self.state[3:5] = total_velocity
-        self.state[0:2] += self.state[3:5] * dt
-
-        # Adjust altitude toward the target elevation
-        target_altitude = self.environment.get_elevation(
-            self.state[0:2]
-        )  # Get target elevation
-        altitude_error = (
-            target_altitude - self.state[2]
-        )  # Difference between target and current altitude
-
-        # Proportional control for vertical velocity
-        vertical_velocity = np.clip(
-            altitude_error, -self.max_climb_rate, +self.max_climb_rate
-        )
-        self.state[5] = vertical_velocity  # Update vertical velocity
-
-        # Update vertical position
-        self.state[2] += self.state[5] * dt
-
-    def _calculate_obstacle_avoidance(self) -> np.ndarray:
-        """
-        Calculates a repulsion force to avoid nearby obstacles.
-
-        Returns
-        -------
-        np.ndarray
-            A (2,) array representing the horizontal repulsion force [fx, fy].
-        """
-        repulsion_force = np.zeros(2)
-        repulsion_radius = 5.0  # Distance within which obstacles influence the agent
-        repulsion_strength = 2.0  # Strength of the repulsion force
-
-        num_obstacles = len(self.environment.obstacles)
-        distances = np.zeros((num_obstacles, 1))
-        directions = np.zeros((num_obstacles, 2))
-        for i, obstacle in enumerate(self.environment.obstacles):
-            distances[i] = obstacle.distance(self.position[0:2])
-            directions[i] = obstacle.direction(self.position[0:2])
-
-        is_near = distances < repulsion_radius
-        forces = repulsion_strength * distances * (-directions) * is_near
-        repulsion_force = np.sum(forces, axis=0)
-        return repulsion_force
+        self.network.send(packet)

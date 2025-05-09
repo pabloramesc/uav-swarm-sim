@@ -7,8 +7,8 @@ import numpy as np
 from .sim_bridge import SimBridge, SimPacket
 
 
-NODE_TYPE = Literal["gcs", "uav", "user"]
-NODE_TYPE_PREFIX: dict[NODE_TYPE, str] = {
+NodeType = Literal["gcs", "uav", "user"]
+NodeTypeToPrefix: dict[NodeType, str] = {
     "gcs": "10.0.1.",
     "uav": "10.0.2.",
     "user": "10.0.3.",
@@ -19,7 +19,7 @@ NODE_TYPE_PREFIX: dict[NODE_TYPE, str] = {
 class SimNode:
     node_id: int
     type_id: int
-    type: NODE_TYPE
+    type: NodeType
     addr: str = "0.0.0.0"
     position: np.ndarray = None
 
@@ -43,6 +43,9 @@ class NetworkSimulator:
     @property
     def num_nodes(self) -> int:
         return len(self.nodes)
+    
+    def get_broadcast_ip(self) -> str:
+        return "10.0.255.255"
 
     def launch_simulator(self, max_attempts: int = 1, verbose: bool = True) -> None:
         attempt = 1
@@ -143,7 +146,7 @@ class NetworkSimulator:
         self._validate_node_id(node_id)
         return self.nodes[node_id].addr
 
-    def node_id_to_type_id(self, node_id: int) -> tuple[NODE_TYPE, int]:
+    def node_id_to_type_id(self, node_id: int) -> tuple[NodeType, int]:
         """
         Convert a node ID to its type and type_id.
         """
@@ -151,7 +154,7 @@ class NetworkSimulator:
         node = self.nodes[node_id]
         return node.type, node.type_id
 
-    def type_id_to_node_id(self, node_type: NODE_TYPE, type_id: int) -> int:
+    def type_id_to_node_id(self, node_type: NodeType, type_id: int) -> int:
         """
         Convert a node type and type_id to its node ID.
         """
@@ -245,7 +248,7 @@ class NetworkSimulator:
         if id >= self.num_nodes:
             raise ValueError("Node ID must be lower than the number of nodes")
 
-    def _validate_node_type_address(self, node_type: NODE_TYPE, addr: str) -> None:
+    def _validate_node_type_address(self, node_type: NodeType, addr: str) -> None:
         octets = addr.split(".")
         if len(octets) != 4:
             raise ValueError(f"Address must have 4 bytes but {len(octets)} were given")
@@ -253,7 +256,7 @@ class NetworkSimulator:
         if not all(0 <= int(octet) <= 255 for octet in octets):
             raise ValueError("Address octets must be in range 0-255")
 
-        prefix = NODE_TYPE_PREFIX[node_type]
+        prefix = NodeTypeToPrefix[node_type]
         if not addr.startswith(prefix):
             raise ValueError(
                 f"Node of type '{node_type}' must have address in '{prefix}x' format."

@@ -6,9 +6,10 @@ https://opensource.org/licenses/MIT
 """
 
 import numpy as np
-from simulator.environment.environment import Environment
-from simulator.position_control.base_position_control import PositionController
-from simulator.agents.agent import Agent
+
+from ..environment.environment import Environment
+from ..mobility.base_position_control import PositionController
+from .agent import Agent
 
 
 class Drone(Agent):
@@ -69,9 +70,7 @@ class Drone(Agent):
 
         self.neighbor_ids = np.copy(neighbor_ids)
         self.neighbor_states = np.copy(neighbor_states)
-        self.position_controller.initialize(
-            state, neighbor_states, neighbor_ids, time
-        )
+        self.position_controller.initialize(state, neighbor_states, neighbor_ids, time)
 
     def update(self, dt: float = 0.01) -> None:
         """

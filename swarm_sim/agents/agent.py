@@ -4,12 +4,14 @@ Copyright (c) 2025 Pablo Ramirez Escudero
 This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
+
 from abc import ABC, abstractmethod
 from typing import Literal
 
 import numpy as np
 
-from simulator.environment.environment import Environment
+from ..environment.environment import Environment
+from ..network.network_interface import NetworkInterface
 
 AgentType = Literal["drone", "user", "gcs"]
 
@@ -17,40 +19,25 @@ AgentType = Literal["drone", "user", "gcs"]
 class Agent(ABC):
     """
     Represents an agent in the simulation environment.
-
-    Attributes
-    ----------
-    id : int
-        Unique identifier for the agent.
-    type : AgentType
-        Type of the agent (e.g., "drone", "user", "gcs").
-    time : float
-        Simulation time for the agent.
-    state : np.ndarray
-        State of the agent [px, py, pz, vx, vy, vz], where:
-        - px, py, pz: Position in meters.
-        - vx, vy, vz: Velocity in m/s.
-    environment : Environment
-        The simulation environment the agent interacts with.
     """
 
-    def __init__(self, id: int, type: AgentType, env: Environment):
+    def __init__(
+        self,
+        global_id: int,
+        type_id: int,
+        agent_type: AgentType,
+        env: Environment,
+        net: NetworkInterface = None,
+    ):
         """
         Initializes an agent with a unique ID, type, and environment.
-
-        Parameters
-        ----------
-        id : int
-            Unique identifier for the agent.
-        type : AgentType
-            Type of the agent (e.g., "drone", "user", "gcs").
-        env : Environment
-            The simulation environment the agent interacts with.
         """
-        self.id = id
-        self.type = type
+        self.global_id = global_id
+        self.type_id = type_id
+        self.agent_type = agent_type
         self.environment = env
-        
+        self.network = net
+
         self.time = 0.0
         self.state = np.zeros(6)  # px, py, pz, vx, vy, vz
 
@@ -96,7 +83,7 @@ class Agent(ABC):
         """
         self.time += dt
 
-    def is_collision(self) -> bool:
+    def is_collision(self, check_altitude: bool = True) -> bool:
         """
         Checks if the agent is in collision with any obstacle or the ground.
 
@@ -105,7 +92,7 @@ class Agent(ABC):
         bool
             True if the agent is in collision, False otherwise.
         """
-        return self.environment.is_collision(self.position)
+        return self.environment.is_collision(self.position, check_altitude)
 
     def is_inside(self) -> bool:
         """

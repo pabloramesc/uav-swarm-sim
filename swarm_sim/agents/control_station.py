@@ -5,7 +5,7 @@ This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
 
-from simulator.agents.agent import Agent
+from .agent import Agent
 
 
 class ControlStation(Agent):
