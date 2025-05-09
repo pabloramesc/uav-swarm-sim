@@ -44,8 +44,12 @@ class NetworkSimulator:
     def num_nodes(self) -> int:
         return len(self.nodes)
     
-    def get_broadcast_ip(self) -> str:
+    def get_broadcast_address(self) -> str:
         return "10.0.255.255"
+
+    def get_node_address(self, node_id: int) -> str:
+        self._validate_node_id(node_id)
+        return self.nodes[node_id].addr
 
     def launch_simulator(self, max_attempts: int = 1, verbose: bool = True) -> None:
         attempt = 1
@@ -130,31 +134,18 @@ class NetworkSimulator:
         time.sleep(timeout)
         self._terminate_ns3_simulator(timeout, verbose)
 
-    def ip_address_to_node_id(self, ip_address: str) -> int:
-        """
-        Convert an IP address to a node ID.
-        """
+    def get_node_id_from_address(self, ip_address: str) -> int:
         for node in self.nodes:
             if node.addr == ip_address:
                 return node.node_id
         raise ValueError(f"No node found with IP address {ip_address}")
 
-    def node_id_to_ip_address(self, node_id: int) -> str:
-        """
-        Convert a node ID to an IP address.
-        """
-        self._validate_node_id(node_id)
-        return self.nodes[node_id].addr
-
-    def node_id_to_type_id(self, node_id: int) -> tuple[NodeType, int]:
-        """
-        Convert a node ID to its type and type_id.
-        """
+    def get_node_type_id(self, node_id: int) -> tuple[NodeType, int]:
         self._validate_node_id(node_id)
         node = self.nodes[node_id]
         return node.type, node.type_id
 
-    def type_id_to_node_id(self, node_type: NodeType, type_id: int) -> int:
+    def get_node_id_from_type_id(self, node_type: NodeType, type_id: int) -> int:
         """
         Convert a node type and type_id to its node ID.
         """

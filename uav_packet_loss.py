@@ -37,8 +37,8 @@ def main():
 
     user0_id = net_sim.type_id_to_node_id("user", 0)
     user1_id = net_sim.type_id_to_node_id("user", 1)
-    user0_addr = net_sim.node_id_to_ip_address(user0_id)
-    user1_addr = net_sim.node_id_to_ip_address(user1_id)
+    user0_addr = net_sim.get_node_address(user0_id)
+    user1_addr = net_sim.get_node_address(user1_id)
 
     t0 = time.time()
     next_tx_time = 0.0

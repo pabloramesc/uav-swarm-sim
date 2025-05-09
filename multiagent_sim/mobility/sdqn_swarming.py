@@ -9,16 +9,15 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from simulator.environment import Environment
-from simulator.sdqn.frame_generator import FrameGenerator
-
-from .altitude_control import AltitudeController
-from .base_position_control import PositionController, PositionControllerConfig
-from .horizontal_position_control import HorizontalPositionController
+from ..environment import Environment
+from ..sdqn.frame_generator import FrameGenerator
+from .altitude_controller import AltitudeController
+from .base_swarming import SwarmingController, SwarmingConfig
+from .position_controller import PositionController
 
 
 @dataclass
-class SDQNConfig(PositionControllerConfig):
+class SDQNConfig(SwarmingConfig):
     num_cells: int = 64
     num_actions: int = 9
     visible_distance: float = 100.0  # in meters
@@ -29,12 +28,12 @@ class SDQNConfig(PositionControllerConfig):
     target_height: float = 100.0  # in meters (AGL - Above Ground Level)
 
 
-class SDQNPostionController(PositionController):
+class SDQNController(SwarmingController):
     def __init__(self, config: SDQNConfig, env: Environment) -> None:
         super().__init__(config, env)
         self.config = config
         self.update_period = 0.1
-        
+
         cell_size = 2 * config.visible_distance / config.num_cells
 
         self.dqns = FrameGenerator(
@@ -47,7 +46,7 @@ class SDQNPostionController(PositionController):
             kp=config.max_acceleration / cell_size,
             kd=config.max_acceleration / config.target_velocity,
         )
-        self.position_controller = HorizontalPositionController(
+        self.position_controller = PositionController(
             kp=config.max_acceleration / cell_size,
             kd=config.max_acceleration / config.target_velocity,
         )
@@ -58,47 +57,28 @@ class SDQNPostionController(PositionController):
     def initialize(
         self,
         state: np.ndarray,
-        neighbor_states: np.ndarray,
-        neighbor_ids: np.ndarray = None,
+        neighbor_positions: np.ndarray,
         time: float = None,
     ) -> None:
-        super().initialize(state, neighbor_states, neighbor_ids, time)
-        self.dqns.reset(self.state[0:2], self.neighbor_states[:, 0:2], time)
+        super().initialize(state, neighbor_positions, time=time)
+        self.dqns.reset(self.state[0:2], self.neighbor_positions[:, 0:2], time)
         self.last_update_time: float = None
         self.target_position = state[0:2]  # px, py
 
     def update(
         self,
         state: np.ndarray,
-        neighbor_states: np.ndarray,
-        neighbor_ids: np.ndarray = None,
+        neighbor_positions: np.ndarray,
+        user_positions: np.ndarray = None,
         time: float = None,
     ) -> np.ndarray:
         """
         Updates the DQNS controller's state and computes the control output.
-
-        Parameters
-        ----------
-        state : np.ndarray
-            A (6,) array representing the agent's state
-            [px, py, pz, vx, vy, vz].
-        neighbor_states : np.ndarray
-            A (N, 6) array representing the states [px, py, pz, vx, vy, vz]
-            of N neighbors.
-        neighbor_states : np.ndarray
-            A (N,) array with the IDs of the N neighbors.
-        time : float, optional
-            Current simulation time in seconds. Default is None.
-
-        Returns
-        -------
-        np.ndarray
-            Control output [fx, fy, fz].
         """
-        super().update(state, neighbor_states, neighbor_ids, time)
+        super().update(state, neighbor_positions, user_positions, time)
 
         if self._needs_update(time):
-            self.dqns.update(state[0:2], neighbor_states[:, 0:2], time)
+            self.dqns.update(state[0:2], neighbor_positions[:, 0:2], time)
 
         control = np.zeros(3)
 

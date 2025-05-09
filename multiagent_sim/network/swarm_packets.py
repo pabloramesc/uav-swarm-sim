@@ -5,32 +5,31 @@ from numpy.typing import ArrayLike
 
 
 class PacketType(Enum):
-    DATA = 0xAA
-    COMMAND = 0xBB
-    POSITION = 0xCC
+    DATA = 0x00
+    POSITION = 0xA1
 
 
 class DataPacket:
-    min_length = 9  # header: packet type (1 byte) + packet ID (4 bytes) + float 32 timestamp (4 bytes)
+    min_length = 8  # header: packet type (1 byte) + agent ID (1 byte) + counter (2 bytes) + timestamp (4 bytes)
 
     def __init__(self):
-        self.packet_type = PacketType.DATA
-        self.packet_id: np.uint32 = None
+        self.type = PacketType.DATA
+        self.agent_id: np.uint8 = None
+        self.counter: np.uint16 = None
         self.timestamp: np.float32 = None
         self.payload: bytes = b""
 
-    def set_packet_id(self, agent_id: int, counter: int) -> None:
-        self.packet_id = np.uint32(((agent_id & 0xFFFF) << 16) | counter)
-
-    def set_timestamp(self, t: float = None) -> None:
-        self.timestamp = np.float32(t if t is not None else time.time())
+    def set_header_fields(self, agent_id: int, counter: int, timestamp: float) -> None:
+        self.agent_id = np.uint8(agent_id)
+        self.counter = np.uint16(counter)
+        self.timestamp = np.float32(timestamp)
 
     def set_payload(self, data: bytes) -> None:
         self.payload = data
 
     def get_header(self) -> bytes:
         header = b""
-        header += self.packet_type.value.to_bytes(length=1)
+        header += self.type.value.to_bytes(length=1)
         header += self.packet_id.tobytes()
         header += self.timestamp.tobytes()
         return header
@@ -44,7 +43,7 @@ class DataPacket:
         if len(packet) < 9:
             raise ValueError("Packet length must be at least 9 bytes.")
 
-        self.packet_type = PacketType(packet[0])
+        self.type = PacketType(packet[0])
         self.packet_id = np.frombuffer(packet[1:5], dtype=np.uint32)[0]
         self.timestamp = np.frombuffer(packet[5:9], dtype=np.float32)[0]
         self.payload = packet[9:]
@@ -58,7 +57,9 @@ class DataPacket:
 
 class PositionPacket(DataPacket):
     payload_length = 3 * 4  # positions [px, py, pz] in float32 (3x4 bytes)
-    expected_length = 9 + payload_length  # header (9 bytes) + payload (3x4 bytes)
+    expected_length = (
+        DataPacket.min_length + payload_length
+    )  # header (9 bytes) + payload (12 bytes)
 
     def __init__(self):
         super().__init__()
@@ -85,3 +86,23 @@ class PositionPacket(DataPacket):
                 f"Packet must have {self.expected_length} bytes, got {len(packet)}"
             )
         return super().deserialize(packet)
+
+
+def parse_packet(data: bytes) -> DataPacket:
+    if not data:
+        raise ValueError("Packet is empty")
+
+    try:
+        packet_type = PacketType(data[0])
+    except ValueError:
+        raise ValueError(f"Invalid packet type code: 0x{data[0]:02x} ({data[0]})")
+
+    if packet_type == PacketType.DATA:
+        packet = DataPacket()
+    elif packet_type == PacketType.POSITION:
+        packet = PositionPacket()
+    else:
+        raise ValueError(f"Unsuported packet type: {packet_type}")
+
+    packet.deserialize(data)
+    return packet

@@ -9,9 +9,9 @@ import numpy as np
 from .pd_controller import PDController
 
 
-class HorizontalPositionController(PDController):
+class PositionController(PDController):
     """
-    A PD controller for horizontal position control.
+    A PD controller for 2D horizontal position control.
 
     Attributes
     ----------

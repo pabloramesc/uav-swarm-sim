@@ -9,15 +9,14 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from simulator.environment.environment import Environment
-from simulator.evsm.evsm_algorithm import EVSM
-
-from .altitude_control import AltitudeController
-from .base_position_control import PositionController, PositionControllerConfig
+from ..environment.environment import Environment
+from ..evsm.evsm_algorithm import EVSM
+from .altitude_controller import AltitudeController
+from .base_swarming import SwarmingController, SwarmingConfig
 
 
 @dataclass
-class EVSMConfig(PositionControllerConfig):
+class EVSMConfig(SwarmingConfig):
     """
     Configuration for the EVSMPositionControl class.
 
@@ -49,7 +48,7 @@ class EVSMConfig(PositionControllerConfig):
     ln_rate: float = 1.0
 
 
-class EVSMPositionController(PositionController):
+class EVSMController(SwarmingController):
     """
     EVSM-based horizontal position control and altitude hold.
 
@@ -100,42 +99,19 @@ class EVSMPositionController(PositionController):
             kd=config.max_acceleration / config.target_velocity,
         )
 
-    def initialize(self, state, neighbor_states, neighbor_ids=None, time=None):
-        return super().initialize(state, neighbor_states, neighbor_ids, time)
+    def initialize(self, state, neighbor_positions, time=None):
+        return super().initialize(state, neighbor_positions, time=time)
 
     def update(
         self,
         state: np.ndarray,
-        neighbor_states: np.ndarray,
-        neighbor_ids: np.ndarray = None,
+        neighbor_positions: np.ndarray,
         time: float = None,
     ) -> np.ndarray:
         """
         Updates the EVSM controller's state and computes the control output.
-
-        Parameters
-        ----------
-        state : np.ndarray
-            A (6,) array representing the agent's state
-            [px, py, pz, vx, vy, vz].
-        neighbor_states : np.ndarray
-            A (N, 6) array representing the states [px, py, pz, vx, vy, vz]
-            of N neighbors.
-        neighbor_states : np.ndarray
-            A (N,) array with the IDs of the N neighbors.
-        time : float, optional
-            Current simulation time in seconds. Default is None.
-
-        Returns
-        -------
-        np.ndarray
-            Control output [fx, fy, fz].
         """
-        force_evsm_update = False
-        if not np.array_equal(neighbor_ids, self.neighbor_ids):
-            force_evsm_update = True
-
-        super().update(state, neighbor_states, neighbor_ids, time)
+        super().update(state, neighbor_positions, time=time)
 
         self._update_natural_length(time)
 
@@ -145,9 +121,9 @@ class EVSMPositionController(PositionController):
         control[0:2] = self.evsm.update(
             position=state[0:2],
             velocity=state[3:5],
-            neighbors=neighbor_states[:, 0:2],
+            neighbors=neighbor_positions[:, 0:2],
             time=time,
-            force_update=force_evsm_update,
+            force_update=False,
         )
 
         # Vertical control by altitude hold

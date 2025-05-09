@@ -7,13 +7,13 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from simulator.agents.drone import Drone
-from simulator.environment.environment import Environment
-from simulator.position_control.evsm_position_control import EVSMConfig, EVSMPositionController
-from simulator.math.path_loss_model import signal_strength
+from agents import Drone, AgentsManager, AgentsConfig
+from environment import Environment
+from mobility.evsm_swarming import EVSMConfig, EVSMController
+from math.path_loss_model import signal_strength
 
 
-class MultiDroneSimulatorEVSM:
+class MultiDroneEVSMSimulator:
     """
     Simulates a swarm of drones in a 3D environment.
 
@@ -46,25 +46,8 @@ class MultiDroneSimulatorEVSM:
         self.config = config if config is not None else EVSMConfig()
         self.visible_distance = visible_distance
 
-        self._init_states()
-        self._init_drones()
-
-    def _init_states(self) -> None:
-        self.time = 0.0
-        self.step = 0
-        self.drone_states = np.zeros((self.num_drones, 6))  # px, py, pz, vx, vy, vz
-        self.links_matrix = np.full(
-            (self.num_drones, self.num_drones), False, dtype=bool
-        )
-        self.edge_drones_mask = np.full((self.num_drones,), False, dtype=bool)
-
-    def _init_drones(self) -> None:
-        self.drones: list[Drone] = []
-        for id in range(self.num_drones):
-            evsm = EVSMPositionController(self.config, self.environment)
-            drone = Drone(id, self.environment, evsm)
-            drone.initialize(self.drone_states[id, :], np.zeros((0, 6)))
-            self.drones.append(drone)
+        config = AgentsConfig(num_drones=num_drones)
+        self.agents_manager = AgentsManager(config=config, env=self.environment)
 
     @property
     def drone_positions(self) -> np.ndarray:
@@ -72,7 +55,7 @@ class MultiDroneSimulatorEVSM:
         A (N, 3) shape array with drone positions [px, py, pz] in meters,
         where N is the number of drones.
         """
-        return self.drone_states[:, 0:3]
+        return self.agents_manager.drones.get_states()[:, 0:3]
 
     @property
     def drone_velocities(self) -> np.ndarray:
@@ -80,7 +63,7 @@ class MultiDroneSimulatorEVSM:
         A (N, 3) shape array with drone velocities [vx, vy, vz] in m/s,
         where N is the number of drones.
         """
-        return self.drone_states[:, 3:6]
+        return self.agents_manager.drones.get_states()[:, 3:6]
 
     def initialize(self, positions: np.ndarray = None, verbose: bool = True) -> None:
         """
@@ -97,12 +80,10 @@ class MultiDroneSimulatorEVSM:
         if verbose:
             print("Initializing simulation ...")
 
-        self._init_states()
-        self._init_drones()
-
         if positions is not None:
-            self.drone_states[:, 0:3] = positions  # Fix assignment to update all drones
-            self._set_drone_states()
+            states = np.zeros((self.num_drones, 6), dtype=np.float32)
+            states[:, 0:3] = positions
+            self.agents_manager.initialize_drones(states)
 
         self.update(dt=0.0)
 
@@ -170,42 +151,6 @@ class MultiDroneSimulatorEVSM:
         in_range = tx_power_map > rx_sens
         return np.sum(in_range) / np.sum(in_area)
 
-    def _get_drone_states(self) -> None:
-        """
-        Updates the `drone_states` array with the current states of all drones.
-        """
-        for i, drone in enumerate(self.drones):
-            self.drone_states[i, 0:3] = drone.position
-            self.drone_states[i, 3:6] = drone.velocity
-
-    def _set_drone_states(self) -> None:
-        """
-        Updates the states of all drones with the values in the `drone_states` array.
-        """
-        for i, drone in enumerate(self.drones):
-            drone.state[0:3] = self.drone_states[i, 0:3]
-            drone.state[3:6] = self.drone_states[i, 3:6]
-
-    def _update_drones(self, dt: float) -> None:
-        """
-        Advances the state of all drones in the simulation by one time step.
-        """
-        for drone in self.drones:
-            drone.update(dt)
-
-    def _update_visible_neighbors(self) -> None:
-        """
-        Updates the list of visible neighbors for each drone based on a maximum
-        visibility distance.
-        """
-        positions = self.drone_states[:, 0:3]
-        for drone in self.drones:
-            deltas = positions - drone.position
-            distances = np.linalg.norm(deltas, axis=1)
-            is_visible = (distances < self.visible_distance) & (distances > 0.0)
-            indices = np.where(is_visible)[0]
-            drone.set_neighbors(indices, positions[indices])
-
     def _update_links_matrix(self) -> None:
         """
         Updates the adjacency matrix representing links between drones.
@@ -213,9 +158,9 @@ class MultiDroneSimulatorEVSM:
         self.links_matrix = np.full(
             (self.num_drones, self.num_drones), False, dtype=bool
         )
-        for drone in self.drones:
+        for drone in self.agents_manager.drones.get_all():
             indices = drone.neighbor_ids
-            controller: EVSMPositionController = drone.position_controller
+            controller: EVSMController = drone.position_controller
             if not isinstance(controller, EVSMPositionController):
                 raise Exception(f"Drone {drone.id} position controller is not EVSM")
             links_mask = controller.evsm.links_mask

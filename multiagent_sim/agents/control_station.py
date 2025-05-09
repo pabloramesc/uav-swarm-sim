@@ -6,6 +6,8 @@ https://opensource.org/licenses/MIT
 """
 
 from .agent import Agent
+from ..environment import Environment
+from ..network.swarm_interface import SwarmProtocolInterface
 
 
 class ControlStation(Agent):
@@ -21,16 +23,16 @@ class ControlStation(Agent):
         Unique identifier for the control station.
     """
 
-    def __init__(self, id: int) -> None:
-        """
-        Initializes the control station with a unique ID.
-
-        Parameters
-        ----------
-        id : int
-            Unique identifier for the control station.
-        """
-        super().__init__(id=id, type="gcs")
+    def __init__(
+        self,
+        global_id: int,
+        type_id: int,
+        env: Environment,
+        net: SwarmProtocolInterface = None,
+    ):
+        super().__init__(
+            global_id=global_id, type_id=type_id, agent_type="gcs", env=env, net=net
+        )
 
     def update(self, dt: float = 0.01) -> None:
         """
