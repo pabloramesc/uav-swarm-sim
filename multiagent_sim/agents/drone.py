@@ -78,6 +78,9 @@ class Drone(Agent):
         """
         super().update(dt)
         self._update_neighbors()
+        
+        if self.network is not None:
+            self.network.update(self.time, self.state[0:3])
 
         # Compute control force using the position controller
         control_force = self.swarming.update(
@@ -144,11 +147,11 @@ class Drone(Agent):
         Updates the neighbor states based on the selected provider.
         """
         if self.neighbor_provider == "network":
-            drone_id_pos = self.network.get_drone_positions(clean_old=True)
+            drone_id_pos = self.network.get_drone_positions()
             self.neighbor_drone_ids = np.array(list(drone_id_pos.keys()))
-            self.neighbor_drone_positions = np.array(list(drone_id_pos.values()))
-            user_positions = self.network.get_user_positions(clean_old=True)
-            self.neighbor_user_positions = np.array(list(user_positions.values()))
+            self.neighbor_drone_positions = np.array(list(drone_id_pos.values())) if drone_id_pos else np.zeros((0, 3))
+            user_positions = self.network.get_user_positions()
+            self.neighbor_user_positions = np.array(list(user_positions.values())) if user_positions else np.zeros((0, 3))
 
         elif self.neighbor_provider == "registry":
             # self.drones_positions = self.drones_registry.get_states(self.agent_id)[:, 0:3]

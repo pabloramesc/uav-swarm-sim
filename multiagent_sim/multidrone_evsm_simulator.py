@@ -5,12 +5,16 @@ This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
 
+import time
+
 import numpy as np
 
-from .agents import Drone, AgentsManager, AgentsConfig
+from .agents import Drone, AgentsManager, AgentsConfig, NeighborProvider
 from .environment import Environment
 from .mobility.evsm_swarming import EVSMConfig, EVSMController
 from .math.path_loss_model import signal_strength
+from .network import NetworkSimulator
+from .utils.logger import create_logger
 
 
 class MultiDroneEVSMSimulator:
@@ -28,7 +32,8 @@ class MultiDroneEVSMSimulator:
         dt: float = 0.01,
         dem_path: str = None,
         evsm_config: EVSMConfig = None,
-        visible_distance: float = 100.0,
+        neihgbor_provider: NeighborProvider = "registry",
+        # visible_distance: float = 100.0,
     ) -> None:
         """
         Initializes the MultiDroneSimulator.
@@ -43,18 +48,40 @@ class MultiDroneEVSMSimulator:
         self.num_drones = num_drones
         self.dt = dt
         self.environment = Environment(dem_path)
-        self.visible_distance = visible_distance
+        # self.visible_distance = visible_distance
 
+        if neihgbor_provider == "network":
+            network_simulator = NetworkSimulator(
+                num_gcs=0, num_uavs=num_drones, num_users=0, verbose=True
+            )
+            network_simulator.launch_simulator(max_attempts=2)
+
+        agents_config = AgentsConfig(
+            num_drones=num_drones, drones_neighbor_provider=neihgbor_provider
+        )
         self.agents_manager = AgentsManager(
-            agents_config=AgentsConfig(num_drones=num_drones),
+            agents_config=agents_config,
             swarming_config=evsm_config,
             env=self.environment,
+            net_sim=network_simulator,
         )
 
-        self.time = 0.0
-        self.step = 0
+        self.init_time: float = None
+        self.sim_time = 0.0
+        self.sim_step = 0
 
         self.edge_drones_mask = np.zeros((self.num_drones,), dtype=bool)
+
+        self.logger = create_logger(name="MultiDroneEVSMSimulator", level="INFO")
+
+    @property
+    def real_time(self) -> float:
+        """
+        Returns the real time elapsed since the simulation started.
+        """
+        if self.init_time is None:
+            return 0.0
+        return time.time() - self.init_time
 
     @property
     def drone_states(self) -> np.ndarray:
@@ -80,7 +107,7 @@ class MultiDroneEVSMSimulator:
         """
         return self.agents_manager.drones.get_states_array()[:, 3:6]
 
-    def initialize(self, positions: np.ndarray = None, verbose: bool = True) -> None:
+    def initialize(self, positions: np.ndarray = None) -> None:
         """
         Initializes the simulation by updating the initial state of all drones.
 
@@ -89,21 +116,21 @@ class MultiDroneEVSMSimulator:
         positions : np.ndarray, optional
             A (N, 3) array specifying the initial positions [px, py, pz] of the drones.
             If None, the positions remain unchanged (default is None).
-        verbose : bool, optional
-            If True, prints initialization progress (default is True).
         """
-        if verbose:
-            print("Initializing simulation ...")
+        self.logger.info("Initializing simulation ...")
 
         if positions is not None:
             states = np.zeros((self.num_drones, 6), dtype=np.float32)
             states[:, 0:3] = positions
             self.agents_manager.initialize_drones(states)
 
+        self.init_time = time.time()
+        self.sim_time = 0.0
+        self.sim_step = 0
+
         self.update(dt=0.0)
 
-        if verbose:
-            print("✅ Initialization completed.")
+        self.logger.info("✅ Initialization completed.")
 
     def update(self, dt: float = None) -> None:
         """
@@ -115,11 +142,19 @@ class MultiDroneEVSMSimulator:
             Time step for the update in seconds (default is `self.dt`).
         """
         dt = dt if dt is not None else self.dt
-        self.time += dt
-        self.step += 1
+        self.sim_time += dt
+        self.sim_step += 1
         self.agents_manager.update_agents(dt=dt)
         self._update_links_matrix()
         self._update_edge_drones_mask()
+
+    def sync_to_real_time(self) -> None:
+        """
+        Synchronizes the simulation time with real time, ensuring that the simulation
+        does not run faster than real time.
+        """
+        if self.sim_time - self.real_time > self.dt:
+            time.sleep(self.sim_time - self.real_time - self.dt)
 
     def area_coverage_ratio(
         self,
@@ -184,8 +219,11 @@ class MultiDroneEVSMSimulator:
 
             indices = drone.neighbor_drone_ids
             links_mask = controller.evsm.links_mask
+
             drone_links = np.zeros((self.num_drones,), dtype=bool)
-            drone_links[indices] = links_mask
+            if indices.shape[0] > 0:
+                drone_links[indices] = links_mask
+
             self.links_matrix[drone.agent_id, :] = drone_links
 
     def _update_edge_drones_mask(self) -> None:

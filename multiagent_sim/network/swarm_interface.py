@@ -113,7 +113,7 @@ class SwarmProtocolInterface(NetworkInterface):
         else:
             raise ValueError(f"Invalid agent type: {agent_type}")
 
-    def get_drone_positions(self, clean_old: bool = True) -> dict[int, np.ndarray]:
+    def get_drone_positions(self) -> dict[int, np.ndarray]:
         drone_positions: dict[int, np.ndarray] = {}
 
         for node_id, pos in self.drone_positions.items():
@@ -124,12 +124,9 @@ class SwarmProtocolInterface(NetworkInterface):
                 drone_positions[node_id] = pos.position
                 continue
 
-            if clean_old:
-                drone_positions[node_id] = None
-
         return drone_positions
 
-    def get_user_positions(self, clean_old: bool = True) -> dict[int, np.ndarray]:
+    def get_user_positions(self) -> dict[int, np.ndarray]:
         user_positions: dict[int, np.ndarray] = {}
 
         for node_id, pos in self.user_positions.items():
@@ -139,9 +136,6 @@ class SwarmProtocolInterface(NetworkInterface):
             if self.time - pos.time < self.position_timeout:
                 user_positions[node_id] = pos.position
                 continue
-
-            if clean_old:
-                user_positions[node_id] = None
 
         return user_positions
 

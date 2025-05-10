@@ -30,13 +30,14 @@ class DataPacket:
     def get_header(self) -> bytes:
         header = b""
         header += self.type.value.to_bytes(length=1)
-        header += self.packet_id.tobytes()
+        header += self.counter.tobytes()
+        header += self.agent_id.tobytes()
         header += self.timestamp.tobytes()
         return header
 
     def serialize(self, data: bytes = None) -> bytes:
         header = self.get_header()
-        payload = data if not None else self.payload
+        payload = data if data is not None else self.payload
         return header + payload
 
     def deserialize(self, packet: bytes) -> None:
@@ -44,7 +45,7 @@ class DataPacket:
             raise ValueError("Packet length must be at least 9 bytes.")
 
         self.type = PacketType(packet[0])
-        self.packet_id = np.frombuffer(packet[1:5], dtype=np.uint32)[0]
+        self.agent_id = np.frombuffer(packet[1:5], dtype=np.uint32)[0]
         self.timestamp = np.frombuffer(packet[5:9], dtype=np.float32)[0]
         self.payload = packet[9:]
 

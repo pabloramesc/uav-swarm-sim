@@ -73,6 +73,8 @@ def control_force(
         A (2,) array representing the control force [fx, fy] in m/s^2.
     """
     linked_neighbors = linked_neighbors.reshape(-1, 2)
+    if linked_neighbors.shape[0] == 0:
+        return np.zeros(2)
     deltas = linked_neighbors - position
     distances = np.sqrt(np.sum(deltas**2, axis=1))[:, np.newaxis]
     directions = np.where(distances > 0.0, deltas / distances, np.zeros_like(deltas))
@@ -165,6 +167,8 @@ def obstacles_force(
     np.ndarray
         A (2,) array representing the avoidance force [fx, fy] in m/s^2.
     """
+    if obstacle_distances.shape[0] == 0:
+        return np.zeros(2)
     obstacle_distances = obstacle_distances.reshape(-1, 1)
     obstacle_directions = obstacle_directions.reshape(-1, 2)
     is_near = obstacle_distances < d_min
@@ -203,11 +207,10 @@ def exploration_force(
     np.ndarray
         A (2,) array representing the exploration force [fx, fy] in m/s^2.
     """
+    if obstacle_distances.shape[0] == 0:
+        return np.zeros(2)
     obstacle_distances = obstacle_distances.reshape(-1, 1)
     obstacle_directions = obstacle_directions.reshape(-1, 2)
-    num_obstacles = obstacle_distances.shape[0]
-    if num_obstacles == 0:
-        return np.zeros(2)
     obstacle_angles = np.arctan2(obstacle_directions[:, 1], obstacle_directions[:, 0])
     # Get visible obstacle by checking if direction angles are inside the sweep angle
     diff = (obstacle_angles - sweep_angle[0]) % (2 * np.pi)

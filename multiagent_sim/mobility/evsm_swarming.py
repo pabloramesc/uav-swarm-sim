@@ -120,13 +120,15 @@ class EVSMController(SwarmingController):
         """
         super().update(time, state)
 
-        neighbor_positions: np.ndarray = kwargs.get("neighbor_positions", None)
-        if neighbor_positions is not None:
+        control = np.zeros(3)
+
+        neighbor_positions: np.ndarray = kwargs.get(
+            "neighbor_positions", np.zeros((0, 3))
+        )
+        if neighbor_positions.shape[0] > 0:
             self.neighbor_positions = neighbor_positions.copy()
 
         self._update_natural_length(time)
-
-        control = np.zeros(3)
 
         # Horizontal control using EVSM (Extended Virtual Spring Mesh)
         control[0:2] = self.evsm.update(

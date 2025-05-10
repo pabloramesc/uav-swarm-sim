@@ -89,10 +89,18 @@ class AgentsManager:
     def _create_drone(self, agent_id: int, type_id: int) -> Drone:
         swarming: SwarmingController = None
         if self.agents_config.drones_swarming_type == "evsm":
-            config = self.swarming_config if self.swarming_config is not None else EVSMConfig()
+            config = (
+                self.swarming_config
+                if self.swarming_config is not None
+                else EVSMConfig()
+            )
             swarming = EVSMController(config=config, env=self.environment)
         elif self.agents_config.drones_swarming_type == "sdqn":
-            config = self.swarming_config if self.swarming_config is not None else SDQNConfig()
+            config = (
+                self.swarming_config
+                if self.swarming_config is not None
+                else SDQNConfig()
+            )
             swarming = SDQNController(config=config, env=self.environment)
         else:
             raise ValueError(
@@ -101,7 +109,10 @@ class AgentsManager:
 
         interface = (
             SwarmProtocolInterface(
-                agent_id=agent_id, network_sim=self.network_simulator
+                agent_id=agent_id,
+                network_sim=self.network_simulator,
+                local_bcast_interval=0.1,
+                global_bcast_interval=1.0,
             )
             if self.network_simulator is not None
             else None
@@ -116,7 +127,7 @@ class AgentsManager:
             users_registry=self.users,
             neighbor_provider=self.agents_config.drones_neighbor_provider,
         )
-        
+
         return drone
 
     def _create_user(self, global_id: int, type_id: int) -> User:
