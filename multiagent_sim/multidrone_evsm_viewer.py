@@ -323,7 +323,7 @@ class MultiDroneViewerEVSM:
 
     def _plot_rssi_heatmap(self) -> None:
         """
-        Plots the 2D transmitter power heatmap in real time.
+        Plots received signal strength heatmap in real time.
         """
         if self.is_3d:
             return  # Heatmap is only supported in 2D mode
@@ -334,7 +334,7 @@ class MultiDroneViewerEVSM:
 
         # Calculate the heatmap using the simulator's tx_power_heatmap method
         heatmap = signal_strength_map(
-            self.sim.drone_positions, xs, ys, f=2.4e3, mode="max"
+            self.sim.drone_positions, xs, ys, f=2412, n=2.4, mode="max"
         )
 
         # Plot the heatmap
@@ -346,7 +346,7 @@ class MultiDroneViewerEVSM:
                 cmap="turbo",  # Use a visually appealing colormap
                 alpha=0.7,
             )
-            plt.colorbar(self.heatmap_image, ax=self.ax, label="Tx Power (dBm)")
+            plt.colorbar(self.heatmap_image, ax=self.ax, label="RSSI (dBm)")
         else:
             self.heatmap_image.set_data(heatmap)
 

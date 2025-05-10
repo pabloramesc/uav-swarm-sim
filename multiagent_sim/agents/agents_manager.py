@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from ..environment import Environment
-from ..mobility.base_swarming import SwarmingController, SwarmingType
+from ..mobility.base_swarming import SwarmingController, SwarmingType, SwarmingConfig
 from ..mobility.evsm_swarming import EVSMConfig, EVSMController
 from ..mobility.sdqn_swarming import SDQNConfig, SDQNController
 from ..network.network_simulator import NetworkSimulator
@@ -28,11 +28,13 @@ class AgentsManager:
 
     def __init__(
         self,
-        config: AgentsConfig,
+        agents_config: AgentsConfig,
+        swarming_config: SwarmingConfig = None,
         env: Environment = None,
         net_sim: NetworkSimulator = None,
     ):
-        self.config = config
+        self.agents_config = agents_config
+        self.swarming_config = swarming_config
         self.environment = env if env is not None else Environment()
         self.network_simulator = net_sim
 
@@ -58,18 +60,18 @@ class AgentsManager:
 
     def _create_agents(self) -> None:
         global_id = 0
-        for id in range(self.config.num_gcs):
+        for id in range(self.agents_config.num_gcs):
             gcs = self._create_control_station(global_id=global_id, type_id=id)
             self.agents.append(gcs)
             global_id += 1
 
-        for id in range(self.config.num_drones):
+        for id in range(self.agents_config.num_drones):
             drone = self._create_drone(agent_id=global_id, type_id=id)
             self.agents.append(drone)
             self.drones.register(drone)
             global_id += 1
 
-        for id in range(self.config.num_users):
+        for id in range(self.agents_config.num_users):
             user = self._create_user(global_id=global_id, type_id=id)
             self.agents.append(user)
             self.users.register(user)
@@ -86,13 +88,15 @@ class AgentsManager:
 
     def _create_drone(self, agent_id: int, type_id: int) -> Drone:
         swarming: SwarmingController = None
-        if self.config.drones_swarming_type == "evsm":
-            swarming = EVSMController(config=EVSMConfig(), env=self.environment)
-        elif self.config.drones_swarming_type == "sdqn":
-            swarming = SDQNController(config=SDQNConfig(), env=self.environment)
+        if self.agents_config.drones_swarming_type == "evsm":
+            config = self.swarming_config if self.swarming_config is not None else EVSMConfig()
+            swarming = EVSMController(config=config, env=self.environment)
+        elif self.agents_config.drones_swarming_type == "sdqn":
+            config = self.swarming_config if self.swarming_config is not None else SDQNConfig()
+            swarming = SDQNController(config=config, env=self.environment)
         else:
             raise ValueError(
-                f"Invalid swarming controller type: {self.config.drones_swarming_type}"
+                f"Invalid swarming controller type: {self.agents_config.drones_swarming_type}"
             )
 
         interface = (
@@ -110,7 +114,7 @@ class AgentsManager:
             network=interface,
             drones_registry=self.drones,
             users_registry=self.users,
-            neighbor_provider=self.config.drones_neighbor_provider,
+            neighbor_provider=self.agents_config.drones_neighbor_provider,
         )
         
         return drone

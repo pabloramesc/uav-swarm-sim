@@ -15,6 +15,7 @@ using namespace std;
 using namespace ns3;
 
 #define DEBUG false
+#define TIMESTAMP true
 
 SimBridge::SimBridge(float pollingInterval)
     : m_pollingInterval(pollingInterval),
@@ -119,6 +120,10 @@ void SimBridge::ProcessCommand(int numBytes) {
         HandleRequestAddresses(numBytes);
         break;
 
+    case CMD_REQUEST_SIM_TIME:
+        HandleRequestSimTime(numBytes);
+        break;
+
     case CMD_INGRESS_PACKET:
         HandleIngressPacket(numBytes);
         break;
@@ -196,25 +201,23 @@ void SimBridge::HandleStopSimulation(int numBytes) {
         cout << "[NS3:SimBridge] ERROR: Stop simulation received with more than 1 byte. Ignoring." << endl;
         return;
     }
-    cout << "[NS3:SimBridge] DEBUG: Stopping simulation." << endl;
+    cout << "[NS3:SimBridge] Stopping simulation." << endl;
     StopSimulation();
 }
 
 void SimBridge::HandleIngressPacket(int numBytes) {
-    if (numBytes < 13) { // 1 byte for command + 1 byte for nodeId + 4 bytes for srcAddr + 4 bytes for destAddr
+    if (numBytes < 13) { // 1 byte for command + 1 byte for nodeId + 4 bytes for srcAddr + 4 bytes for dstAddr
         NS_FATAL_ERROR("[NS3:SimBridge] ERROR: Ingress packet received with insufficient data.");
         return;
     }
 
     int nodeId = (int)m_buffer[1];
-    uint32_t srcAddr, destAddr;
+    uint32_t srcAddr, dstAddr;
 
-    // Convert bytes to uint32_t with byte-order inversion
     memcpy(&srcAddr, &m_buffer[2], sizeof(uint32_t));
-    srcAddr = ntohl(srcAddr); // Convert from network byte order to host byte order
-
-    memcpy(&destAddr, &m_buffer[6], sizeof(uint32_t));
-    destAddr = ntohl(destAddr); // Convert from network byte order to host byte order
+    srcAddr = ntohl(srcAddr);
+    memcpy(&dstAddr, &m_buffer[6], sizeof(uint32_t));
+    dstAddr = ntohl(dstAddr);
 
     size_t payloadSize = numBytes - 10; // Remaining bytes are the payload
     if (payloadSize == 0) {
@@ -222,14 +225,31 @@ void SimBridge::HandleIngressPacket(int numBytes) {
         return;
     }
 
+    uint8_t data[BUFFER_SIZE];
+    memcpy(&data[0], &m_buffer[10], payloadSize);
+
+#if TIMESTAMP
+    double ingressTimestamp = Simulator::Now().GetSeconds();
+    if (10 + 8 + payloadSize > BUFFER_SIZE) {
+        NS_FATAL_ERROR("[NS3:SimBridge] ERROR: Payload with timestamp too large.");
+        return;
+    }
+    memcpy(&data[payloadSize], &ingressTimestamp, sizeof(double));
+    payloadSize += sizeof(double);
+#if DEBUG
+    cout << "[NS3:SimBridge] DEBUG: Ingress packet marked with timestamp: "
+         << ingressTimestamp << endl;
+#endif
+#endif
+
 #if DEBUG
     cout << "[NS3:SimBridge] DEBUG: Ingress packet received. Node " << nodeId
          << ", Source Address: " << Ipv4Address(srcAddr)
-         << ", Destination Address: " << Ipv4Address(destAddr)
+         << ", Destination Address: " << Ipv4Address(dstAddr)
          << ", Payload Size: " << payloadSize << " bytes." << endl;
 #endif
 
-    m_nodesManager.SendPacket(nodeId, Ipv4Address(destAddr), &m_buffer[10], payloadSize);
+    m_nodesManager.SendPacket(nodeId, Ipv4Address(dstAddr), data, payloadSize);
 }
 
 void SimBridge::ReplyDoNothing() {
@@ -275,24 +295,33 @@ void SimBridge::ReplyAllPositions() {
     m_ipcSocket.SendToRemote(response, offset);
 }
 
-void SimBridge::ReplyEgressPacket(int nodeId, Ipv4Address srcAddr, Ipv4Address destAddr, const uint8_t *data, size_t size) {
+void SimBridge::ReplyEgressPacket(int nodeId, Ipv4Address srcAddr, Ipv4Address dstAddr, const uint8_t *data, size_t size) {
     uint8_t response[1024];
-    size_t responseSize = 10 + size; // 1 byte for command + 1 byte for nodeId + 4 bytes for srcAddr + 4 bytes for destAddr + payload
+    size_t responseSize = 10 + size; // 1 byte for command + 1 byte for nodeId + 4 bytes for srcAddr + 4 bytes for dstAddr + payload
 
     if (responseSize > sizeof(response)) {
         NS_FATAL_ERROR("[NS3:SimBridge] ERROR: Response size exceeds buffer limit.");
         return;
     }
 
+    uint32_t srcAddrUint32 = htonl(srcAddr.Get());
+    uint32_t dstAddrUint32 = htonl(dstAddr.Get());
+
     response[0] = REPLY_EGRESS_PACKET; // Command code for egress packet
     response[1] = (uint8_t)nodeId;
-    *reinterpret_cast<uint32_t *>(&response[2]) = htonl(srcAddr.Get());
-    *reinterpret_cast<uint32_t *>(&response[6]) = htonl(destAddr.Get());
+    memcpy(&response[2], &srcAddrUint32, sizeof(uint32_t)); // Source address
+    memcpy(&response[6], &dstAddrUint32, sizeof(uint32_t)); // Destination address
     memcpy(&response[10], data, size);
+
+#if TIMESTAMP
+    double egressTimestamp = Simulator::Now().GetSeconds();
+    memcpy(&response[10 + size], &egressTimestamp, sizeof(double));
+    responseSize += sizeof(double);
+#endif
 
 #if DEBUG
     cout << "[NS3:SimBridge] DEBUG: Node " << nodeId
-         << " sent a response from " << srcAddr << " to " << destAddr
+         << " sent a response from " << srcAddr << " to " << dstAddr
          << " with payload size " << size << " bytes." << endl;
 #endif
 
@@ -339,4 +368,31 @@ void SimBridge::ReplyAllAddresses() {
     cout << "[NS3:SimBridge] DEBUG: Sent REPLY_ALL_ADDRESSES with " << (offset - 1) / 5
          << " entries (" << offset << " bytes)." << endl;
 #endif
+}
+
+void SimBridge::HandleRequestSimTime(int numBytes) {
+    if (numBytes > 1) {
+        cerr << "[NS3:SimBridge] ERROR: CMD_REQUEST_SIM_TIME received with extra data. Ignoring." << endl;
+        return;
+    }
+#if DEBUG
+    cout << "[NS3:SimBridge] DEBUG: Handling CMD_REQUEST_SIM_TIME. Replying with simulation time." << endl;
+#endif
+    ReplySimTime();
+}
+
+void SimBridge::ReplySimTime() {
+    uint8_t response[BUFFER_SIZE];
+    size_t size = 1;
+
+    response[0] = REPLY_SIM_TIME; // Add the reply command code
+
+    double simTime = Simulator::Now().GetSeconds();
+    memcpy(&response[size], &simTime, sizeof(double));
+    size += sizeof(double);
+
+#if DEBUG
+    cout << "[NS3:SimBridge] DEBUG: Sending simulation time: " << simTime << " seconds." << endl;
+#endif
+    m_ipcSocket.SendToRemote(response, size);
 }

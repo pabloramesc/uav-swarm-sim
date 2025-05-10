@@ -20,7 +20,7 @@ evsm_config = EVSMConfig(
     target_velocity=15.0,
     target_height=10.0,
 )
-sim = MultiDroneEVSMSimulator(num_drones, dt, evsm_config=evsm_config)
+sim = MultiDroneEVSMSimulator(num_drones, dt, config=evsm_config)
 sim.environment.set_rectangular_boundary([-200.0, -100.0], [+200.0, +100.0])
 sim.environment.add_circular_obstacle([25.0, 25.0], 25.0)
 sim.environment.add_rectangular_obstacle([-125.0, -50.0], [-100.0, +50.0])

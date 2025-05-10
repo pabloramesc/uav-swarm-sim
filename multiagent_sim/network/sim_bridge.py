@@ -22,14 +22,16 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 CMD_DO_NOTHING = 0x00
-CMD_SET_POSITIONS = 0x01
-CMD_REQUEST_POSITIONS = 0x02
-CMD_REQUEST_ADDRESSES = 0x03
-CMD_INGRESS_PACKET = 0x10
 CMD_STOP_SIMULATION = 0xFF
-REPLY_ALL_POSITIONS = 0xA1
-REPLY_EGRESS_PACKET = 0xA2
-REPLY_ALL_ADDRESSES = 0xA3
+CMD_SET_POSITIONS = 0x01
+CMD_REQUEST_POSITIONS = 0xA1
+CMD_REQUEST_ADDRESSES = 0xA2
+CMD_INGRESS_PACKET = 0xA3
+CMD_REQUEST_SIM_TIME = 0xA4
+REPLY_ALL_POSITIONS = 0xB1
+REPLY_ALL_ADDRESSES = 0xB2
+REPLY_EGRESS_PACKET = 0xB3
+REPLY_SIM_TIME = 0xB4
 
 
 @dataclass
@@ -47,6 +49,8 @@ class SimPacket:
     src_addr: str
     dst_addr: str
     data: bytes = b""
+    ingress_time: float = None
+    egress_time: float = None
 
 
 class SimBridge:
@@ -196,6 +200,28 @@ class SimBridge:
 
         logger.debug(f"Final parsed addresses: {addresses}")
         return addresses
+    
+    def get_ns3_time(self, timeout: float = 1.0) -> float:
+        logger.debug("Sending CMD_REQUEST_SIM_TIME to NS-3...")
+        
+        msg = SimMessage(command=CMD_REQUEST_SIM_TIME)
+        self.sock.send_to_ns3(msg.to_bytes())
+
+        time.sleep(timeout)
+
+        ipc_msg = self.sock.get_last_message()
+        if ipc_msg is None:
+            logger.debug("No response received for sim time.")
+            return None
+
+        sim_msg = self._ipc_message_to_sim_message(ipc_msg)
+        if sim_msg.command != REPLY_SIM_TIME or len(sim_msg.payload) != 8:
+            logger.debug(f"Unexpected reply for sim time: cmd={sim_msg.command}, payload_len={len(sim_msg.payload)}")
+            return None
+
+        sim_time = np.frombuffer(sim_msg.payload, dtype=np.float64)[0]
+        logger.debug(f"Received simulation time: {sim_time} s")
+        return float(sim_time)
 
     def stop_ns3(self):
         logger.debug("Sending CMD_STOP_SIMULATION to NS-3...")
@@ -264,8 +290,9 @@ class SimBridge:
 
     def _sim_message_to_sim_packet(self, sim_msg: SimMessage) -> SimPacket:
         """Convert a SimMessage object into a SimPacket object."""
-        if len(sim_msg.payload) < 9:
-            # Minimum size: 1 byte (node_id) + 4 bytes (src_addr) + 4 bytes (dst_addr) + data
+        if len(sim_msg.payload) < 9 + 16:
+            # Minimum size: node_id (1 byte) + src_addr (4 bytes) + dst_addr (4 bytes)
+            # + ingress_time (8 bytes) + egress_time (8 bytes)
             raise ValueError(
                 "Invalid SimMessage payload size for SimPacket conversion."
             )
@@ -273,15 +300,23 @@ class SimBridge:
         node_id = sim_msg.payload[0]
         src_addr = self._bytes_to_ipv4(sim_msg.payload[1:5])
         dst_addr = self._bytes_to_ipv4(sim_msg.payload[5:9])
-        data = sim_msg.payload[9:] if len(sim_msg.payload) > 9 else b""
+        data = sim_msg.payload[9:-16] if len(sim_msg.payload) > 9 else b""
+        ingress_time = np.frombuffer(sim_msg.payload[-16:-8], dtype=np.float64)[0]
+        egress_time = np.frombuffer(sim_msg.payload[-8:], dtype=np.float64)[0]
 
         logger.debug(
             f"Converting SimMessage to SimPacket: node_id={node_id}, "
-            f"src_addr={src_addr}, dst_addr={dst_addr}, data_size={len(data)}, data={data}"
+            f"src_addr={src_addr}, dst_addr={dst_addr}, data_size={len(data)}, data={data}, "
+            f"ingress_time={ingress_time}, egress_time={egress_time}"
         )
 
         return SimPacket(
-            node_id=node_id, src_addr=src_addr, dst_addr=dst_addr, data=data
+            node_id=node_id,
+            src_addr=src_addr,
+            dst_addr=dst_addr,
+            data=data,
+            ingress_time=ingress_time,
+            egress_time=egress_time,
         )
 
     def _bytes_to_ipv4(self, addr_bytes: bytes) -> str:

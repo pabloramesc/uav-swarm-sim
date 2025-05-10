@@ -1,4 +1,4 @@
-from swarm_sim.network.network_simulator import NetworkSimulator, SimPacket
+from multiagent_sim.network.network_simulator import NetworkSimulator, SimPacket
 
 import time
 import numpy as np

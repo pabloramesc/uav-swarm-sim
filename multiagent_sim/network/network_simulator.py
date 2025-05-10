@@ -40,10 +40,22 @@ class NetworkSimulator:
 
         self.bridge = SimBridge()
 
+        self.ns3_process = None
+        self.ns3_init_time: float = None
+        self.ns3_last_time: float = None
+
     @property
     def num_nodes(self) -> int:
         return len(self.nodes)
-    
+
+    @property
+    def elapsed_time(self) -> float:
+        if self.ns3_init_time is None:
+            raise ValueError("NS-3 simulator has not been launched yet.")
+        if self.ns3_last_time is None:
+            raise ValueError("No packets have been sent or received yet.")
+        return self.ns3_last_time - self.ns3_init_time
+
     def get_broadcast_address(self) -> str:
         return "10.0.255.255"
 
@@ -64,6 +76,7 @@ class NetworkSimulator:
                 time.sleep(1.0)
                 self._verify_ns3_connection(max_attempts=5)
                 self._verify_ns3_nodes()
+                self._update_ns3_init_time()
 
                 if verbose:
                     print(
@@ -110,6 +123,10 @@ class NetworkSimulator:
         for packet in packets:
             self._validate_node_id(packet.node_id)
             self.node_packets[packet.node_id].append(packet)
+
+        if len(packets) > 0:
+            self.ns3_last_time = packets[-1].egress_time
+
         return
 
     def get_node_packets(self, node_id: int, delete: bool = False) -> list[SimPacket]:
@@ -253,3 +270,19 @@ class NetworkSimulator:
                 f"Node of type '{node_type}' must have address in '{prefix}x' format."
                 f"But {addr} was given."
             )
+
+    def _update_ns3_init_time(self) -> None:
+        self.ns3_init_time = self.bridge.get_ns3_time(timeout=0.1)
+        if self.ns3_init_time is None:
+            raise ValueError("Failed to get NS-3 initialization time.")
+        self.ns3_last_time = self.ns3_init_time
+
+    def _update_ns3_last_time(self) -> None:
+        self.ns3_last_time = self.bridge.get_ns3_time(timeout=0.1)
+        if self.ns3_last_time is None:
+            raise ValueError("Failed to get NS-3 last time.")
+        if self.ns3_last_time < self.ns3_init_time:
+            raise ValueError(
+                "NS-3 last time cannot be less than NS-3 initialization time."
+            )
+        return

@@ -14,14 +14,16 @@ using namespace ns3;
 
 enum SimCommandCode {
     CMD_DO_NOTHING = 0x00,
-    CMD_SET_POSITIONS = 0x01,
-    CMD_REQUEST_POSITIONS = 0x02,
-    CMD_REQUEST_ADDRESSES = 0x03,
-    CMD_INGRESS_PACKET = 0x10,
     CMD_STOP_SIMULATION = 0xFF,
-    REPLY_ALL_POSITIONS = 0xA1,
-    REPLY_EGRESS_PACKET = 0xA2,
-    REPLY_ALL_ADDRESSES = 0xA3,
+    CMD_SET_POSITIONS = 0x01,
+    CMD_REQUEST_POSITIONS = 0xA1,
+    CMD_REQUEST_ADDRESSES = 0xA2,
+    CMD_INGRESS_PACKET = 0xA3,
+    CMD_REQUEST_SIM_TIME = 0xA4,
+    REPLY_ALL_POSITIONS = 0xB1,
+    REPLY_ALL_ADDRESSES = 0xB2,
+    REPLY_EGRESS_PACKET = 0xB3,
+    REPLY_SIM_TIME = 0xB4,
 };
 
 class SimBridge {
@@ -45,11 +47,13 @@ private:
     void HandleRequestAddresses(int numBytes);
     void HandleIngressPacket(int numBytes);
     void HandleStopSimulation(int numBytes);
+    void HandleRequestSimTime(int numBytes);
 
     void ReplyDoNothing();
     void ReplyAllPositions();
     void ReplyAllAddresses();
     void ReplyEgressPacket(int nodeId, Ipv4Address srcAddr, Ipv4Address destAddr, const uint8_t *data, size_t size);
+    void ReplySimTime();
 
     float m_pollingInterval;
     uint8_t m_buffer[BUFFER_SIZE];

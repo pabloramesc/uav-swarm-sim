@@ -43,17 +43,19 @@ class MultiDroneEVSMSimulator:
         self.num_drones = num_drones
         self.dt = dt
         self.environment = Environment(dem_path)
-        self.evsm_config = evsm_config if evsm_config is not None else EVSMConfig()
         self.visible_distance = visible_distance
 
-        evsm_config = AgentsConfig(num_drones=num_drones)
-        self.agents_manager = AgentsManager(config=evsm_config, env=self.environment)
-        
+        self.agents_manager = AgentsManager(
+            agents_config=AgentsConfig(num_drones=num_drones),
+            swarming_config=evsm_config,
+            env=self.environment,
+        )
+
         self.time = 0.0
         self.step = 0
-        
+
         self.edge_drones_mask = np.zeros((self.num_drones,), dtype=bool)
-        
+
     @property
     def drone_states(self) -> np.ndarray:
         """
@@ -171,13 +173,15 @@ class MultiDroneEVSMSimulator:
         )
         for drone in self.agents_manager.drones.get_all():
             controller: EVSMController = drone.swarming
-            
+
             if controller is None:
                 raise Exception(f"Drone {drone.agent_id} has no position controller")
-            
+
             if not isinstance(controller, EVSMController):
-                raise Exception(f"Drone {drone.agent_id} position controller is not EVSM")
-            
+                raise Exception(
+                    f"Drone {drone.agent_id} position controller is not EVSM"
+                )
+
             indices = drone.neighbor_drone_ids
             links_mask = controller.evsm.links_mask
             drone_links = np.zeros((self.num_drones,), dtype=bool)
@@ -190,11 +194,11 @@ class MultiDroneEVSMSimulator:
         """
         for i, drone in enumerate(self.agents_manager.drones.get_all()):
             controller: EVSMController = drone.swarming
-            
+
             if controller is None:
                 raise Exception(f"Drone {drone.id} has no position controller")
-            
+
             if not isinstance(controller, EVSMController):
                 raise Exception(f"Drone {drone.id} position controller is not EVSM")
-            
+
             self.edge_drones_mask[i] = controller.evsm.is_edge_robot()
