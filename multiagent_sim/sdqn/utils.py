@@ -1,6 +1,6 @@
 import numpy as np
 
-from simulator.environment import Environment
+from ..environment import Environment
 
 
 def gaussian_decay(x: np.ndarray, sigma: float) -> np.ndarray:

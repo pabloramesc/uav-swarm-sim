@@ -76,12 +76,13 @@ class EVSMController(SwarmingController):
             The simulation environment.
         """
         super().__init__(config, env)
-        self.config = config
+        self.neighbor_positions: np.ndarray = None
 
         self.min_ln = 10.0
         self.max_ln = config.separation_distance
         self.ln_rate = config.ln_rate
         self.ln = self.min_ln
+        self.target_height = config.target_height
 
         self.evsm = EVSM(
             env=self.env,
@@ -99,19 +100,29 @@ class EVSMController(SwarmingController):
             kd=config.max_acceleration / config.target_velocity,
         )
 
-    def initialize(self, state, neighbor_positions, time=None):
-        return super().initialize(state, neighbor_positions, time=time)
+    def initialize(self, time: float, state: np.ndarray, **kwargs: dict) -> np.ndarray:
+        super().initialize(time, state)
+
+        neighbor_positions: np.ndarray = kwargs.get("neighbor_positions", None)
+        if neighbor_positions is None:
+            raise ValueError("neighbor_positions must be provided in the kwargs.")
+
+        self.neighbor_positions = neighbor_positions.copy()
 
     def update(
         self,
+        time: float,
         state: np.ndarray,
-        neighbor_positions: np.ndarray,
-        time: float = None,
+        **kwargs: dict,
     ) -> np.ndarray:
         """
         Updates the EVSM controller's state and computes the control output.
         """
-        super().update(state, neighbor_positions, time=time)
+        super().update(time, state)
+
+        neighbor_positions: np.ndarray = kwargs.get("neighbor_positions", None)
+        if neighbor_positions is not None:
+            self.neighbor_positions = neighbor_positions.copy()
 
         self._update_natural_length(time)
 
@@ -127,7 +138,7 @@ class EVSMController(SwarmingController):
         )
 
         # Vertical control by altitude hold
-        target_altitude = self.env.get_elevation(state[0:2]) + self.config.target_height
+        target_altitude = self.env.get_elevation(state[0:2]) + self.target_height
         control[2] = self.altitude_hold.control(
             target_altitude=target_altitude, altitude=state[2], vspeed=state[5]
         )
@@ -141,3 +152,16 @@ class EVSMController(SwarmingController):
         """
         self.ln = min(self.max_ln, self.min_ln + self.ln_rate * time)
         self.evsm.set_natural_length(self.ln)
+
+    def set_natural_length(self, ln: float) -> None:
+        """
+        Sets the natural length of the EVSM algorithm.
+        """
+        self.ln = ln
+        self.evsm.set_natural_length(ln)
+
+    def set_target_height(self, target_height: float) -> None:
+        """
+        Sets the target height for the altitude controller.
+        """
+        self.target_height = target_height

@@ -23,8 +23,7 @@ class Agent(ABC):
 
     def __init__(
         self,
-        global_id: int,
-        type_id: int,
+        agent_id: int,
         agent_type: AgentType,
         env: Environment,
         net: SwarmProtocolInterface = None,
@@ -32,8 +31,7 @@ class Agent(ABC):
         """
         Initializes an agent with a unique ID, type, and environment.
         """
-        self.global_id = global_id
-        self.type_id = type_id
+        self.agent_id = agent_id
         self.agent_type = agent_type
         self.environment = env
         self.network = net
@@ -137,4 +135,4 @@ class Agent(ABC):
         vel = self.velocity
         pos_str = f"[{pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f}] m"
         vel_str = f"[{vel[0]:.2f}, {vel[1]:.2f}, {vel[2]:.2f}] m/s"
-        return f"Agent(id={self.id}, type='{self.type}', position={pos_str}, velocity={vel_str})"
+        return f"Agent(id={self.agent_id}, type='{self.agent_type}', position={pos_str}, velocity={vel_str})"

@@ -17,9 +17,8 @@ from mpl_toolkits.mplot3d.art3d import Line3D, Line3DCollection, Poly3DCollectio
 from mpl_toolkits.mplot3d.axes3d import Axes3D
 from numpy.typing import ArrayLike
 
-from simulator.multidrone_simulator_evsm import MultiDroneSimulatorEVSM
-
-from simulator.math.path_loss_model import signal_strength_map
+from .math.path_loss_model import signal_strength_map
+from .multidrone_evsm_simulator import MultiDroneEVSMSimulator
 
 AspectRatios = Literal["auto", "equal"]
 
@@ -35,7 +34,7 @@ class MultiDroneViewerEVSM:
 
     def __init__(
         self,
-        sim: MultiDroneSimulatorEVSM,
+        sim: MultiDroneEVSMSimulator,
         xlim: tuple[float, float] = None,
         ylim: tuple[float, float] = None,
         zlim: tuple[float, float] = None,

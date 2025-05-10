@@ -9,9 +9,9 @@ from typing import Literal
 
 import numpy as np
 
-from simulator.environment import Environment
-from simulator.math.distances import distances_from_point, pairwise_cross_distances
-from simulator.math.path_loss_model import signal_strength
+from ..environment import Environment
+from ..math.distances import distances_from_point, pairwise_cross_distances
+from ..math.path_loss_model import signal_strength
 
 from .utils import (
     VisitedCells,

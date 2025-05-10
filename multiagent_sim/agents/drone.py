@@ -13,7 +13,7 @@ from ..environment.environment import Environment
 from ..mobility.base_swarming import SwarmingController
 from ..network.swarm_interface import SwarmProtocolInterface
 from .agent import Agent
-from .agents_registry import DronesRegistry, UsersRegistry
+from .agents_registry import AgentsRegistry
 
 NeighborProvider = Literal["network", "registry"]
 
@@ -25,17 +25,16 @@ class Drone(Agent):
 
     def __init__(
         self,
-        global_id: int,
-        type_id: int,
+        agent_id: int,
         env: Environment,
         swarming: SwarmingController,
         network: SwarmProtocolInterface = None,
-        drones_registry: DronesRegistry = None,
-        users_registry: UsersRegistry = None,
+        drones_registry: AgentsRegistry = None,
+        users_registry: AgentsRegistry = None,
         neighbor_provider: NeighborProvider = "registry",
     ):
         super().__init__(
-            global_id=global_id, type_id=type_id, type="drone", env=env, net=network
+            agent_id=agent_id, agent_type="drone", env=env, net=network
         )
         self.swarming = swarming
         self.drones_registry = drones_registry
@@ -47,13 +46,14 @@ class Drone(Agent):
                 "If neighbor_provider is 'network', a network object must be provided."
             )
 
-        if self.neighbor_provider == "registry" and drones_registry:
+        if self.neighbor_provider == "registry" and drones_registry is None:
             raise ValueError(
                 "If neighbor_provider is 'registry', drones_registry must be provided."
             )
 
-        self.drones_positions: np.ndarray = None
-        self.users_positions: np.ndarray = None
+        self.neighbor_drone_ids: np.ndarray = None
+        self.neighbor_drone_positions: np.ndarray = None
+        self.neighbor_user_positions: np.ndarray = None
 
         self.mass = 1.0  # 1 kg for simple equivalence between force and acceleration
         self.max_acc = 10.0  # aprox. 1 g = 9.81 m/s^2
@@ -64,7 +64,8 @@ class Drone(Agent):
         time: float = 0.0,
     ):
         super().initialize(state, time)
-        self.swarming.initialize(state, self.drones_positions, time=time)
+        self._update_neighbors()
+        self.swarming.initialize(time, state, neighbor_positions=self.neighbor_drone_positions)
 
     def update(self, dt: float = 0.01) -> None:
         """
@@ -80,7 +81,7 @@ class Drone(Agent):
 
         # Compute control force using the position controller
         control_force = self.swarming.update(
-            self.state, self.drones_positions, time=self.time
+            self.time, self.state, neighbor_positions=self.neighbor_drone_positions,
         )
 
         # Limit the acceleration to the maximum allowable value
@@ -143,14 +144,21 @@ class Drone(Agent):
         Updates the neighbor states based on the selected provider.
         """
         if self.neighbor_provider == "network":
-            drone_positions = self.network.get_drone_positions(clean_old=True)
-            self.drones_positions = np.array(list(drone_positions.values()))
+            drone_id_pos = self.network.get_drone_positions(clean_old=True)
+            self.neighbor_drone_ids = np.array(list(drone_id_pos.keys()))
+            self.neighbor_drone_positions = np.array(list(drone_id_pos.values()))
             user_positions = self.network.get_user_positions(clean_old=True)
-            self.users_positions = np.array(list(user_positions.values()))
+            self.neighbor_user_positions = np.array(list(user_positions.values()))
 
         elif self.neighbor_provider == "registry":
-            self.drones_positions = self.drones_registry.get_states(self.global_id)
-            self.users_positions = self.users_registry.get_states()
+            # self.drones_positions = self.drones_registry.get_states(self.agent_id)[:, 0:3]
+            drone_id_pos = self.drones_registry.get_states_dict(self.agent_id)
+            self.neighbor_drone_ids = np.array(list(drone_id_pos.keys()))
+            self.neighbor_drone_positions = np.array(list(drone_id_pos.values()))[
+                :, 0:3
+            ]
+            if self.users_registry.num_agents > 0:
+                self.neighbor_user_positions = self.users_registry.get_states_array()[:, 0:3]
 
         else:
             raise ValueError("Invalid neighbor provider specified.")

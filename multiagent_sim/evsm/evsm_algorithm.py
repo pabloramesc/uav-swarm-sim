@@ -7,8 +7,8 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from simulator.environment.environment import Environment
-from simulator.math.angles import SweepAngle
+from ..environment.environment import Environment
+from ..math.angles import SweepAngle
 from .numba_helpers import (
     obstacles_force,
     control_force,

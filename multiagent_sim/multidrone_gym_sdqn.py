@@ -259,7 +259,7 @@ class MultidroneGymSDQN:
 
     def _get_drone_position_controller(self, drone: Drone) -> SDQNPostionController:
         if not isinstance(drone.swarming, SDQNPostionController):
-            raise Exception(f"Drone {drone.id} position controller is not DQNS")
+            raise Exception(f"Drone {drone.agent_id} position controller is not DQNS")
         return drone.swarming
 
     def _generate_random_position(self) -> np.ndarray:

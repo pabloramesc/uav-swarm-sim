@@ -7,10 +7,10 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from agents import Drone, AgentsManager, AgentsConfig
-from environment import Environment
-from mobility.evsm_swarming import EVSMConfig, EVSMController
-from math.path_loss_model import signal_strength
+from .agents import Drone, AgentsManager, AgentsConfig
+from .environment import Environment
+from .mobility.evsm_swarming import EVSMConfig, EVSMController
+from .math.path_loss_model import signal_strength
 
 
 class MultiDroneEVSMSimulator:
@@ -27,7 +27,7 @@ class MultiDroneEVSMSimulator:
         num_drones: int,
         dt: float = 0.01,
         dem_path: str = None,
-        config: EVSMConfig = None,
+        evsm_config: EVSMConfig = None,
         visible_distance: float = 100.0,
     ) -> None:
         """
@@ -43,11 +43,24 @@ class MultiDroneEVSMSimulator:
         self.num_drones = num_drones
         self.dt = dt
         self.environment = Environment(dem_path)
-        self.config = config if config is not None else EVSMConfig()
+        self.evsm_config = evsm_config if evsm_config is not None else EVSMConfig()
         self.visible_distance = visible_distance
 
-        config = AgentsConfig(num_drones=num_drones)
-        self.agents_manager = AgentsManager(config=config, env=self.environment)
+        evsm_config = AgentsConfig(num_drones=num_drones)
+        self.agents_manager = AgentsManager(config=evsm_config, env=self.environment)
+        
+        self.time = 0.0
+        self.step = 0
+        
+        self.edge_drones_mask = np.zeros((self.num_drones,), dtype=bool)
+        
+    @property
+    def drone_states(self) -> np.ndarray:
+        """
+        A (N, 6) shape array with drone states [px, py, pz, vx, vy, vz] in meters and m/s,
+        where N is the number of drones.
+        """
+        return self.agents_manager.drones.get_states_array()
 
     @property
     def drone_positions(self) -> np.ndarray:
@@ -55,7 +68,7 @@ class MultiDroneEVSMSimulator:
         A (N, 3) shape array with drone positions [px, py, pz] in meters,
         where N is the number of drones.
         """
-        return self.agents_manager.drones.get_states()[:, 0:3]
+        return self.agents_manager.drones.get_states_array()[:, 0:3]
 
     @property
     def drone_velocities(self) -> np.ndarray:
@@ -63,7 +76,7 @@ class MultiDroneEVSMSimulator:
         A (N, 3) shape array with drone velocities [vx, vy, vz] in m/s,
         where N is the number of drones.
         """
-        return self.agents_manager.drones.get_states()[:, 3:6]
+        return self.agents_manager.drones.get_states_array()[:, 3:6]
 
     def initialize(self, positions: np.ndarray = None, verbose: bool = True) -> None:
         """
@@ -102,9 +115,7 @@ class MultiDroneEVSMSimulator:
         dt = dt if dt is not None else self.dt
         self.time += dt
         self.step += 1
-        self._get_drone_states()
-        self._update_visible_neighbors()
-        self._update_drones(dt)
+        self.agents_manager.update_agents(dt=dt)
         self._update_links_matrix()
         self._update_edge_drones_mask()
 
@@ -159,21 +170,31 @@ class MultiDroneEVSMSimulator:
             (self.num_drones, self.num_drones), False, dtype=bool
         )
         for drone in self.agents_manager.drones.get_all():
-            indices = drone.neighbor_ids
-            controller: EVSMController = drone.position_controller
-            if not isinstance(controller, EVSMPositionController):
-                raise Exception(f"Drone {drone.id} position controller is not EVSM")
+            controller: EVSMController = drone.swarming
+            
+            if controller is None:
+                raise Exception(f"Drone {drone.agent_id} has no position controller")
+            
+            if not isinstance(controller, EVSMController):
+                raise Exception(f"Drone {drone.agent_id} position controller is not EVSM")
+            
+            indices = drone.neighbor_drone_ids
             links_mask = controller.evsm.links_mask
             drone_links = np.zeros((self.num_drones,), dtype=bool)
             drone_links[indices] = links_mask
-            self.links_matrix[drone.id, :] = drone_links
+            self.links_matrix[drone.agent_id, :] = drone_links
 
     def _update_edge_drones_mask(self) -> None:
         """
         Updates the mask indicating which drones are at the edge of the swarm.
         """
-        for i, drone in enumerate(self.drones):
-            controller: EVSMPositionController = drone.position_controller
-            if not isinstance(controller, EVSMPositionController):
+        for i, drone in enumerate(self.agents_manager.drones.get_all()):
+            controller: EVSMController = drone.swarming
+            
+            if controller is None:
+                raise Exception(f"Drone {drone.id} has no position controller")
+            
+            if not isinstance(controller, EVSMController):
                 raise Exception(f"Drone {drone.id} position controller is not EVSM")
+            
             self.edge_drones_mask[i] = controller.evsm.is_edge_robot()
