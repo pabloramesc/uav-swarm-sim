@@ -1,12 +1,22 @@
-from typing import Literal
-from dataclasses import dataclass
+"""
+Copyright (c) 2025 Pablo Ramirez Escudero
+
+This software is released under the MIT License.
+https://opensource.org/licenses/MIT
+"""
+
+import atexit
+import os
+import signal
 import subprocess
 import time
+from dataclasses import dataclass
+from typing import Literal
+
 import numpy as np
 
-from .sim_bridge import SimBridge, SimPacket
 from ..utils.logger import create_logger
-
+from .sim_bridge import SimBridge, SimPacket
 
 NodeType = Literal["gcs", "uav", "user"]
 NodeTypeToPrefix: dict[NodeType, str] = {
@@ -48,6 +58,11 @@ class NetworkSimulator:
             "NetworkSimulator", level="INFO" if verbose else "WARNING"
         )
 
+        atexit.register(self.shutdown_simulator)
+
+        signal.signal(signal.SIGINT, self._on_exit_signal)
+        signal.signal(signal.SIGTERM, self._on_exit_signal)
+
     @property
     def num_nodes(self) -> int:
         return len(self.nodes)
@@ -66,7 +81,7 @@ class NetworkSimulator:
     def get_node_address(self, node_id: int) -> str:
         self._validate_node_id(node_id)
         return self.nodes[node_id].addr
-    
+
     def update(self) -> None:
         self.fetch_packets()
 
@@ -77,6 +92,8 @@ class NetworkSimulator:
                 self.logger.info(
                     f"➡️  Initializing NS-3 simulator... (attempt {attempt}/{max_attempts})"
                 )
+                
+                self._kill_previous_ns3()
 
                 self._launch_ns3_simulator()
                 time.sleep(1.0)
@@ -163,6 +180,7 @@ class NetworkSimulator:
         self.bridge.stop_ns3()
         time.sleep(timeout)
         self._terminate_ns3_simulator(timeout)
+        self.ns3_process = None
 
     def get_node_id_from_address(self, ip_address: str) -> int:
         for node in self.nodes:
@@ -216,20 +234,52 @@ class NetworkSimulator:
     def _rewrite_ns3_code(self) -> None:
         subprocess.run(["sh", "rewrite_ns3_code.sh"], cwd="./network_sim", check=True)
 
+    def _kill_previous_ns3(self) -> None:
+        # first check if any process is running
+        result = subprocess.run(
+            ["pgrep", "-f", "ns3"], stdout=subprocess.PIPE, check=False
+        )
+        pids = result.stdout.decode("utf-8").splitlines()
+
+        # if no match, return
+        if len(pids) == 0:
+            self.logger.info("No previous NS-3 process found.")
+            return
+
+        self.logger.info(
+            f"Found {len(pids)} previous NS-3 process(es): {', '.join(pids)}"
+        )
+
+        # if match, kill the process
+        subprocess.run(["pkill", "-f", "ns3"], check=True)
+        self.logger.info("Previous NS-3 process killed.")
+
     def _launch_ns3_simulator(self) -> None:
         sim_cmd = (
             "scratch/swarm-net-sim/main "
             f"--nGCS={self.num_gcs} --nUAV={self.num_uavs} --nUser={self.num_users}"
         )
         self.ns3_process = subprocess.Popen(
-            ["./ns3", "run", sim_cmd], cwd="./network_sim/ns-3"
+            ["./ns3", "run", sim_cmd], cwd="./network_sim/ns-3", preexec_fn=os.setsid
         )
 
     def _terminate_ns3_simulator(self, timeout: float = 1.0) -> None:
-        if self.ns3_process.poll() is None:  # Check if the process is still running
+        if self.ns3_process and self.ns3_process.poll() is None:
+            pgid = os.getpgid(self.ns3_process.pid)
+
             self.logger.info("NS-3 process is still running. Terminating...")
-            self.ns3_process.terminate()  # Send termination signal
-            self.ns3_process.wait(timeout)  # Wait for the process to terminate
+            # self.ns3_process.terminate()  # Send termination signal
+            os.killpg(pgid, signal.SIGTERM)  # Send SIGTERM to the process group
+
+            try:
+                self.ns3_process.wait(timeout)  # Wait for the process to terminate
+
+            except subprocess.TimeoutExpired:
+                self.logger.warning(
+                    "NS-3 process did not terminate. Forcing termination..."
+                )
+                os.killpg(pgid, signal.SIGKILL)
+                self.ns3_process.wait()
 
         self.logger.info("🛑 NS-3 process terminated.")
 
@@ -293,3 +343,10 @@ class NetworkSimulator:
                 "NS-3 last time cannot be less than NS-3 initialization time."
             )
         return
+
+    def _on_exit_signal(self, signum, frame):
+        self.logger.warning(f"Received signal {signum}, shutting down NS-3")
+        self.shutdown_simulator()
+        # re-raise default behavior
+        signal.signal(signum, signal.SIG_DFL)
+        os.kill(os.getpid(), signum)

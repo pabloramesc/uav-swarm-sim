@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from .network_simulator import NetworkSimulator
 from .network_interface import NetworkInterface, SimPacket
 from .swarm_packets import DataPacket, PositionPacket, parse_packet, PacketType
+from ..utils.logger import create_logger
 
 BroadcastMode = Literal["local", "global"]
 
@@ -44,6 +45,8 @@ class SwarmLink:
         self.next_local_bcast_time = 0.0
         self.next_global_bcast_time = 0.0
 
+        self.logger = create_logger(name="SwarmLink", level="INFO")
+
     def update(self, time: float, position: np.ndarray) -> None:
         self.time = time
         self.position = position.copy()
@@ -61,6 +64,8 @@ class SwarmLink:
             self.next_global_bcast_time = self.time + np.random.normal(
                 self.global_bcast_interval, self.global_bcast_interval / 10
             )
+            
+        pass
 
     def broadcast_position(self, position: np.ndarray, mode: BroadcastMode) -> None:
         position_packet = PositionPacket()
@@ -112,9 +117,7 @@ class SwarmLink:
         agent_type, type_id = self.network_interface.network_simulator.get_node_type_id(
             source_id
         )
-        pos = NeighborPosition(
-            time=packet.timestamp, position=packet.get_position()
-        )
+        pos = NeighborPosition(time=packet.timestamp, position=packet.get_position())
         if agent_type == "user":
             self.user_positions[type_id] = pos
         elif agent_type == "uav":
@@ -132,6 +135,10 @@ class SwarmLink:
             if self.time - pos.time < self.position_timeout:
                 drone_positions[node_id] = pos.position
             else:
+                self.logger.debug(
+                    f"At {self.time:.2f} s, in agent {self.agent_id}: "
+                    f"Drone {node_id} position timed out"
+                )
                 continue
 
         return drone_positions

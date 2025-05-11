@@ -36,18 +36,23 @@ class IpcSocket:
         addr: str = "127.0.0.1",
         port: int = 9001,
         ns3_port: int = 9000,
-        buffer_size: int = 100,
+        max_size: int = 100,
     ) -> None:
         self.addr = addr
         self.port = port
         self.ns3_port = ns3_port
-        self.buffer_size = buffer_size
         
         self.sock = self._setup_socket()
-        self.message_buffer = deque(maxlen=buffer_size)
+        self.message_buffer = deque(maxlen=max_size)
         
         self.running = False
         self.thread = None
+        self.buffer_lock = threading.Lock()
+        
+    @property
+    def buffer_size(self) -> int:
+        """Returns the number of messages currently in the buffer."""
+        return len(self.message_buffer)
 
     def _setup_socket(self) -> socket.socket:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -81,7 +86,8 @@ class IpcSocket:
                 )
 
                 if msg.port == self.ns3_port:
-                    self.message_buffer.append(msg)  # Add message to buffer
+                    with self.buffer_lock:
+                        self.message_buffer.append(msg)  # Add message to buffer
                     logger.debug(
                         f"Message added to buffer. Buffer size: {len(self.message_buffer)}"
                     )
@@ -103,26 +109,31 @@ class IpcSocket:
             self.thread.join()
 
     def clear_buffer(self) -> None:
-        self.message_buffer.clear()
+        with self.buffer_lock:
+            self.message_buffer.clear()
 
     def get_buffer_size(self) -> int:
         """Returns the number of messages currently in the buffer."""
-        return len(self.message_buffer)
+        with self.buffer_lock:
+            return len(self.message_buffer)
 
     def get_first_message(self) -> IpcMessage | None:
         """Returns and removes the first message in the buffer, or None if the buffer is empty."""
-        if self.message_buffer:
-            return self.message_buffer.popleft()
-        return None
+        with self.buffer_lock:
+            if self.message_buffer:
+                return self.message_buffer.popleft()
+            return None
 
     def get_last_message(self) -> IpcMessage | None:
         """Returns and removes the last message in the buffer, or None if the buffer is empty."""
-        if self.message_buffer:
-            return self.message_buffer.pop()
-        return None
+        with self.buffer_lock:
+            if self.message_buffer:
+                return self.message_buffer.pop()
+            return None
 
     def get_all_messages(self) -> list[IpcMessage]:
         """Returns all messages in the buffer and clears it."""
-        messages = list(self.message_buffer)
-        self.message_buffer.clear()
+        with self.buffer_lock:
+            messages = list(self.message_buffer)
+            self.message_buffer.clear()
         return messages

@@ -10,8 +10,8 @@ from multiagent_sim.multidrone_evsm_simulator import MultiDroneEVSMSimulator
 from multiagent_sim.mobility.evsm_swarming import EVSMConfig
 from multiagent_sim.utils.mobility_helper import grid_positions
 
-dt = 0.1
-num_drones = 50
+dt = 0.01
+num_drones = 25
 
 evsm_config = EVSMConfig(
     separation_distance=100.0,
@@ -22,7 +22,7 @@ evsm_config = EVSMConfig(
     initial_natural_length=5.0,
     natural_length_rate=1.0,
 )
-sim = MultiDroneEVSMSimulator(num_drones, dt, evsm_config=evsm_config, neihgbor_provider="registry")
+sim = MultiDroneEVSMSimulator(num_drones, dt, evsm_config=evsm_config, neihgbor_provider="network")
 sim.environment.set_rectangular_boundary([-200.0, -200.0], [+200.0, +200.0])
 sim.environment.add_circular_obstacle([50.0, 50.0], 25.0)
 sim.environment.add_rectangular_obstacle([-125.0, 0.0], [-100.0, +100.0])
@@ -30,13 +30,13 @@ sim.environment.add_rectangular_obstacle([50.0, -100.0], [100.0, -50.0])
 p0 = grid_positions(num_drones, origin=[-100.0, -100.0], space=5.0, altitude=0.0)
 sim.initialize(positions=p0)
 
-gui = MultiDroneViewerEVSM(sim, is_3d=False)
+gui = MultiDroneViewerEVSM(sim)
 
 while True:
     sim.update()
     gui.update(force_render=False, verbose=True)
 
-    cr = sim.area_coverage_ratio()
-    print(f"Area coverage ratio: {cr * 100:.2f} %")
+    # cr = sim.area_coverage_ratio()
+    # print(f"Area coverage ratio: {cr * 100:.2f} %")
 
     sim.sync_to_real_time()

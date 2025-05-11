@@ -15,6 +15,7 @@ from .mobility.evsm_swarming import EVSMConfig, EVSMController
 from .math.path_loss_model import signal_strength
 from .network import NetworkSimulator
 from .utils.logger import create_logger
+from .utils.type_checks import is_symmetric
 
 
 class MultiDroneEVSMSimulator:
@@ -146,12 +147,12 @@ class MultiDroneEVSMSimulator:
         dt = dt if dt is not None else self.dt
         self.sim_time += dt
         self.sim_step += 1
-        
+
         if self.network_simulator is not None:
             self.network_simulator.update()
-        
+
         self.agents_manager.update_agents(dt=dt)
-        
+
         self._update_links_matrix()
         self._update_edge_drones_mask()
 
@@ -231,6 +232,9 @@ class MultiDroneEVSMSimulator:
             drone_links = np.zeros((self.num_drones,), dtype=bool)
             if indices.size > 0 and indices.size == links_mask.size:
                 drone_links[indices] = links_mask
+
+            if not np.any(drone_links):
+                self.logger.info(f"Drone {drone.agent_id} has no links.")
 
             self.links_matrix[drone.agent_id, :] = drone_links
 

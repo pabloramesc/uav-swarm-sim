@@ -68,7 +68,7 @@ class SimBridge:
 
     def __init__(self):
         self.sock = IpcSocket(
-            addr="127.0.0.1", port=9001, ns3_port=9000, buffer_size=1000
+            addr="127.0.0.1", port=9001, ns3_port=9000, max_size=1000
         )
         self.sock.start_reading()
 
