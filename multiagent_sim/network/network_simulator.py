@@ -66,13 +66,16 @@ class NetworkSimulator:
     def get_node_address(self, node_id: int) -> str:
         self._validate_node_id(node_id)
         return self.nodes[node_id].addr
+    
+    def update(self) -> None:
+        self.fetch_packets()
 
     def launch_simulator(self, max_attempts: int = 1) -> None:
         attempt = 1
         while attempt <= max_attempts:
             try:
                 self.logger.info(
-                    f"Initializing NS-3 simulator... (attempt {attempt}/{max_attempts})"
+                    f"➡️  Initializing NS-3 simulator... (attempt {attempt}/{max_attempts})"
                 )
 
                 self._launch_ns3_simulator()
@@ -155,7 +158,7 @@ class NetworkSimulator:
 
         return packets
 
-    def stop_simulator(self, timeout: float = 1.0) -> None:
+    def shutdown_simulator(self, timeout: float = 1.0) -> None:
         self.logger.info("Terminating NS-3 simulator...")
         self.bridge.stop_ns3()
         time.sleep(timeout)
@@ -211,7 +214,7 @@ class NetworkSimulator:
             node_id += 1
 
     def _rewrite_ns3_code(self) -> None:
-        subprocess.run(["sh", "update_code.sh"], cwd="./network_sim", check=True)
+        subprocess.run(["sh", "rewrite_ns3_code.sh"], cwd="./network_sim", check=True)
 
     def _launch_ns3_simulator(self) -> None:
         sim_cmd = (
@@ -228,7 +231,7 @@ class NetworkSimulator:
             self.ns3_process.terminate()  # Send termination signal
             self.ns3_process.wait(timeout)  # Wait for the process to terminate
 
-        self.logger.info("NS-3 process terminated.")
+        self.logger.info("🛑 NS-3 process terminated.")
 
     def _verify_ns3_connection(self, max_attempts: int = 2) -> None:
         is_running = False

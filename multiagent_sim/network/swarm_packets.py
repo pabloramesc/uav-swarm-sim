@@ -1,19 +1,26 @@
 from enum import Enum
-import time
+from abc import ABC, abstractmethod
 import numpy as np
 from numpy.typing import ArrayLike
 
 
 class PacketType(Enum):
     DATA = 0x00
-    POSITION = 0xA1
+    POSITION = 0x01
 
 
-class DataPacket:
-    min_length = 8  # header: packet type (1 byte) + agent ID (1 byte) + counter (2 bytes) + timestamp (4 bytes)
+class SwarmPacket(ABC):
+    """
+    Base class for all swarm packets.
 
-    def __init__(self):
-        self.type = PacketType.DATA
+    Header format (8 bytes):
+    [ Packet Type (1 byte) | Counter (2 bytes) | Agent ID (1 byte) | Timestamp (4 bytes) ]
+    """
+
+    HEADER_SIZE = 8  # header size in bytes
+
+    def __init__(self, packet_type: PacketType):
+        self.packet_type = packet_type
         self.agent_id: np.uint8 = None
         self.counter: np.uint16 = None
         self.timestamp: np.float32 = None
@@ -24,72 +31,79 @@ class DataPacket:
         self.counter = np.uint16(counter)
         self.timestamp = np.float32(timestamp)
 
-    def set_payload(self, data: bytes) -> None:
-        self.payload = data
-
-    def get_header(self) -> bytes:
+    def _build_header(self) -> bytes:
         header = b""
-        header += self.type.value.to_bytes(length=1)
+        header += self.packet_type.value.to_bytes(length=1)
         header += self.counter.tobytes()
         header += self.agent_id.tobytes()
         header += self.timestamp.tobytes()
         return header
 
-    def serialize(self, data: bytes = None) -> bytes:
-        header = self.get_header()
-        payload = data if data is not None else self.payload
-        return header + payload
+    def _parse_header(self, packet: bytes) -> None:
+        packet_type = PacketType(packet[0])
+        if self.packet_type != packet_type:
+            raise ValueError(f"Expected {self.packet_type}, got {packet_type}")
 
+        self.counter = np.frombuffer(packet[1:3], dtype=np.uint16)[0]
+        self.agent_id = np.frombuffer(packet[3:4], dtype=np.uint8)[0]
+        self.timestamp = np.frombuffer(packet[4:8], dtype=np.float32)[0]
+
+    def serialize(self) -> bytes:
+        return self._build_header() + self.payload
+
+    @abstractmethod
     def deserialize(self, packet: bytes) -> None:
-        if len(packet) < 9:
-            raise ValueError("Packet length must be at least 9 bytes.")
-
-        self.type = PacketType(packet[0])
-        self.agent_id = np.frombuffer(packet[1:5], dtype=np.uint32)[0]
-        self.timestamp = np.frombuffer(packet[5:9], dtype=np.float32)[0]
-        self.payload = packet[9:]
-
-        expected_length = 9 + len(self.payload)
-        if len(packet) != expected_length:
-            raise ValueError(
-                f"Packet length mismatch. Expected {expected_length} bytes, got {len(packet)}"
-            )
+        """Deserialize the packet from bytes."""
+        pass
 
 
-class PositionPacket(DataPacket):
-    payload_length = 3 * 4  # positions [px, py, pz] in float32 (3x4 bytes)
-    expected_length = (
-        DataPacket.min_length + payload_length
-    )  # header (9 bytes) + payload (12 bytes)
+class DataPacket(SwarmPacket):
 
     def __init__(self):
-        super().__init__()
-        self.packet_type = PacketType.POSITION
+        super().__init__(PacketType.DATA)
+
+    def set_payload(self, data: bytes) -> None:
+        self.payload = data
+
+    def deserialize(self, packet: bytes) -> None:
+        if len(packet) < SwarmPacket.HEADER_SIZE:
+            raise ValueError(
+                f"Packet must have at least {self.HEADER_SIZE} bytes, got {len(packet)}"
+            )
+        self._parse_header(packet)
+        self.payload = packet[self.HEADER_SIZE :]
+
+
+class PositionPacket(SwarmPacket):
+    PAYLOAD_SIZE = 3 * 4  # 3 float32s (px, py, pz) in bytes
+    EXPECTED_LENGTH = SwarmPacket.HEADER_SIZE + PAYLOAD_SIZE
+
+    def __init__(self):
+        super().__init__(PacketType.POSITION)
 
     def set_position(self, position: ArrayLike) -> None:
-        position = np.asarray(position, dtype=np.float32)
-        if position.shape != (3,):
+        arr = np.asarray(position, dtype=np.float32)
+        if arr.shape != (3,):
             raise ValueError("Position must be a numpy array with shape (3,)")
-        data = position.tobytes()
-        self.set_payload(data)
+        self.payload = arr.tobytes()
 
     def get_position(self) -> np.ndarray:
-        if len(self.payload) != PositionPacket.payload_length:
+        if len(self.payload) != self.PAYLOAD_SIZE:
             raise Exception(
-                f"Payload must have {PositionPacket.payload_length} bytes, got {len(self.payload)}"
+                f"Expected payload of {PositionPacket.payload_length} bytes, got {len(self.payload)}"
             )
-        position = np.frombuffer(self.payload, dtype=np.float32)
-        return position
+        return np.frombuffer(self.payload, dtype=np.float32)
 
-    def deserialize(self, packet):
-        if len(packet) != PositionPacket.expected_length:
+    def deserialize(self, packet: bytes) -> None:
+        if len(packet) != self.EXPECTED_LENGTH:
             raise ValueError(
-                f"Packet must have {self.expected_length} bytes, got {len(packet)}"
+                f"Packet must be {self.expected_length} bytes, got {len(packet)}"
             )
-        return super().deserialize(packet)
+        self._parse_header(packet)
+        self.payload = packet[self.HEADER_SIZE : self.EXPECTED_LENGTH]
 
 
-def parse_packet(data: bytes) -> DataPacket:
+def parse_packet(data: bytes) -> SwarmPacket:
     if not data:
         raise ValueError("Packet is empty")
 

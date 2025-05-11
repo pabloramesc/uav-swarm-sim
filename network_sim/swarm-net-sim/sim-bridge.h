@@ -13,17 +13,21 @@ using namespace std;
 using namespace ns3;
 
 enum SimCommandCode {
-    CMD_DO_NOTHING = 0x00,
-    CMD_STOP_SIMULATION = 0xFF,
-    CMD_SET_POSITIONS = 0x01,
-    CMD_REQUEST_POSITIONS = 0xA1,
-    CMD_REQUEST_ADDRESSES = 0xA2,
-    CMD_INGRESS_PACKET = 0xA3,
-    CMD_REQUEST_SIM_TIME = 0xA4,
+    // Command codes for simulation control
+    DO_NOTHING = 0x00,
+    STOP_SIMULATION = 0xFF,
+    // Command codes to control nodes
+    SET_POSITIONS = 0x01,
+    INGRESS_PACKET = 0x02,
+    EGRESS_PACKET = 0x03,
+    // Command codes for simulation status
+    REQUEST_POSITIONS = 0xA1,
+    REQUEST_ADDRESSES = 0xA2,
+    REQUEST_SIM_TIME = 0xA3,
+    // Reply codes for simulation status
     REPLY_ALL_POSITIONS = 0xB1,
     REPLY_ALL_ADDRESSES = 0xB2,
-    REPLY_EGRESS_PACKET = 0xB3,
-    REPLY_SIM_TIME = 0xB4,
+    REPLY_SIM_TIME = 0xB3,
 };
 
 class SimBridge {
@@ -41,18 +45,21 @@ private:
     void RxCallback(Ptr<Socket> socket);
 
     void ProcessCommand(int numBytes);
+
     void HandleDoNothing(int numBytes);
+    void HandleStopSimulation(int numBytes);
+    
     void HandleSetPositions(int numBytes);
+    void HandleIngressPacket(int numBytes);
+    void SendEgressPacket(int nodeId, Ipv4Address srcAddr, Ipv4Address destAddr, const uint8_t *data, size_t size);
+
     void HandleRequestPositions(int numBytes);
     void HandleRequestAddresses(int numBytes);
-    void HandleIngressPacket(int numBytes);
-    void HandleStopSimulation(int numBytes);
     void HandleRequestSimTime(int numBytes);
 
     void ReplyDoNothing();
     void ReplyAllPositions();
     void ReplyAllAddresses();
-    void ReplyEgressPacket(int nodeId, Ipv4Address srcAddr, Ipv4Address destAddr, const uint8_t *data, size_t size);
     void ReplySimTime();
 
     float m_pollingInterval;

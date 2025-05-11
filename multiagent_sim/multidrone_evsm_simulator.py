@@ -51,10 +51,12 @@ class MultiDroneEVSMSimulator:
         # self.visible_distance = visible_distance
 
         if neihgbor_provider == "network":
-            network_simulator = NetworkSimulator(
+            self.network_simulator = NetworkSimulator(
                 num_gcs=0, num_uavs=num_drones, num_users=0, verbose=True
             )
-            network_simulator.launch_simulator(max_attempts=2)
+            self.network_simulator.launch_simulator(max_attempts=2)
+        else:
+            self.network_simulator = None
 
         agents_config = AgentsConfig(
             num_drones=num_drones, drones_neighbor_provider=neihgbor_provider
@@ -63,7 +65,7 @@ class MultiDroneEVSMSimulator:
             agents_config=agents_config,
             swarming_config=evsm_config,
             env=self.environment,
-            net_sim=network_simulator,
+            net_sim=self.network_simulator,
         )
 
         self.init_time: float = None
@@ -144,7 +146,12 @@ class MultiDroneEVSMSimulator:
         dt = dt if dt is not None else self.dt
         self.sim_time += dt
         self.sim_step += 1
+        
+        if self.network_simulator is not None:
+            self.network_simulator.update()
+        
         self.agents_manager.update_agents(dt=dt)
+        
         self._update_links_matrix()
         self._update_edge_drones_mask()
 
@@ -207,6 +214,7 @@ class MultiDroneEVSMSimulator:
             (self.num_drones, self.num_drones), False, dtype=bool
         )
         for drone in self.agents_manager.drones.get_all():
+            drone: Drone = drone
             controller: EVSMController = drone.swarming
 
             if controller is None:
@@ -217,11 +225,11 @@ class MultiDroneEVSMSimulator:
                     f"Drone {drone.agent_id} position controller is not EVSM"
                 )
 
-            indices = drone.neighbor_drone_ids
+            indices = np.array(list(drone.drone_positions.keys()))
             links_mask = controller.evsm.links_mask
 
             drone_links = np.zeros((self.num_drones,), dtype=bool)
-            if indices.shape[0] > 0:
+            if indices.size > 0 and indices.size == links_mask.size:
                 drone_links[indices] = links_mask
 
             self.links_matrix[drone.agent_id, :] = drone_links

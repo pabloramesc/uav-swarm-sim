@@ -7,7 +7,7 @@ https://opensource.org/licenses/MIT
 
 from .agent import Agent
 from ..environment import Environment
-from ..network.swarm_interface import SwarmProtocolInterface
+from ..network.swarm_link import SwarmLink
 
 
 class ControlStation(Agent):
@@ -28,7 +28,7 @@ class ControlStation(Agent):
         global_id: int,
         type_id: int,
         env: Environment,
-        net: SwarmProtocolInterface = None,
+        net: SwarmLink = None,
     ):
         super().__init__(
             global_id=global_id, type_id=type_id, agent_type="gcs", env=env, net=net

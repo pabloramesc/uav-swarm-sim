@@ -97,4 +97,4 @@ print(f"Simulation time: {t_sim:.2f} s")
 net_sim._update_ns3_last_time()
 print(f"NS-3 elapsed time: {net_sim.elapsed_time:.2f} s")
 
-net_sim.stop_simulator()
+net_sim.shutdown_simulator()

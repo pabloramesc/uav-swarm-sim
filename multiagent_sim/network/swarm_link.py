@@ -2,6 +2,7 @@ import numpy as np
 from typing import Literal
 from dataclasses import dataclass
 
+from .network_simulator import NetworkSimulator
 from .network_interface import NetworkInterface, SimPacket
 from .swarm_packets import DataPacket, PositionPacket, parse_packet, PacketType
 
@@ -14,23 +15,25 @@ class NeighborPosition:
     position: np.ndarray
 
 
-class SwarmProtocolInterface(NetworkInterface):
+class SwarmLink:
 
     def __init__(
         self,
-        agent_id,
-        network_sim,
+        agent_id: int,
+        network_sim: NetworkSimulator,
         local_bcast_interval: float = None,
         global_bcast_interval: float = None,
         position_timeout: float = 5.0,
     ):
-        super().__init__(agent_id, network_sim)
+        self.agent_id = agent_id
+        self.network_interface = NetworkInterface(agent_id, network_sim)
+
         self.local_bcast_interval = local_bcast_interval
         self.global_bcast_interval = global_bcast_interval
         self.position_timeout = position_timeout
 
         self.local_bcast_addr = "255.255.255.255"
-        self.global_bcast_addr = self.network.get_broadcast_address()
+        self.global_bcast_addr = self.network_interface.get_broadcast_address()
 
         self.time: float = 0.0
         self.node_position: np.ndarray = None
@@ -62,7 +65,9 @@ class SwarmProtocolInterface(NetworkInterface):
     def broadcast_position(self, position: np.ndarray, mode: BroadcastMode) -> None:
         position_packet = PositionPacket()
         position_packet.set_header_fields(
-            agent_id=self.node_id, counter=self.tx_packet_counter, timestamp=self.time
+            agent_id=self.agent_id,
+            counter=self.network_interface.tx_packet_counter,
+            timestamp=self.time,
         )
         position_packet.set_position(position)
 
@@ -74,16 +79,16 @@ class SwarmProtocolInterface(NetworkInterface):
             raise ValueError(f"Invalid broacast mode: {mode}")
 
         broadcast_packet = SimPacket(
-            node_id=self.node_id,
-            src_addr=self.node_addr,
+            node_id=self.agent_id,
+            src_addr=self.network_interface.node_addr,
             dst_addr=bcast_addr,
             data=position_packet.serialize(),
         )
 
-        self.send(broadcast_packet)
+        self.network_interface.send(broadcast_packet)
 
     def receive(self, delete: bool = True) -> list[SimPacket]:
-        packets = super().receive(delete)
+        packets = self.network_interface.receive(delete)
 
         for packet in packets:
             try:
@@ -91,9 +96,9 @@ class SwarmProtocolInterface(NetworkInterface):
             except Exception:
                 print(f"Failed to parse packet: {packet}")
 
-            if swarm_packet.type == PacketType.DATA:
+            if swarm_packet.packet_type == PacketType.DATA:
                 self.data_packets.append(swarm_packet)
-            elif swarm_packet.type == PacketType.POSITION:
+            elif swarm_packet.packet_type == PacketType.POSITION:
                 self.handle_position_packet(swarm_packet)
             else:
                 raise ValueError(f"Invalid packet type: {swarm_packet.type}")
@@ -102,13 +107,17 @@ class SwarmProtocolInterface(NetworkInterface):
 
     def handle_position_packet(self, packet: PositionPacket) -> None:
         source_id = packet.agent_id
-        if source_id == self.node_id:
+        if source_id == self.agent_id:
             return  # ignore own packets
-        agent_type, type_id = self.network.get_node_type_id(source_id)
-        pos = NeighborPosition(time=packet.timestamp, position=packet.get_position())
+        agent_type, type_id = self.network_interface.network_simulator.get_node_type_id(
+            source_id
+        )
+        pos = NeighborPosition(
+            time=packet.timestamp, position=packet.get_position()
+        )
         if agent_type == "user":
             self.user_positions[type_id] = pos
-        elif agent_type == "drone":
+        elif agent_type == "uav":
             self.drone_positions[type_id] = pos
         else:
             raise ValueError(f"Invalid agent type: {agent_type}")
@@ -122,6 +131,7 @@ class SwarmProtocolInterface(NetworkInterface):
 
             if self.time - pos.time < self.position_timeout:
                 drone_positions[node_id] = pos.position
+            else:
                 continue
 
         return drone_positions

@@ -1,12 +1,4 @@
-"""
-Copyright (c) 2025 Pablo Ramirez Escudero
-
-This software is released under the MIT License.
-https://opensource.org/licenses/MIT
-"""
-
 from dataclasses import dataclass
-
 import numpy as np
 
 from ..environment.environment import Environment
@@ -18,152 +10,157 @@ from .base_swarming import SwarmingController, SwarmingConfig
 @dataclass
 class EVSMConfig(SwarmingConfig):
     """
-    Configuration for the EVSMPositionControl class.
+    Configuration for EVSMController.
 
     Attributes
     ----------
     separation_distance : float
-        Desired separation distance between agents in meters
-        (default is 50.0).
+        Desired separation between agents (m).
     obstacle_distance : float
-        Minimum distance to obstacles for avoidance in meters
-        (default is 10.0).
+        Minimum obstacle avoidance distance (m).
     agent_mass : float
-        Mass of the agent in kilograms (default is 1.0).
+        Agent mass (kg).
     max_acceleration : float
-        Maximum acceleration of the agent in m/s^2 (default is 10.0).
-    target_velocity : float
-        Target velocity of the agent in m/s (default is 15.0).
+        Maximum acceleration (m/s^2).
+    target_speed : float
+        Desired horizontal speed (m/s).
     target_altitude : float
-        Desired altitude of the agent in meters (default is 100.0).
+        Desired altitude above ground (m).
+    max_altitude_error : float
+        Maximum altitude error for controller.
+    natural_length_rate : float
+        Rate of change for EVSM natural length (m/s).
     """
 
-    separation_distance: float = 50.0  # in meters
-    obstacle_distance: float = 10.0  # in meters
-    agent_mass: float = 1.0  # simple equivalence between force and acceleration
-    max_acceleration: float = 10.0  # 1 g aprox. 9.81 m/s^2
-    target_velocity: float = 15.0  # between 5-25 m/S
-    target_height: float = 100.0  # in meters (AGL - Above Ground Level)
-    max_height_error: float = 100.0
-    ln_rate: float = 1.0
+    separation_distance: float = 50.0
+    obstacle_distance: float = 10.0
+    agent_mass: float = 1.0
+    max_acceleration: float = 10.0
+    target_speed: float = 15.0
+    target_altitude: float = 100.0
+    max_altitude_error: float = 100.0
+    initial_natural_length: float = 50.0
+    natural_length_rate: float = 1.0
 
 
 class EVSMController(SwarmingController):
     """
-    EVSM-based horizontal position control and altitude hold.
-
-    This class combines the EVSM algorithm for horizontal position control
-    with a PD controller for altitude hold.
-
-    Attributes
-    ----------
-    evsm : EVSM
-        Instance of the EVSM algorithm for horizontal position control.
-    altitude_hold : AltitudeController
-        Instance of the AltitudeController for vertical control.
+    Combines EVSM horizontal control with altitude hold.
     """
 
-    def __init__(self, config: EVSMConfig, env: Environment):
-        """
-        Initializes the EVSMPositionControl class.
+    def __init__(
+        self,
+        config: EVSMConfig,
+        environment: Environment,
+    ):
+        super().__init__(config, environment)
 
-        Parameters
-        ----------
-        config : EVSMConfig
-            Configuration object containing parameters for the EVSM and
-            altitude controllers.
-        env : Environment
-            The simulation environment.
-        """
-        super().__init__(config, env)
-        self.neighbor_positions: np.ndarray = None
+        # Natural length parameters
+        self._initial_nat_length = config.initial_natural_length
+        self._max_nat_length = config.separation_distance
+        self._nat_length_rate = config.natural_length_rate
+        self._current_nat_length = self._initial_nat_length
 
-        self.min_ln = 10.0
-        self.max_ln = config.separation_distance
-        self.ln_rate = config.ln_rate
-        self.ln = self.min_ln
-        self.target_height = config.target_height
+        # Altitude setpoint
+        self._target_altitude = config.target_altitude
 
+        # EVSM horizontal control
         self.evsm = EVSM(
-            env=self.env,
-            ln=self.min_ln,
-            # ln=config.separation_distance,
+            env=environment,
+            ln=self._initial_nat_length,
             ks=config.max_acceleration / config.separation_distance,
-            # kd=config.agent_mass / 1.0,
-            kd=config.max_acceleration / config.target_velocity,
+            kd=config.max_acceleration / config.target_speed,
             d_obs=config.obstacle_distance,
         )
 
-        self.altitude_hold = AltitudeController(
-            kp=config.max_acceleration / config.max_height_error,
-            # kd=config.agent_mass / 1.0,
-            kd=config.max_acceleration / config.target_velocity,
+        # Vertical PD control
+        self.vertical_controller = AltitudeController(
+            kp=config.max_acceleration / config.max_altitude_error,
+            kd=config.max_acceleration / config.target_speed,
         )
 
-    def initialize(self, time: float, state: np.ndarray, **kwargs: dict) -> np.ndarray:
+        # Neighbor positions cache
+        self._neighbor_drone_positions: dict[int, np.ndarray] = {}
+
+    def initialize(
+        self,
+        time: float,
+        state: np.ndarray,
+        drone_positions: dict[int, np.ndarray] = None,
+    ) -> None:
         super().initialize(time, state)
-
-        neighbor_positions: np.ndarray = kwargs.get("neighbor_positions", None)
-        if neighbor_positions is None:
-            raise ValueError("neighbor_positions must be provided in the kwargs.")
-
-        self.neighbor_positions = neighbor_positions.copy()
+        if drone_positions is None:
+            raise ValueError("`drone_positions` is required for initialization")
+        self._neighbor_drone_positions = drone_positions.copy()
 
     def update(
         self,
         time: float,
         state: np.ndarray,
-        **kwargs: dict,
+        drone_positions: dict[int, np.ndarray] = None,
     ) -> np.ndarray:
         """
-        Updates the EVSM controller's state and computes the control output.
+        Compute control forces: [Fx, Fy, Fz]
         """
         super().update(time, state)
 
-        control = np.zeros(3)
+        # Check for changes in neighbor topology
+        force_update = False
+        if drone_positions.keys() != self._neighbor_drone_positions.keys():
+            force_update = True
 
-        neighbor_positions: np.ndarray = kwargs.get(
-            "neighbor_positions", np.zeros((0, 3))
+        self._neighbor_drone_positions = drone_positions.copy()
+
+        # Prepare neighbor array for EVSM
+        neighbors_array = (
+            np.array(list(self._neighbor_drone_positions.values()))[:, 0:2]
+            if self._neighbor_drone_positions
+            else np.zeros((0, 2))
         )
-        if neighbor_positions.shape[0] > 0:
-            self.neighbor_positions = neighbor_positions.copy()
 
+        # Update EVSM natural length
         self._update_natural_length(time)
 
-        # Horizontal control using EVSM (Extended Virtual Spring Mesh)
-        control[0:2] = self.evsm.update(
+        # Initialize control vector [Fx, Fy, Fz]
+        control_force = np.zeros(3)
+
+        # Horizontal EVSM force
+        control_force[:2] = self.evsm.update(
             position=state[0:2],
             velocity=state[3:5],
-            neighbors=neighbor_positions[:, 0:2],
+            neighbors=neighbors_array,
             time=time,
-            force_update=False,
+            force_update=force_update,
         )
 
-        # Vertical control by altitude hold
-        target_altitude = self.env.get_elevation(state[0:2]) + self.target_height
-        control[2] = self.altitude_hold.control(
-            target_altitude=target_altitude, altitude=state[2], vspeed=state[5]
+        # Vertical force via PD altitude controller
+        ground_elevation = self.env.get_elevation(state[0:2])
+        desired_alt = ground_elevation + self._target_altitude
+        control_force[2] = self.vertical_controller.control(
+            target_altitude=desired_alt,
+            altitude=state[2],
+            vspeed=state[5],
         )
 
-        return control
+        return control_force
 
     def _update_natural_length(self, time: float) -> None:
         """
-        Updates the natural length of the EVSM algorithm based on the rate of
-        change.
+        Grow natural length at fixed rate up to maximum.
         """
-        self.ln = min(self.max_ln, self.min_ln + self.ln_rate * time)
-        self.evsm.set_natural_length(self.ln)
+        new_length = self._initial_nat_length + self._nat_length_rate * time
+        self._current_nat_length = min(self._max_nat_length, new_length)
+        self.evsm.set_natural_length(self._current_nat_length)
 
-    def set_natural_length(self, ln: float) -> None:
+    def set_natural_length(self, length: float) -> None:
         """
-        Sets the natural length of the EVSM algorithm.
+        Override the EVSM natural length directly.
         """
-        self.ln = ln
-        self.evsm.set_natural_length(ln)
+        self._current_nat_length = length
+        self.evsm.set_natural_length(length)
 
-    def set_target_height(self, target_height: float) -> None:
+    def set_target_altitude(self, altitude: float) -> None:
         """
-        Sets the target height for the altitude controller.
+        Update altitude controller setpoint.
         """
-        self.target_height = target_height
+        self._target_altitude = altitude

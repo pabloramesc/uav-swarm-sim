@@ -7,7 +7,7 @@ from ..mobility.base_swarming import SwarmingController, SwarmingType, SwarmingC
 from ..mobility.evsm_swarming import EVSMConfig, EVSMController
 from ..mobility.sdqn_swarming import SDQNConfig, SDQNController
 from ..network.network_simulator import NetworkSimulator
-from ..network.swarm_interface import SwarmProtocolInterface
+from ..network.swarm_link import SwarmLink
 from .agent import Agent
 from .agents_registry import AgentsRegistry
 from .control_station import ControlStation
@@ -78,7 +78,7 @@ class AgentsManager:
             global_id += 1
 
     def _create_control_station(self, global_id: int, type_id: int) -> ControlStation:
-        interface = SwarmProtocolInterface(
+        interface = SwarmLink(
             agent_id=global_id, network_sim=self.network_simulator
         )
         gcs = ControlStation(
@@ -94,7 +94,7 @@ class AgentsManager:
                 if self.swarming_config is not None
                 else EVSMConfig()
             )
-            swarming = EVSMController(config=config, env=self.environment)
+            swarming = EVSMController(config=config, environment=self.environment)
         elif self.agents_config.drones_swarming_type == "sdqn":
             config = (
                 self.swarming_config
@@ -107,8 +107,8 @@ class AgentsManager:
                 f"Invalid swarming controller type: {self.agents_config.drones_swarming_type}"
             )
 
-        interface = (
-            SwarmProtocolInterface(
+        swarm_link = (
+            SwarmLink(
                 agent_id=agent_id,
                 network_sim=self.network_simulator,
                 local_bcast_interval=0.1,
@@ -122,7 +122,7 @@ class AgentsManager:
             agent_id=agent_id,
             env=self.environment,
             swarming=swarming,
-            network=interface,
+            link=swarm_link,
             drones_registry=self.drones,
             users_registry=self.users,
             neighbor_provider=self.agents_config.drones_neighbor_provider,
@@ -131,7 +131,7 @@ class AgentsManager:
         return drone
 
     def _create_user(self, global_id: int, type_id: int) -> User:
-        interface = SwarmProtocolInterface(
+        interface = SwarmLink(
             agent_id=global_id, network_sim=self.network_simulator
         )
         user = User(

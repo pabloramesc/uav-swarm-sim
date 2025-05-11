@@ -90,7 +90,7 @@ class IpcSocket:
 
             except BlockingIOError:
                 # logger.debug("No message received.")
-                continue
+                time.sleep(0.01)  # Sleep briefly to avoid busy waiting
 
     def close(self) -> None:
         self.stop_reading()

@@ -26,11 +26,23 @@ class SwarmingController(ABC):
         self.state = np.zeros((6,))  # px, py, pz, vx, vy, vz
 
     @abstractmethod
-    def initialize(self, time: float, state: np.ndarray, **kwargs) -> np.ndarray:
+    def initialize(
+        self,
+        time: float,
+        state: np.ndarray,
+        drone_positions: dict[int, np.ndarray] = None,
+        user_positions: dict[int, np.ndarray] = None,
+    ) -> None:
         self.time = time
         self.state = state.copy()
 
     @abstractmethod
-    def update(self, time: float, state: np.ndarray, **kwargs) -> np.ndarray:
+    def update(
+        self,
+        time: float,
+        state: np.ndarray,
+        drone_positions: dict[int, np.ndarray] = None,
+        user_positions: dict[int, np.ndarray] = None,
+    ) -> np.ndarray:
         self.time = time
         self.state = state.copy()

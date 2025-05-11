@@ -9,7 +9,7 @@ import numpy as np
 
 from ..environment import Environment
 from ..mobility.random_walk import SurfaceRandomWalker
-from ..network.swarm_interface import SwarmProtocolInterface
+from ..network.swarm_link import SwarmLink
 from .agent import Agent, AgentType
 
 
@@ -25,7 +25,7 @@ class User(Agent):
         global_id: int,
         type_id: int,
         env: Environment,
-        network: SwarmProtocolInterface = None,
+        network: SwarmLink = None,
     ):
         """
         Initializes the user agent with a unique ID, maximum speed, and maximum acceleration.

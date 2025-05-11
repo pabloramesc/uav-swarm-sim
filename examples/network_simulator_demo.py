@@ -11,7 +11,7 @@ WAIT_TIME = 0.01
 INTERVAL = 1.0
 
 net_sim = NetworkSimulator(num_gcs=1, num_uavs=NUM_UAVS, num_users=NUM_USERS)
-# net_sim._rewrite_ns3_code()
+net_sim._rewrite_ns3_code()
 net_sim.launch_simulator(max_attempts=2)
 
 print("Updating node positions...")
@@ -83,4 +83,4 @@ for id in range(NUM_UAVS + NUM_USERS + 1):
     for packet in packets:
         print("-", packet)
 
-net_sim.stop_simulator()
+net_sim.shutdown_simulator()

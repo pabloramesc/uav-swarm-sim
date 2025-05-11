@@ -11,7 +11,7 @@ from typing import Literal
 import numpy as np
 
 from ..environment.environment import Environment
-from ..network.swarm_interface import SwarmProtocolInterface
+from ..network.swarm_link import SwarmLink
 
 AgentType = Literal["drone", "user", "gcs"]
 
@@ -26,7 +26,6 @@ class Agent(ABC):
         agent_id: int,
         agent_type: AgentType,
         env: Environment,
-        net: SwarmProtocolInterface = None,
     ):
         """
         Initializes an agent with a unique ID, type, and environment.
@@ -34,7 +33,6 @@ class Agent(ABC):
         self.agent_id = agent_id
         self.agent_type = agent_type
         self.environment = env
-        self.network = net
 
         self.time = 0.0
         self.state = np.zeros(6)  # px, py, pz, vx, vy, vz

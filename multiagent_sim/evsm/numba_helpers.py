@@ -9,7 +9,7 @@ import numpy as np
 from numba import njit, prange
 
 
-@njit(parallel=True, cache=True)
+@njit(parallel=False, cache=True)
 def links_matrix(position: np.ndarray, neighbors: np.ndarray) -> np.ndarray:
     """
     Determines which neighbors are linked to the given position based on the EVSM algorithm.

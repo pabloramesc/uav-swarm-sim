@@ -56,6 +56,17 @@ class AgentsRegistry(ABC):
             for agent_id, agent in self.agents.items()
             if agent_id != exclude_id
         }
+        
+    def get_positions_dict(self, exclude_id: int = None) -> dict[int, np.ndarray]:
+        """
+        Returns a dictionary mapping agent IDs to their positions.
+        If `exclude_id` is provided, that agent will be excluded.
+        """
+        return {
+            agent_id: agent.position
+            for agent_id, agent in self.agents.items()
+            if agent_id != exclude_id
+        }
 
     def get_near_positions(
         self, position: np.ndarray, distance: float = 100.0

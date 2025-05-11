@@ -17,6 +17,9 @@ from .numba_helpers import (
     links_matrix,
     sweep_angle,
 )
+from ..utils.logger import create_logger
+
+logger = create_logger("EVSM Algorithm", level="NOTSET")
 
 
 class EVSM:
@@ -119,9 +122,15 @@ class EVSM:
         """
         Update the links mask and compute the total force acting on the agent.
         """
+        exploration_force = None
         if force_update or self._needs_update(time):
             self.links_mask = self._calculate_links()
             self.sweep_angle = self._calculate_sweep_angle()
+
+            exploration_force = (
+                self._calculate_exploration_force() if self.is_edge_robot() else None
+            )
+
             self.last_update_time = time
 
         damping_force = self._calculate_damping_force()
@@ -132,10 +141,8 @@ class EVSM:
 
         control_force = self._calculate_control_force()
 
-        if self.is_edge_robot():
-            if force_update or self._needs_update(time) or self.exploration_force is None:
-                exploration_force = self._calculate_exploration_force()
-                self.exploration_force = self._limit_force(exploration_force)
+        if exploration_force is not None:
+            self.exploration_force = self._limit_force(exploration_force)
             return control_force + damping_force + self.exploration_force
 
         return control_force + damping_force
@@ -157,9 +164,7 @@ class EVSM:
 
     def _calculate_control_force(self) -> np.ndarray:
         linked_neighbors = self.neighbors[self.links_mask]
-        return control_force(
-            self.position, linked_neighbors, ln=self.ln, ks=self.ks
-        )
+        return control_force(self.position, linked_neighbors, ln=self.ln, ks=self.ks)
 
     def _calculate_damping_force(self) -> np.ndarray:
         return damping_force(self.velocity, kd=self.kd)

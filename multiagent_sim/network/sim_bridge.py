@@ -9,6 +9,7 @@ import logging
 import time
 from dataclasses import dataclass
 
+from enum import IntEnum, unique
 import numpy as np
 
 from .ipc_socket import IpcMessage, IpcSocket
@@ -21,22 +22,32 @@ formatter = logging.Formatter("[%(name)s] %(levelname)s: %(message)s")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-CMD_DO_NOTHING = 0x00
-CMD_STOP_SIMULATION = 0xFF
-CMD_SET_POSITIONS = 0x01
-CMD_REQUEST_POSITIONS = 0xA1
-CMD_REQUEST_ADDRESSES = 0xA2
-CMD_INGRESS_PACKET = 0xA3
-CMD_REQUEST_SIM_TIME = 0xA4
-REPLY_ALL_POSITIONS = 0xB1
-REPLY_ALL_ADDRESSES = 0xB2
-REPLY_EGRESS_PACKET = 0xB3
-REPLY_SIM_TIME = 0xB4
+
+@unique
+class SimCommandCode(IntEnum):
+    # simulation control
+    DO_NOTHING = 0x00
+    STOP_SIMULATION = 0xFF
+
+    # node control
+    SET_POSITIONS = 0x01
+    INGRESS_PACKET = 0x02
+    EGRESS_PACKET = 0x03
+
+    # simulation status requests
+    REQUEST_POSITIONS = 0xA1
+    REQUEST_ADDRESSES = 0xA2
+    REQUEST_SIM_TIME = 0xA3
+
+    # replies
+    REPLY_ALL_POSITIONS = 0xB1
+    REPLY_ALL_ADDRESSES = 0xB2
+    REPLY_SIM_TIME = 0xB3
 
 
 @dataclass
 class SimMessage:
-    command: int
+    command: SimCommandCode
     payload: bytes = b""
 
     def to_bytes(self) -> bytes:
@@ -62,10 +73,10 @@ class SimBridge:
         self.sock.start_reading()
 
     def is_ns3_running(self, timeout: float = 1.0) -> bool:
-        logger.debug("Sending CMD_DO_NOTHING to NS-3...")
+        logger.debug("Sending DO_NOTHING command to NS-3...")
 
-        data = bytes([CMD_DO_NOTHING])
-        self.sock.send_to_ns3(data)
+        msg = SimMessage(command=SimCommandCode.DO_NOTHING)
+        self.sock.send_to_ns3(msg.to_bytes())
 
         time.sleep(timeout)
 
@@ -81,8 +92,8 @@ class SimBridge:
             logger.debug("Received message is longer than 1")
             return False
 
-        if msg.command != CMD_DO_NOTHING:
-            logger.debug("Received command is not CMD_DO_NOTHING")
+        if msg.command != SimCommandCode.DO_NOTHING:
+            logger.debug("Received command is not DO_NOTHING")
             return False
 
         logger.debug("Received heartbeat response. NS-3 is alive.")
@@ -90,9 +101,9 @@ class SimBridge:
         return True
 
     def set_node_positions(self, node_id_pos: dict[int, np.ndarray]) -> None:
-        logger.debug("Sending CMD_SET_POSITIONS to NS-3...")
+        logger.debug("Sending SET_POSITIONS command to NS-3...")
 
-        msg = SimMessage(command=CMD_SET_POSITIONS)
+        msg = SimMessage(command=SimCommandCode.SET_POSITIONS)
 
         for id, pos in node_id_pos.items():
             logger.debug(f"Processing node ID {id} with position {pos}...")
@@ -114,11 +125,11 @@ class SimBridge:
         self.sock.send_to_ns3(msg.to_bytes())
 
     def get_node_positions(self, timeout: float = 1.0) -> dict[int, np.ndarray]:
-        logger.debug("Sending CMD_REQUEST_POSITIONS to NS-3...")
+        logger.debug("Sending REQUEST_POSITIONS command to NS-3...")
 
         # Send the request command to NS-3
-        msg = SimMessage(command=CMD_REQUEST_POSITIONS)
-        self.sock.send_to_ns3(msg.to_bytes())
+        request_msg = SimMessage(command=SimCommandCode.REQUEST_POSITIONS)
+        self.sock.send_to_ns3(request_msg.to_bytes())
 
         time.sleep(timeout)
 
@@ -128,14 +139,14 @@ class SimBridge:
             logger.debug("No response received.")
             return {}
 
-        msg = self._ipc_message_to_sim_message(ipc_msg)
+        reply_msg = self._ipc_message_to_sim_message(ipc_msg)
 
-        if len(msg.payload) == 0:
+        if len(reply_msg.payload) == 0:
             logger.debug("Empty response received.")
             return {}
 
-        if msg.command != REPLY_ALL_POSITIONS:
-            logger.debug(f"Unexpected reply code: {msg.data[0]}")
+        if reply_msg.command != SimCommandCode.REPLY_ALL_POSITIONS:
+            logger.debug(f"Unexpected reply code: {reply_msg.command}")
             return {}
 
         logger.debug("Processing REPLY_ALL_POSITIONS from NS-3...")
@@ -143,9 +154,9 @@ class SimBridge:
         # Parse the response
         positions = {}
         offset = 0
-        while offset + 13 <= len(msg.payload):
+        while offset + 13 <= len(reply_msg.payload):
             # Each entry: 1 byte (ID) + 3 floats (4 bytes each)
-            entry = msg.payload[offset : offset + 13]
+            entry = reply_msg.payload[offset : offset + 13]
             node_id = entry[0]
             pos = np.frombuffer(entry[1:13], dtype=np.float32)
 
@@ -158,11 +169,11 @@ class SimBridge:
         return positions
 
     def get_node_addresses(self, timeout: float = 1.0) -> dict[int, str]:
-        logger.debug("Sending CMD_REQUEST_ADDRESSES to NS-3...")
+        logger.debug("Sending REQUEST_ADDRESSES command to NS-3...")
 
         # Send the request command to NS-3
-        msg = SimMessage(command=CMD_REQUEST_ADDRESSES)
-        self.sock.send_to_ns3(msg.to_bytes())
+        request_msg = SimMessage(command=SimCommandCode.REQUEST_ADDRESSES)
+        self.sock.send_to_ns3(request_msg.to_bytes())
 
         time.sleep(timeout)  # Wait for the response
 
@@ -172,14 +183,14 @@ class SimBridge:
             logger.debug("No response received.")
             return {}
 
-        msg = self._ipc_message_to_sim_message(ipc_msg)
+        reply_msg = self._ipc_message_to_sim_message(ipc_msg)
 
-        if len(msg.payload) == 0:
+        if len(reply_msg.payload) == 0:
             logger.debug("Empty response received.")
             return {}
 
-        if msg.command != REPLY_ALL_ADDRESSES:
-            logger.debug(f"Unexpected reply code: {msg.command}")
+        if reply_msg.command != SimCommandCode.REPLY_ALL_ADDRESSES:
+            logger.debug(f"Unexpected reply code: {reply_msg.command}")
             return {}
 
         logger.debug("Processing REPLY_ALL_ADDRESSES from NS-3...")
@@ -187,9 +198,9 @@ class SimBridge:
         # Parse the response
         addresses = {}
         offset = 0
-        while offset + 5 <= len(msg.payload):
+        while offset + 5 <= len(reply_msg.payload):
             # Each entry: 1 byte (node_id) + 4 bytes (IPv4 address)
-            entry = msg.payload[offset : offset + 5]
+            entry = reply_msg.payload[offset : offset + 5]
             node_id = entry[0]
             ip_addr = self._bytes_to_ipv4(entry[1:5])
 
@@ -200,12 +211,12 @@ class SimBridge:
 
         logger.debug(f"Final parsed addresses: {addresses}")
         return addresses
-    
+
     def get_ns3_time(self, timeout: float = 1.0) -> float:
-        logger.debug("Sending CMD_REQUEST_SIM_TIME to NS-3...")
-        
-        msg = SimMessage(command=CMD_REQUEST_SIM_TIME)
-        self.sock.send_to_ns3(msg.to_bytes())
+        logger.debug("Sending REQUEST_SIM_TIME command to NS-3...")
+
+        request_msg = SimMessage(command=SimCommandCode.REQUEST_SIM_TIME)
+        self.sock.send_to_ns3(request_msg.to_bytes())
 
         time.sleep(timeout)
 
@@ -214,25 +225,32 @@ class SimBridge:
             logger.debug("No response received for sim time.")
             return None
 
-        sim_msg = self._ipc_message_to_sim_message(ipc_msg)
-        if sim_msg.command != REPLY_SIM_TIME or len(sim_msg.payload) != 8:
-            logger.debug(f"Unexpected reply for sim time: cmd={sim_msg.command}, payload_len={len(sim_msg.payload)}")
+        reply_msg = self._ipc_message_to_sim_message(ipc_msg)
+
+        if reply_msg.command != SimCommandCode.REPLY_SIM_TIME:
+            logger.debug(f"Unexpected reply code: {reply_msg.command}")
             return None
 
-        sim_time = np.frombuffer(sim_msg.payload, dtype=np.float64)[0]
+        if len(reply_msg.payload) != 8:
+            logger.debug(
+                f"Invalid payload size. Expected 8 bytes, got {len(reply_msg.payload)}"
+            )
+            return None
+
+        sim_time = np.frombuffer(reply_msg.payload, dtype=np.float64)[0]
         logger.debug(f"Received simulation time: {sim_time} s")
         return float(sim_time)
 
     def stop_ns3(self):
-        logger.debug("Sending CMD_STOP_SIMULATION to NS-3...")
+        logger.debug("Sending STOP_SIMULATION command to NS-3...")
 
-        msg = SimMessage(command=CMD_STOP_SIMULATION)
+        msg = SimMessage(command=SimCommandCode.STOP_SIMULATION)
         self.sock.send_to_ns3(msg.to_bytes())
 
         self.sock.close()
 
     def send_ingress_packet(self, packet: SimPacket) -> None:
-        logger.debug(f"Sending CMD_INGRESS_PACKET to NS-3 for Node {packet.node_id}...")
+        logger.debug(f"Sending INGRESS_PACKET to NS-3 for Node {packet.node_id}...")
 
         # Validate node_id
         self._validate_node_id(packet.node_id)
@@ -242,7 +260,7 @@ class SimBridge:
         dst_addr_bytes = self._convert_ipv4_to_bytes(packet.dst_addr)
 
         # Construct the packet
-        msg = SimMessage(command=CMD_INGRESS_PACKET)
+        msg = SimMessage(command=SimCommandCode.INGRESS_PACKET)
         msg.payload += packet.node_id.to_bytes(length=1)
         msg.payload += src_addr_bytes
         msg.payload += dst_addr_bytes
@@ -257,10 +275,9 @@ class SimBridge:
         for ipc_msg in messages:
             msg = self._ipc_message_to_sim_message(ipc_msg)
 
-            if msg.command == REPLY_EGRESS_PACKET:
+            if msg.command == SimCommandCode.EGRESS_PACKET:
                 packet = self._sim_message_to_sim_packet(msg)
                 packets.append(packet)
-
                 logger.debug("Egress packet added to buffer.")
 
             else:
@@ -284,7 +301,7 @@ class SimBridge:
 
     def _ipc_message_to_sim_message(self, ipc_msg: IpcMessage) -> SimMessage:
         """Convert IpcMessage from the socket into a SimMessage object."""
-        command = ipc_msg.data[0]
+        command = SimCommandCode(ipc_msg.data[0])
         payload = ipc_msg.data[1:]
         return SimMessage(command=command, payload=payload)
 
