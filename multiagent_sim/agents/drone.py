@@ -146,8 +146,8 @@ class Drone(Agent):
         Updates the neighbor states based on the selected provider.
         """
         if self.neighbor_provider == "network":
-            self.drone_positions = self.swarm_link.get_drone_positions()
-            self.user_positions = self.swarm_link.get_user_positions()
+            self.drone_positions = self.swarm_link.get_positions(node_type="drone")
+            self.user_positions = self.swarm_link.get_positions(node_type="user")
 
         elif self.neighbor_provider == "registry":
             self.drone_positions = self.drones_registry.get_positions_dict(

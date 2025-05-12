@@ -53,26 +53,27 @@ class AgentsManager:
 
     def get_agent(self, global_id: int) -> Agent:
         return self.agents[global_id]
-    
+
     def initialize_agent(self, global_id: int, state: np.ndarray) -> None:
         agent = self.agents[global_id]
         agent.initialize(state)
 
-    def initialize_all_agents(self, states: np.ndarray, agent_type: AgentType = None) -> None:
+    def initialize_all_agents(
+        self, states: np.ndarray, agent_type: AgentType = None
+    ) -> None:
         if agent_type is None:
             selected_agents = self.agents
         elif agent_type == "drone":
-            selected_agents = self.drones.agents
+            selected_agents = self.drones.get_all()
         elif agent_type == "user":
-            selected_agents = self.users.agents
+            selected_agents = self.users.get_all()
         elif agent_type == "gcs":
-            selected_agents = self.control_stations.agents
+            selected_agents = self.control_stations.get_all()
         else:
             raise ValueError(f"Invalid agent type: {agent_type}")
-        
+
         for i, agent in enumerate(selected_agents):
             agent.initialize(states[i])
-            
 
     def update_agents(self, dt: float = 0.01) -> None:
         for agent in self.agents:

@@ -27,7 +27,6 @@ class SimNode:
     node_type: NodeType
     name: str = None
     addr: str = "0.0.0.0"
-    position: np.ndarray = None
 
 
 class NetworkSimulator:
@@ -269,17 +268,22 @@ class NetworkSimulator:
     def _terminate_ns3_simulator(self, timeout: float = 1.0) -> None:
         if self.ns3_process and self.ns3_process.poll() is None:
             self.logger.info("NS-3 process is still running. Terminating...")
+            
             self.ns3_process.terminate()  # Send termination signal
             self.ns3_process.wait(timeout)  # Wait for the process to terminate
+            
         self.logger.info("🛑 NS-3 process terminated.")
         
     def _kill_ns3_process(self) -> None:
         if self.ns3_process and self.ns3_process.poll() is None:
-            self.logger.warning("NS-3 process is still running. Killing...")
+            self.logger.warning("⚠️  NS-3 process is still running. Killing...")
+            
             pgid = os.getpgid(self.ns3_process.pid)
             os.killpg(pgid, signal.SIGKILL)
+            
             self.ns3_process.wait()
             self.ns3_process = None
+            
             self.logger.info("💀 NS-3 process killed.")
 
     def _verify_ns3_connection(self, max_attempts: int = 2) -> None:

@@ -10,7 +10,7 @@ MAX_PACKETS = 5
 WAIT_TIME = 0.01
 INTERVAL = 1.0
 
-net_sim = NetworkSimulator(num_gcs=1, num_uavs=NUM_UAVS, num_users=NUM_USERS)
+net_sim = NetworkSimulator(num_gcs=1, num_drones=NUM_UAVS, num_users=NUM_USERS)
 net_sim._rewrite_ns3_code()
 net_sim.launch_simulator(max_attempts=2)
 
@@ -31,11 +31,11 @@ time.sleep(5.0)
 
 for _ in range(MAX_PACKETS):
     node_id = 0
-    gcs_addr = net_sim.get_node_address(node_id)
+    gcs_addr = net_sim.get_node(node_id).addr
 
     for uav_id in range(NUM_UAVS):
         node_id += 1
-        uav_addr = net_sim.get_node_address(node_id)
+        uav_addr = net_sim.get_node(node_id).addr
         msg = f"Hello from GCS (node {0}) to UAV {uav_id} (node ({node_id}))"
         packet = SimPacket(
             node_id=0, src_addr=gcs_addr, dst_addr=uav_addr, data=msg.encode("utf-8")
@@ -46,7 +46,7 @@ for _ in range(MAX_PACKETS):
 
     for user_id in range(NUM_USERS):
         node_id += 1
-        uav_addr = net_sim.get_node_address(node_id)
+        uav_addr = net_sim.get_node(node_id).addr
         msg = f"Hello from GCS (node {0}) to user {user_id} (node ({node_id}))"
         packet = SimPacket(
             node_id=0, src_addr=gcs_addr, dst_addr=uav_addr, data=msg.encode("utf-8")

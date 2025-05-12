@@ -53,7 +53,7 @@ class MultiDroneEVSMSimulator:
 
         if neihgbor_provider == "network":
             self.network_simulator = NetworkSimulator(
-                num_gcs=0, num_uavs=num_drones, num_users=0, verbose=True
+                num_gcs=0, num_drones=num_drones, num_users=0, verbose=True
             )
             self.network_simulator.launch_simulator(max_attempts=2)
         else:
@@ -125,7 +125,7 @@ class MultiDroneEVSMSimulator:
         if positions is not None:
             states = np.zeros((self.num_drones, 6), dtype=np.float32)
             states[:, 0:3] = positions
-            self.agents_manager.initialize_all_drones(states)
+            self.agents_manager.initialize_all_agents(states, agent_type="drone")
 
         self.init_time = time.time()
         self.sim_time = 0.0
@@ -243,7 +243,8 @@ class MultiDroneEVSMSimulator:
         Updates the mask indicating which drones are at the edge of the swarm.
         """
         for i, drone in enumerate(self.agents_manager.drones.get_all()):
-            controller: EVSMPositionController = drone.swarming
+            drone: Drone = drone
+            controller: EVSMPositionController = drone.position_controller
 
             if controller is None:
                 raise Exception(f"Drone {drone.id} has no position controller")

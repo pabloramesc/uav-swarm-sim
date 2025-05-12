@@ -2,7 +2,7 @@ import numpy as np
 from typing import Literal
 from dataclasses import dataclass
 
-from .network_simulator import NetworkSimulator
+from .network_simulator import NetworkSimulator, SimNode, NodeType
 from .network_interface import NetworkInterface, SimPacket
 from .swarm_packets import DataPacket, PositionPacket, parse_packet, PacketType
 from ..utils.logger import create_logger
@@ -11,9 +11,12 @@ BroadcastMode = Literal["local", "global"]
 
 
 @dataclass
-class NeighborPosition:
+class NeighborInfo:
+    node: SimNode
     time: float
     position: np.ndarray
+    counter: int
+    is_valid: bool = True
 
 
 class SwarmLink:
@@ -34,18 +37,17 @@ class SwarmLink:
         self.position_timeout = position_timeout
 
         self.local_bcast_addr = "255.255.255.255"
-        self.global_bcast_addr = self.network_interface.get_broadcast_address()
+        self.global_bcast_addr = self.network_interface.broadcast_address
 
         self.time: float = 0.0
         self.node_position: np.ndarray = None
-        self.drone_positions: dict[int, NeighborPosition] = {}
-        self.user_positions: dict[int, NeighborPosition] = {}
+        self.neighbors_info: dict[int, NeighborInfo] = {}
         self.data_packets: list[DataPacket] = []
 
         self.next_local_bcast_time = 0.0
         self.next_global_bcast_time = 0.0
 
-        self.logger = create_logger(name="SwarmLink", level="INFO")
+        self.logger = create_logger(name=f"SwarmLink.{self.agent_id}", level="WARNING")
 
     def update(self, time: float, position: np.ndarray) -> None:
         self.time = time
@@ -64,7 +66,7 @@ class SwarmLink:
             self.next_global_bcast_time = self.time + np.random.normal(
                 self.global_bcast_interval, self.global_bcast_interval / 10
             )
-            
+
         pass
 
     def broadcast_position(self, position: np.ndarray, mode: BroadcastMode) -> None:
@@ -85,7 +87,7 @@ class SwarmLink:
 
         broadcast_packet = SimPacket(
             node_id=self.agent_id,
-            src_addr=self.network_interface.node_addr,
+            src_addr=self.network_interface.node_address,
             dst_addr=bcast_addr,
             data=position_packet.serialize(),
         )
@@ -114,47 +116,52 @@ class SwarmLink:
         source_id = packet.agent_id
         if source_id == self.agent_id:
             return  # ignore own packets
-        agent_type, type_id = self.network_interface.network_simulator.get_node_type_id(
-            source_id
-        )
-        pos = NeighborPosition(time=packet.timestamp, position=packet.get_position())
-        if agent_type == "user":
-            self.user_positions[type_id] = pos
-        elif agent_type == "uav":
-            self.drone_positions[type_id] = pos
-        else:
-            raise ValueError(f"Invalid agent type: {agent_type}")
 
-    def get_drone_positions(self) -> dict[int, np.ndarray]:
-        drone_positions: dict[int, np.ndarray] = {}
+        node = self.network_interface.network_simulator.get_node(source_id)
 
-        for node_id, pos in self.drone_positions.items():
-            if pos is None:
-                continue
+        if source_id != node.node_id:
+            self.logger.warning(
+                f"Node ID mismatch: {source_id} != {node.node_id}. " f"Packet: {packet}"
+            )
+            return
 
-            if self.time - pos.time < self.position_timeout:
-                drone_positions[node_id] = pos.position
-            else:
-                self.logger.debug(
-                    f"At {self.time:.2f} s, in agent {self.agent_id}: "
-                    f"Drone {node_id} position timed out"
+        if source_id in self.neighbors_info:
+            prev_info = self.neighbors_info[source_id]
+            if prev_info.counter == packet.counter:
+                self.logger.info(
+                    f"Ignoring duplicate packet from node {source_id}. "
+                    f"Packet: {packet}. Neighbor info: {prev_info}"
                 )
+                return
+
+        info = NeighborInfo(
+            time=packet.timestamp,
+            position=packet.get_position(),
+            node=node,
+            counter=packet.counter,
+        )
+
+        self.neighbors_info[source_id] = info
+
+    def get_positions(self, node_type: NodeType = None) -> dict[int, np.ndarray]:
+        poisitions: dict[int, np.ndarray] = {}
+        for node_id, info in self.neighbors_info.items():
+            if node_type is not None and info.node.node_type != node_type:
                 continue
 
-        return drone_positions
-
-    def get_user_positions(self) -> dict[int, np.ndarray]:
-        user_positions: dict[int, np.ndarray] = {}
-
-        for node_id, pos in self.user_positions.items():
-            if pos is None:
+            if self.time - info.time > self.position_timeout or info.position is None:
+                if info.is_valid:
+                    info.is_valid = False
+                    self.logger.info(
+                        f"Position timeout for node {node_id}. "
+                        f"Last update at {info.time:.2f} s. Current time: {self.time:.2f} s"
+                    )
                 continue
 
-            if self.time - pos.time < self.position_timeout:
-                user_positions[node_id] = pos.position
-                continue
+            info.is_valid = True
+            poisitions[node_id] = info.position
 
-        return user_positions
+        return poisitions
 
     def get_data_packets(self, clear: bool = True) -> list[DataPacket]:
         packets = self.data_packets.copy()

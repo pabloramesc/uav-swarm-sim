@@ -2,7 +2,7 @@ import logging
 from typing import Literal
 
 # Define allowed log level names
-LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+LogLevel = Literal["NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 # Map string levels to logging constants
 _LEVEL_MAP: dict[str, int] = {
