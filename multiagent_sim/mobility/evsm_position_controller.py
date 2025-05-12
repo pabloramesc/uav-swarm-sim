@@ -4,13 +4,13 @@ import numpy as np
 from ..environment.environment import Environment
 from ..evsm.evsm_algorithm import EVSM
 from .altitude_controller import AltitudeController
-from .base_swarming import SwarmingController, SwarmingConfig
+from .swarm_position_controller import SwarmPositionController, SwarmPositionConfig
 
 
 @dataclass
-class EVSMConfig(SwarmingConfig):
+class EVSMPositionConfig(SwarmPositionConfig):
     """
-    Configuration for EVSMController.
+    Configuration for EVSMPositionController.
 
     Attributes
     ----------
@@ -43,14 +43,14 @@ class EVSMConfig(SwarmingConfig):
     natural_length_rate: float = 1.0
 
 
-class EVSMController(SwarmingController):
+class EVSMPositionController(SwarmPositionController):
     """
     Combines EVSM horizontal control with altitude hold.
     """
 
     def __init__(
         self,
-        config: EVSMConfig,
+        config: EVSMPositionConfig,
         environment: Environment,
     ):
         super().__init__(config, environment)

@@ -10,7 +10,7 @@ import numpy as np
 from typing import Literal
 
 from ..environment.environment import Environment
-from ..mobility.base_swarming import SwarmingController
+from ..mobility.swarm_position_controller import SwarmPositionController
 from ..network.swarm_link import SwarmLink
 from .agent import Agent
 from .agents_registry import AgentsRegistry
@@ -27,20 +27,20 @@ class Drone(Agent):
         self,
         agent_id: int,
         env: Environment,
-        swarming: SwarmingController,
-        link: SwarmLink = None,
+        position_controller: SwarmPositionController,
+        swarm_link: SwarmLink = None,
         drones_registry: AgentsRegistry = None,
         users_registry: AgentsRegistry = None,
         neighbor_provider: NeighborProvider = "registry",
     ):
         super().__init__(agent_id=agent_id, agent_type="drone", env=env)
-        self.link = link
-        self.swarming = swarming
+        self.position_controller = position_controller
+        self.swarm_link = swarm_link
         self.drones_registry = drones_registry
         self.users_registry = users_registry
         self.neighbor_provider = neighbor_provider
 
-        if self.neighbor_provider == "network" and self.link is None:
+        if self.neighbor_provider == "network" and self.swarm_link is None:
             raise ValueError(
                 "If neighbor_provider is 'network', a network object must be provided."
             )
@@ -63,7 +63,7 @@ class Drone(Agent):
     ):
         super().initialize(state, time)
         self._update_neighbors()
-        self.swarming.initialize(time, state, drone_positions=self.drone_positions)
+        self.position_controller.initialize(time, state, drone_positions=self.drone_positions)
 
     def update(self, dt: float = 0.01) -> None:
         """
@@ -76,13 +76,13 @@ class Drone(Agent):
         """
         super().update(dt)
 
-        if self.link is not None:
-            self.link.update(self.time, self.state[0:3])
+        if self.swarm_link is not None:
+            self.swarm_link.update(self.time, self.state[0:3])
 
         self._update_neighbors()
 
         # Compute control force using the position controller
-        control_force = self.swarming.update(
+        control_force = self.position_controller.update(
             time=self.time, state=self.state, drone_positions=self.drone_positions
         )
 
@@ -146,8 +146,8 @@ class Drone(Agent):
         Updates the neighbor states based on the selected provider.
         """
         if self.neighbor_provider == "network":
-            self.drone_positions = self.link.get_drone_positions()
-            self.user_positions = self.link.get_user_positions()
+            self.drone_positions = self.swarm_link.get_drone_positions()
+            self.user_positions = self.swarm_link.get_user_positions()
 
         elif self.neighbor_provider == "registry":
             self.drone_positions = self.drones_registry.get_positions_dict(

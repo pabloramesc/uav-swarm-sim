@@ -10,21 +10,22 @@ Geographic to ENU conversion utilities.
 """
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 LATDEG2METERS = 111320
 
 
-def geo2enu(geo: np.ndarray, home: np.ndarray) -> np.ndarray:
+def geo2enu(geo: ArrayLike, home: ArrayLike) -> np.ndarray:
     """
     Converts geographic coordinates (latitude, longitude, altitude) to local
     ENU (East-North-Up) coordinates in meters, relative to a reference point.
 
     Parameters
     ----------
-    geo : np.ndarray
+    geo : ArrayLike
         Geographic coordinates [latitude, longitude, altitude] in (deg, deg, m).
         Can be a (3,) array for a single point or an (N, 3) array for multiple points.
-    home : np.ndarray
+    home : ArrayLike
         Reference geographic coordinates [latitude, longitude, altitude] in (deg, deg, m).
         Must be a (3,) array.
 
@@ -49,17 +50,17 @@ def geo2enu(geo: np.ndarray, home: np.ndarray) -> np.ndarray:
     return np.squeeze(enu)  # Return (3,) if input was (3,)
 
 
-def enu2geo(enu: np.ndarray, home: np.ndarray) -> np.ndarray:
+def enu2geo(enu: ArrayLike, home: ArrayLike) -> np.ndarray:
     """
     Converts local ENU (East-North-Up) coordinates in meters to geographic
     coordinates (latitude, longitude, altitude) relative to a reference point.
 
     Parameters
     ----------
-    enu : np.ndarray
+    enu : ArrayLike
         Local ENU coordinates [E, N, U] in meters.
         Can be a (3,) array for a single point or an (N, 3) array for multiple points.
-    home : np.ndarray
+    home : ArrayLike
         Reference geographic coordinates [latitude, longitude, altitude] in (deg, deg, m).
         Must be a (3,) array.
 

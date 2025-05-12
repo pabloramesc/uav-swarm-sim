@@ -12,12 +12,12 @@ import numpy as np
 from ..environment import Environment
 from ..sdqn.frame_generator import FrameGenerator
 from .altitude_controller import AltitudeController
-from .base_swarming import SwarmingController, SwarmingConfig
+from .swarm_position_controller import SwarmPositionController, SwarmPositionConfig
 from .position_controller import PositionController
 
 
 @dataclass
-class SDQNConfig(SwarmingConfig):
+class SDQNPositionConfig(SwarmPositionConfig):
     num_cells: int = 64
     num_actions: int = 9
     visible_distance: float = 100.0  # in meters
@@ -28,8 +28,8 @@ class SDQNConfig(SwarmingConfig):
     target_height: float = 100.0  # in meters (AGL - Above Ground Level)
 
 
-class SDQNController(SwarmingController):
-    def __init__(self, config: SDQNConfig, env: Environment) -> None:
+class SDQNPositionController(SwarmPositionController):
+    def __init__(self, config: SDQNPositionConfig, env: Environment) -> None:
         super().__init__(config, env)
         self.config = config
         self.update_period = 0.1

@@ -15,41 +15,23 @@ from .mobility.evsm_position_controller import EVSMPositionConfig, EVSMPositionC
 from .math.path_loss_model import signal_strength
 from .network import NetworkSimulator
 from .utils.logger import create_logger
-from .utils.type_checks import is_symmetric
 
 
-class MultiDroneEVSMSimulator:
-    """
-    Simulates a swarm of drones in a 3D environment.
-
-    This class manages the initialization, state updates, and interactions of multiple drones
-    in a simulation environment. It supports features such as obstacle avoidance, neighbor detection,
-    and swarm behavior using position controllers.
-    """
+class MultiAgentEVSMSimulator:
 
     def __init__(
         self,
         num_drones: int,
+        num_users: int = 0,
         dt: float = 0.01,
         dem_path: str = None,
         evsm_config: EVSMPositionConfig = None,
         neihgbor_provider: NeighborProvider = "registry",
-        # visible_distance: float = 100.0,
     ) -> None:
-        """
-        Initializes the MultiDroneSimulator.
-
-        Parameters
-        ----------
-        num_drones : int
-            Number of drones in the simulation.
-        dt : float, optional
-            Time step for the simulation in seconds (default is 0.01).
-        """
         self.num_drones = num_drones
+        self.num_users = num_users
         self.dt = dt
         self.environment = Environment(dem_path)
-        # self.visible_distance = visible_distance
 
         if neihgbor_provider == "network":
             self.network_simulator = NetworkSimulator(
@@ -60,7 +42,10 @@ class MultiDroneEVSMSimulator:
             self.network_simulator = None
 
         agents_config = AgentsConfig(
-            num_drones=num_drones, drones_neighbor_provider=neihgbor_provider
+            num_gcs=1,
+            num_drones=num_drones,
+            num_users=num_users,
+            drones_neighbor_provider=neihgbor_provider,
         )
         self.agents_manager = AgentsManager(
             agents_config=agents_config,
@@ -110,16 +95,7 @@ class MultiDroneEVSMSimulator:
         """
         return self.agents_manager.drones.get_states_array()[:, 3:6]
 
-    def initialize(self, positions: np.ndarray = None) -> None:
-        """
-        Initializes the simulation by updating the initial state of all drones.
-
-        Parameters
-        ----------
-        positions : np.ndarray, optional
-            A (N, 3) array specifying the initial positions [px, py, pz] of the drones.
-            If None, the positions remain unchanged (default is None).
-        """
+    def initialize(self, home: np.ndarray) -> None:
         self.logger.info("Initializing simulation ...")
 
         if positions is not None:
@@ -243,7 +219,8 @@ class MultiDroneEVSMSimulator:
         Updates the mask indicating which drones are at the edge of the swarm.
         """
         for i, drone in enumerate(self.agents_manager.drones.get_all()):
-            controller: EVSMPositionController = drone.swarming
+            drone: Drone = drone
+            controller: EVSMPositionController = drone.position_controller
 
             if controller is None:
                 raise Exception(f"Drone {drone.id} has no position controller")

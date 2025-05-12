@@ -10,7 +10,7 @@ TX_INTERVAL = 0.01  # seconds
 
 def setup_network():
     """Initializes and configures the network simulator with node positions."""
-    net_sim = NetworkSimulator(num_gcs=1, num_uavs=NUM_UAVS, num_users=2)
+    net_sim = NetworkSimulator(num_gcs=1, num_drones=NUM_UAVS, num_users=2)
     net_sim.launch_simulator(max_attempts=2)
 
     positions = np.zeros((1 + NUM_UAVS + 2, 3))  # GCS + UAVs + 2 users
@@ -36,10 +36,8 @@ def setup_network():
 
 net_sim = setup_network()
 
-user0_id = net_sim.get_node_id_from_type_id("user", 0)
-user1_id = net_sim.get_node_id_from_type_id("user", 1)
-user0_addr = net_sim.get_node_address(user0_id)
-user1_addr = net_sim.get_node_address(user1_id)
+user0 = net_sim.get_node_from_name("user0")
+user1 = net_sim.get_node_from_name("user1")
 
 t0 = time.time()
 net_sim._update_ns3_init_time()
@@ -61,9 +59,9 @@ while time.time() - t0 < 30.0:  # Run for 30 seconds
         packet_count += 1
         msg = f"{packet_count}${t_sim}"
         packet = SimPacket(
-            node_id=user0_id,
-            src_addr=user0_addr,
-            dst_addr=user1_addr,
+            node_id=user0.node_id,
+            src_addr=user0.addr,
+            dst_addr=user1.addr,
             data=msg.encode(),
         )
         net_sim.send_packet(packet)
@@ -72,7 +70,7 @@ while time.time() - t0 < 30.0:  # Run for 30 seconds
 
     # Fetch and process received packets
     net_sim.fetch_packets()
-    packets = net_sim.get_node_packets(user1_id, delete=True)
+    packets = net_sim.get_node_packets(user1.node_id, delete=True)
     for packet in packets:
         msg = packet.data.decode()
         packet_id_str, tx_time_str = msg.split("$")

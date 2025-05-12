@@ -258,9 +258,9 @@ class MultidroneGymSDQN:
         return elapsed_time > self.update_period
 
     def _get_drone_position_controller(self, drone: Drone) -> SDQNPostionController:
-        if not isinstance(drone.swarming, SDQNPostionController):
+        if not isinstance(drone.position_controller, SDQNPostionController):
             raise Exception(f"Drone {drone.agent_id} position controller is not DQNS")
-        return drone.swarming
+        return drone.position_controller
 
     def _generate_random_position(self) -> np.ndarray:
         px = np.random.uniform(*self.environment.boundary_xlim)

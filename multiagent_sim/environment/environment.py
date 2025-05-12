@@ -161,13 +161,13 @@ class Environment:
         rect = RectangularObstacle(bottom_left, top_right)
         self.add_obstacle(rect)
 
-    def is_inside(self, pos: np.ndarray) -> np.ndarray:
+    def is_inside(self, pos: ArrayLike) -> np.ndarray:
         """
         Checks if one or more positions are inside the environment boundary.
 
         Parameters
         ----------
-        pos : np.ndarray
+        pos : ArrayLike
             Position(s) [x, y, z] in meters. Can be a (3,) array for a single
             position or an (N, 3) array for multiple positions.
 
@@ -183,13 +183,13 @@ class Environment:
             raise ValueError("Boundary is not defined.")
         return self.boundary.is_inside(pos[:, 0:2])
 
-    def is_collision(self, pos: np.ndarray, check_altitude: bool = True) -> np.ndarray:
+    def is_collision(self, pos: ArrayLike, check_altitude: bool = True) -> np.ndarray:
         """
         Checks if one or more positions collide with any obstacle or the ground.
 
         Parameters
         ----------
-        pos : np.ndarray
+        pos : ArrayLike
             Position(s) [x, y, z] in meters. Can be a (3,) array for a single
             position or an (N, 3) array for multiple positions.
 
@@ -220,13 +220,13 @@ class Environment:
         
         return collisions if collisions.size > 1 else collisions.item()
 
-    def get_elevation(self, pos: np.ndarray) -> np.ndarray:
+    def get_elevation(self, pos: ArrayLike) -> np.ndarray:
         """
         Gets the elevation at a specific position.
 
         Parameters
         ----------
-        pos : np.ndarray
+        pos : ArrayLike
             Horizontal position(s) [x, y] in meters. Can be a (2,) array for a single
             position or an (N, 2) array for multiple positions.
 
