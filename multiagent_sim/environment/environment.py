@@ -237,7 +237,7 @@ class Environment:
         """
         pos = np.atleast_2d(pos)
         if self.elevation_map is None:
-            return np.zeros(pos.shape[0])
+            return np.zeros(pos.shape[0]) if pos.shape[0] > 1 else 0.0
         # Convert local Cartesian coordinates to geographic coordinates
         enu = np.zeros((pos.shape[0], 3))
         enu[:, 0:2] = pos[:, 0:2]

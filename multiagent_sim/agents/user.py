@@ -8,7 +8,8 @@ https://opensource.org/licenses/MIT
 import numpy as np
 
 from ..environment import Environment
-from ..mobility.random_walk import SurfaceRandomWalker
+from ..mobility.random_walker import SurfaceRandomWalker
+from ..network.network_simulator import NetworkSimulator
 from ..network.swarm_link import SwarmLink
 from .agent import Agent, AgentType
 
@@ -20,27 +21,31 @@ class User(Agent):
     The user agent performs a random walk within the environment.
     """
 
-    def __init__(
-        self,
-        global_id: int,
-        type_id: int,
-        env: Environment,
-        network: SwarmLink = None,
-    ):
+    def __init__(self, agent_id: int, env: Environment, network_sim: NetworkSimulator):
         """
         Initializes the user agent with a unique ID, maximum speed, and maximum acceleration.
 
         """
-        super().__init__(
-            global_id=global_id, type_id=type_id, agent_type="user", env=env, net=network
-        )
+        super().__init__(agent_id=agent_id, agent_type="user", env=env)
+
+        self.swarm_link = None
+        if network_sim is not None:
+            self.swarm_link = SwarmLink(
+                agent_id=self.agent_id,
+                network_sim=network_sim,
+                global_bcast_interval=1.0,
+                local_bcast_interval=None,
+                ack_to_messages=True,
+            )
+
         self.random_walk = SurfaceRandomWalker(env)
+        
 
     def initialize(self, state: np.ndarray, time: float = 0.0) -> None:
         super().initialize(state, time)
         self.random_walk.initialize(self.state)
-        if self.network:
-            self.network.update(self.time, self.position)
+        self.next_tx_msg: float = 0.0
+        self.last_msg_id: int = None
 
     def update(self, dt: float = 0.01) -> None:
         """
@@ -53,5 +58,19 @@ class User(Agent):
         """
         super().update(dt)
         self.state = self.random_walk.step(dt)
-        if self.network:
-            self.network.update(self.time, self.position)
+
+        if self.swarm_link is not None:
+            self.swarm_link.update(self.time, self.position)
+            self._send_random_message()
+
+    def _send_random_message(self) -> None:
+        if self.time < self.next_tx_msg:
+            return
+        
+        dst_addr = self.swarm_link.global_bcast_addr
+        self.last_msg_id = self.swarm_link.send_message(f"Hello from agent {self.agent_id}!", dst_addr)
+        
+        self.next_tx_msg = self.time + np.random.uniform(1.0, 10.0)
+        
+    def _read_responses(self) -> None:
+        self.swarm_link.ack_registry[self.last_msg_id]

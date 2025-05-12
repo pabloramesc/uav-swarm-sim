@@ -11,15 +11,11 @@ from typing import Literal
 import matplotlib
 import numpy as np
 from matplotlib import pyplot as plt
-from matplotlib.axes import Axes
 from matplotlib.image import AxesImage
-from matplotlib.lines import Line2D
-from mpl_toolkits.mplot3d.art3d import Line3D, Line3DCollection, Poly3DCollection
-from mpl_toolkits.mplot3d.axes3d import Axes3D
 from numpy.typing import ArrayLike
 
 from .math.path_loss_model import signal_strength_map
-from .multidrone_evsm_simulator import MultiDroneEVSMSimulator
+from .multiagent_evsm_simulator import MultiAgentEVSMSimulator
 from .utils.logger import create_logger
 
 AspectRatios = Literal["auto", "equal"]
@@ -28,41 +24,30 @@ BackgroundType = Literal["elevation", "rssi", "none"]
 matplotlib.use("Qt5Agg")
 
 
-class MultiDroneViewerEVSM:
-    """
-    A viewer for visualizing the MultiDroneSimulator in a 2D environment.
-
-    This class provides real-time visualization of the drone swarm, including
-    drone positions, links between drones, and edge drones. It also supports
-    rendering boundaries and obstacles in the environment.
-    """
+class MultiAgentViewerEVSM:
 
     def __init__(
         self,
-        sim: MultiDroneEVSMSimulator,
+        sim: MultiAgentEVSMSimulator,
         xlim: tuple[float, float] = None,
         ylim: tuple[float, float] = None,
         fig_size: tuple[float, float] = None,
         min_fps: float = 10.0,
         aspect_ratio: AspectRatios = "equal",
-        background: BackgroundType = "rssi",
+        background_type: BackgroundType = "rssi",
     ):
         plt.ion()
 
         self.sim = sim
+
         self.xlim = xlim
         self.ylim = ylim
         self.min_fps = min_fps
         self.aspect_ratio = aspect_ratio
-        self.background = background
+        self.background_type = background_type
 
         self.t0: float = None
         self.last_render_time: float = None
-
-        self.link_lines: Line2D = None
-        self.drone_points: Line2D = None
-        self.edge_drone_points: Line2D = None
-        self.background_image: AxesImage = None
 
         self.fig = plt.figure(figsize=fig_size)
         self.ax = self.fig.add_subplot()
@@ -90,11 +75,13 @@ class MultiDroneViewerEVSM:
         self._reset_timers()
         self._calculate_axis_limits()
 
-        if self.background == "elevation":
+        if self.background_type == "elevation":
             self._plot_elevation_map()
 
         self._initiate_plots()
         self._configure_axis()
+        
+        self.background_image: AxesImage = None
 
         self.fig.canvas.draw_idle()
         self.fig.canvas.flush_events()
@@ -122,11 +109,11 @@ class MultiDroneViewerEVSM:
         if not (force_render or self._need_render()):
             return
 
-        if self.background == "rssi":
-            self._plot_rssi_heatmap()
-
+        self._update_agent_points()
         self._update_links_lines()
-        self._update_drone_points()
+
+        if self.background_type == "rssi":
+            self._plot_rssi_heatmap()
 
         self.fig.canvas.draw_idle()
         self.fig.canvas.flush_events()
@@ -139,10 +126,14 @@ class MultiDroneViewerEVSM:
 
     def _initiate_plots(self) -> None:
         (self.link_lines,) = self.ax.plot([], [], "b-", lw=0.5, label="springs")
-        (self.drone_points,) = self.ax.plot([], [], "ro", ms=5.0, label="drones")
-        (self.edge_drone_points,) = self.ax.plot(
-            [], [], "go", ms=5.0, label="edge drones"
+        (self.drone_points,) = self.ax.plot(
+            [], [], "co", label="drones"
         )
+        (self.edge_drone_points,) = self.ax.plot(
+            [], [], "ro", label="edge drones"
+        )
+        (self.user_points,) = self.ax.plot([], [], "mx", label="users")
+        (self.gcs_points,) = self.ax.plot([], [], "k*", label="GCS")
         self._plot_avoid_regions()
 
     def _plot_avoid_regions(self) -> None:
@@ -150,7 +141,7 @@ class MultiDroneViewerEVSM:
             self.ax.plot(
                 *self.sim.environment.boundary.shape.exterior.coords.xy,
                 "r-",
-                label="boundary",
+                label="boundaries",
             )
 
         for i, obs in enumerate(self.sim.environment.obstacles):
@@ -163,14 +154,21 @@ class MultiDroneViewerEVSM:
                 label="obstacles" if i == 0 else None,
             )
 
-    def _update_drone_points(self) -> None:
+    def _update_agent_points(self) -> None:
+        self.gcs_states = self.sim.agents_manager.control_stations.get_states_array()
+        self.gcs_points.set_data(self.gcs_states[:, 0], self.gcs_states[:, 1])
+
+        self.user_states = self.sim.agents_manager.users.get_states_array()
+        self.user_points.set_data(self.user_states[:, 0], self.user_states[:, 1])
+
+        self.drone_states = self.sim.agents_manager.drones.get_states_array()
         self.drone_points.set_data(
-            self.sim.drone_states[~self.sim.edge_drones_mask, 0],
-            self.sim.drone_states[~self.sim.edge_drones_mask, 1],
+            self.drone_states[~self.sim.edge_drones_mask, 0],
+            self.drone_states[~self.sim.edge_drones_mask, 1],
         )
         self.edge_drone_points.set_data(
-            self.sim.drone_states[self.sim.edge_drones_mask, 0],
-            self.sim.drone_states[self.sim.edge_drones_mask, 1],
+            self.drone_states[self.sim.edge_drones_mask, 0],
+            self.drone_states[self.sim.edge_drones_mask, 1],
         )
 
     def _update_links_lines(self) -> None:
@@ -193,7 +191,7 @@ class MultiDroneViewerEVSM:
         self.ylim = (south_west[1], north_east[1]) if self.ylim is None else self.ylim
 
     def _configure_axis(self) -> None:
-        self.ax.set_title("Multi-drone EVSM simulation")
+        self.ax.set_title("Multi-agent EVSM simulation")
         self.ax.set_xlabel("X (m)")
         self.ax.set_ylabel("Y (m)")
         self.ax.set_aspect(self.aspect_ratio)
@@ -235,7 +233,7 @@ class MultiDroneViewerEVSM:
 
         # Calculate the heatmap using the simulator's tx_power_heatmap method
         heatmap = signal_strength_map(
-            self.sim.drone_positions, xs, ys, f=2412, n=2.4, mode="max"
+            self.drone_states[:, 0:3], xs, ys, f=2412, n=2.4, mode="max"
         )
 
         # Plot the heatmap
@@ -255,12 +253,12 @@ class MultiDroneViewerEVSM:
         links_x, links_y = [], []
         for drone1_idx in range(self.sim.num_drones):
 
-            drone1_pos = self.sim.drone_states[drone1_idx, 0:3]
+            drone1_pos = self.drone_states[drone1_idx, 0:3]
             for drone2_idx in range(self.sim.num_drones):
                 if not self.sim.links_matrix[drone1_idx, drone2_idx]:
                     continue
 
-                drone2_pos = self.sim.drone_states[drone2_idx, 0:3]
+                drone2_pos = self.drone_states[drone2_idx, 0:3]
                 links_x.extend([drone1_pos[0], drone2_pos[0], None])
                 links_y.extend([drone1_pos[1], drone2_pos[1], None])
 

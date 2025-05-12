@@ -11,11 +11,13 @@ import numpy as np
 
 from .agents import Drone, AgentsManager, AgentsConfig, NeighborProvider
 from .environment import Environment
-from .mobility.evsm_position_controller import EVSMPositionConfig, EVSMPositionController
+from .mobility.evsm_position_controller import (
+    EVSMPositionConfig,
+    EVSMPositionController,
+)
 from .math.path_loss_model import signal_strength
 from .network import NetworkSimulator
 from .utils.logger import create_logger
-from .utils.type_checks import is_symmetric
 
 
 class MultiDroneEVSMSimulator:

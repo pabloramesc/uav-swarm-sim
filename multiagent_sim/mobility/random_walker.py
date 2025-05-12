@@ -7,11 +7,13 @@ class SurfaceRandomWalker:
     def __init__(
         self,
         env: Environment,
-        max_speed: float = 1.0,
+        min_speed: float = 1.0,
+        max_speed: float = 3.0,
         climb_rate: float = 0.2,
         turning_rate: float = 0.3,
     ) -> None:
         self.env = env
+        self.min_speed = min_speed
         self.max_speed = max_speed
         self.climb_rate = climb_rate
         self.turning_rate = turning_rate
@@ -19,7 +21,7 @@ class SurfaceRandomWalker:
         self.repulsion_radius = 5.0
         self.repulsion_force = 1.0
         
-        self.state = np.ndarray = None
+        self.state: np.ndarray = None
         
     def initialize(self, state: np.ndarray) -> None:
         if state.shape != (6,):

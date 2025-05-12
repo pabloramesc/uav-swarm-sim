@@ -7,6 +7,9 @@ from numpy.typing import ArrayLike
 class PacketType(Enum):
     DATA = 0x00
     POSITION = 0x01
+    HEARTBEAT = 0x02
+    MESSAGE = 0x03
+    ACKNOWLEDGE = 0xFF
 
 
 class SwarmPacket(ABC):
@@ -14,7 +17,7 @@ class SwarmPacket(ABC):
     Base class for all swarm packets.
 
     Header format (8 bytes):
-    [ Packet Type (1 byte) | Counter (2 bytes) | Agent ID (1 byte) | Timestamp (4 bytes) ]
+    [ Packet Type (1 byte) | Agent ID (1 byte) | Packet ID (2 bytes) | Timestamp (4 bytes) ]
     """
 
     HEADER_SIZE = 8  # header size in bytes
@@ -22,20 +25,25 @@ class SwarmPacket(ABC):
     def __init__(self, packet_type: PacketType):
         self.packet_type = packet_type
         self.agent_id: np.uint8 = None
-        self.counter: np.uint16 = None
+        self.packet_id: np.uint16 = None
         self.timestamp: np.float32 = None
         self.payload: bytes = b""
 
-    def set_header_fields(self, agent_id: int, counter: int, timestamp: float) -> None:
+    def set_header_fields(
+        self, agent_id: int, packet_id: int, timestamp: float
+    ) -> None:
+        if not 0 <= agent_id <= 255:
+            raise ValueError(f"Agent ID must be between 0 and 255, got {agent_id}")
+
         self.agent_id = np.uint8(agent_id)
-        self.counter = np.uint16(counter)
+        self.packet_id = np.uint16(int(packet_id) & 0xFFFF)
         self.timestamp = np.float32(timestamp)
 
     def _build_header(self) -> bytes:
         header = b""
         header += self.packet_type.value.to_bytes(length=1)
-        header += self.counter.tobytes()
         header += self.agent_id.tobytes()
+        header += self.packet_id.tobytes()
         header += self.timestamp.tobytes()
         return header
 
@@ -44,8 +52,8 @@ class SwarmPacket(ABC):
         if self.packet_type != packet_type:
             raise ValueError(f"Expected {self.packet_type}, got {packet_type}")
 
-        self.counter = np.frombuffer(packet[1:3], dtype=np.uint16)[0]
-        self.agent_id = np.frombuffer(packet[3:4], dtype=np.uint8)[0]
+        self.agent_id = np.frombuffer(packet[1:2], dtype=np.uint8)[0]
+        self.packet_id = np.frombuffer(packet[2:4], dtype=np.uint16)[0]
         self.timestamp = np.frombuffer(packet[4:8], dtype=np.float32)[0]
 
     def serialize(self) -> bytes:
@@ -55,6 +63,21 @@ class SwarmPacket(ABC):
     def deserialize(self, packet: bytes) -> None:
         """Deserialize the packet from bytes."""
         pass
+
+    def _build_description(self) -> list[str]:
+        return [
+            f"agent_id={self.agent_id}",
+            f"packet_id={self.packet_id}",
+            f"timestamp={self.timestamp:.4f}",
+            f"payload={self.payload}",
+        ]
+
+    def __str__(self) -> str:
+        info = self._build_description()
+        return f"SwarmPacket({", ".join(info)})"
+
+    def __repr__(self) -> str:
+        return self.__str__()
 
 
 class DataPacket(SwarmPacket):
@@ -66,12 +89,19 @@ class DataPacket(SwarmPacket):
         self.payload = data
 
     def deserialize(self, packet: bytes) -> None:
-        if len(packet) < SwarmPacket.HEADER_SIZE:
+        if len(packet) < self.HEADER_SIZE:
             raise ValueError(
-                f"Packet must have at least {self.HEADER_SIZE} bytes, got {len(packet)}"
+                f"DATA packet must have at least {self.HEADER_SIZE} bytes, got {len(packet)}"
             )
         self._parse_header(packet)
         self.payload = packet[self.HEADER_SIZE :]
+
+    def __str__(self):
+        info = self._build_description()
+        return f"DataPacket({", ".join(info)})"
+
+    def __repr__(self):
+        return self.__str__()
 
 
 class PositionPacket(SwarmPacket):
@@ -97,10 +127,86 @@ class PositionPacket(SwarmPacket):
     def deserialize(self, packet: bytes) -> None:
         if len(packet) != self.EXPECTED_LENGTH:
             raise ValueError(
-                f"Packet must be {self.expected_length} bytes, got {len(packet)}"
+                f"POSITION packet must be exactly {self.EXPECTED_LENGTH} bytes, got {len(packet)}"
             )
         self._parse_header(packet)
         self.payload = packet[self.HEADER_SIZE : self.EXPECTED_LENGTH]
+
+    def __str__(self):
+        info = self._build_description()[:-1]
+        info.append("position=" + ", ".join([f"{p:.2f}" for p in self.get_position()]))
+        return f"PositionPacket({", ".join(info)})"
+
+    def __repr__(self):
+        return self.__str__()
+
+
+class AcknowledgePacket(SwarmPacket):
+    def __init__(self):
+        super().__init__(PacketType.ACKNOWLEDGE)
+
+    def set_ack(self, agent_id: int, packet_id: int, timestamp: float):
+        self.set_header_fields(agent_id, packet_id, timestamp)
+        self.payload = b""  # No payload
+
+    def deserialize(self, packet: bytes) -> None:
+        if len(packet) != self.HEADER_SIZE:
+            raise ValueError(
+                f"ACK packet must be exactly {self.HEADER_SIZE} bytes, got {len(packet)}"
+            )
+        self._parse_header(packet)
+        self.payload = b""  # No payload
+
+    def __str__(self):
+        info = self._build_description()[:-1]
+        return f"AckPacket({", ".join(info)})"
+
+    def __repr__(self):
+        return self.__str__()
+
+
+class HeartbeatPacket(SwarmPacket):
+    def __init__(self):
+        super().__init__(PacketType.HEARTBEAT)
+
+    def set_heartbeat(self, agent_id: int, packet_id: int, timestamp: float):
+        self.set_header_fields(agent_id, packet_id, timestamp)
+        self.payload = b""  # No payload
+
+    def deserialize(self, packet: bytes) -> None:
+        if len(packet) != self.HEADER_SIZE:
+            raise ValueError(
+                f"HEARTBEAT packet must be exactly {self.HEADER_SIZE} bytes"
+            )
+        self._parse_header(packet)
+        self.payload = b""
+
+    def __str__(self):
+        info = self._build_description()[:-1]
+        return f"HeartbeatPacket({", ".join(info)})"
+
+    def __repr__(self):
+        return self.__str__()
+
+
+class MessagePacket(DataPacket):
+    def __init__(self):
+        super().__init__()
+        self.packet_type = PacketType.MESSAGE
+
+    def set_message(self, message: str):
+        self.set_payload(message.encode("utf-8"))
+
+    def get_message(self) -> str:
+        return self.payload.decode("utf-8")
+
+    def __str__(self):
+        info = self._build_description()[:-1]
+        info += "msg=" + self.get_message()
+        return f"Message({", ".join(info)})"
+
+    def __repr__(self):
+        return self.__str__()
 
 
 def parse_packet(data: bytes) -> SwarmPacket:
@@ -116,6 +222,12 @@ def parse_packet(data: bytes) -> SwarmPacket:
         packet = DataPacket()
     elif packet_type == PacketType.POSITION:
         packet = PositionPacket()
+    elif packet_type == PacketType.ACKNOWLEDGE:
+        packet = AcknowledgePacket()
+    elif packet_type == PacketType.HEARTBEAT:
+        packet = HeartbeatPacket()
+    elif packet_type == PacketType.MESSAGE:
+        packet = MessagePacket()
     else:
         raise ValueError(f"Unsuported packet type: {packet_type}")
 

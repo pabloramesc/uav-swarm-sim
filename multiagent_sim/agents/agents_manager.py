@@ -46,7 +46,7 @@ class AgentsManager:
         self.network_simulator = network_simulator
 
         self.agents: list[Agent] = []
-        self.control_stations = AgentsRegistry
+        self.control_stations = AgentsRegistry()
         self.drones = AgentsRegistry()
         self.users = AgentsRegistry()
         self._create_agents()
@@ -82,31 +82,30 @@ class AgentsManager:
     def _create_agents(self) -> None:
         global_id = 0
         for id in range(self.agents_config.num_gcs):
-            gcs = self._create_control_station(global_id=global_id, type_id=id)
+            gcs = self._create_control_station(global_id=global_id)
             self.agents.append(gcs)
             self.control_stations.register(gcs)
             global_id += 1
 
         for id in range(self.agents_config.num_drones):
-            drone = self._create_drone(agent_id=global_id, type_id=id)
+            drone = self._create_drone(agent_id=global_id)
             self.agents.append(drone)
             self.drones.register(drone)
             global_id += 1
 
         for id in range(self.agents_config.num_users):
-            user = self._create_user(global_id=global_id, type_id=id)
+            user = self._create_user(global_id=global_id)
             self.agents.append(user)
             self.users.register(user)
             global_id += 1
 
-    def _create_control_station(self, global_id: int, type_id: int) -> ControlStation:
-        interface = SwarmLink(agent_id=global_id, network_sim=self.network_simulator)
+    def _create_control_station(self, global_id: int) -> ControlStation:
         gcs = ControlStation(
-            global_id=global_id, type_id=type_id, env=self.environment, net=interface
+            agent_id=global_id, env=self.environment, network_sim=self.network_simulator
         )
         return gcs
 
-    def _create_drone(self, agent_id: int, type_id: int) -> Drone:
+    def _create_drone(self, agent_id: int) -> Drone:
         controller: SwarmPositionController = None
         if self.agents_config.drones_swarming_type == "evsm":
             config = (
@@ -129,22 +128,11 @@ class AgentsManager:
                 f"Invalid swarming controller type: {self.agents_config.drones_swarming_type}"
             )
 
-        link = (
-            SwarmLink(
-                agent_id=agent_id,
-                network_sim=self.network_simulator,
-                local_bcast_interval=0.1,
-                global_bcast_interval=1.0,
-            )
-            if self.network_simulator is not None
-            else None
-        )
-
         drone = Drone(
             agent_id=agent_id,
             env=self.environment,
             position_controller=controller,
-            swarm_link=link,
+            network_sim=self.network_simulator,
             drones_registry=self.drones,
             users_registry=self.users,
             neighbor_provider=self.agents_config.drones_neighbor_provider,
@@ -152,9 +140,8 @@ class AgentsManager:
 
         return drone
 
-    def _create_user(self, global_id: int, type_id: int) -> User:
-        interface = SwarmLink(agent_id=global_id, network_sim=self.network_simulator)
+    def _create_user(self, global_id: int) -> User:
         user = User(
-            global_id=global_id, type_id=type_id, env=self.environment, net=interface
+            agent_id=global_id, env=self.environment, network_sim=self.network_simulator
         )
         return user

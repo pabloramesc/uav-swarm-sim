@@ -11,6 +11,7 @@ from typing import Literal
 
 from ..environment.environment import Environment
 from ..mobility.swarm_position_controller import SwarmPositionController
+from ..network.network_simulator import NetworkSimulator
 from ..network.swarm_link import SwarmLink
 from .agent import Agent
 from .agents_registry import AgentsRegistry
@@ -28,19 +29,18 @@ class Drone(Agent):
         agent_id: int,
         env: Environment,
         position_controller: SwarmPositionController,
-        swarm_link: SwarmLink = None,
+        network_sim: NetworkSimulator,
         drones_registry: AgentsRegistry = None,
         users_registry: AgentsRegistry = None,
         neighbor_provider: NeighborProvider = "registry",
     ):
         super().__init__(agent_id=agent_id, agent_type="drone", env=env)
         self.position_controller = position_controller
-        self.swarm_link = swarm_link
         self.drones_registry = drones_registry
         self.users_registry = users_registry
         self.neighbor_provider = neighbor_provider
 
-        if self.neighbor_provider == "network" and self.swarm_link is None:
+        if self.neighbor_provider == "network" and network_sim is None:
             raise ValueError(
                 "If neighbor_provider is 'network', a network object must be provided."
             )
@@ -48,6 +48,16 @@ class Drone(Agent):
         if self.neighbor_provider == "registry" and drones_registry is None:
             raise ValueError(
                 "If neighbor_provider is 'registry', drones_registry must be provided."
+            )
+
+        self.swarm_link: SwarmLink = None
+        if network_sim is not None:
+            self.swarm_link = SwarmLink(
+                agent_id=self.agent_id,
+                network_sim=network_sim,
+                local_bcast_interval=0.1,
+                global_bcast_interval=1.0,
+                position_timeout=5.0,
             )
 
         self.drone_positions: dict[int, np.ndarray] = None
@@ -63,7 +73,9 @@ class Drone(Agent):
     ):
         super().initialize(state, time)
         self._update_neighbors()
-        self.position_controller.initialize(time, state, drone_positions=self.drone_positions)
+        self.position_controller.initialize(
+            time, state, drone_positions=self.drone_positions
+        )
 
     def update(self, dt: float = 0.01) -> None:
         """

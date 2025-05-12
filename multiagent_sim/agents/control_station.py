@@ -8,6 +8,7 @@ https://opensource.org/licenses/MIT
 from .agent import Agent
 from ..environment import Environment
 from ..network.swarm_link import SwarmLink
+from ..network.network_simulator import NetworkSimulator
 
 
 class ControlStation(Agent):
@@ -25,14 +26,22 @@ class ControlStation(Agent):
 
     def __init__(
         self,
-        global_id: int,
-        type_id: int,
+        agent_id: int,
         env: Environment,
-        net: SwarmLink = None,
+        network_sim: NetworkSimulator = None,
     ):
         super().__init__(
-            global_id=global_id, type_id=type_id, agent_type="gcs", env=env, net=net
+            agent_id=agent_id,
+            agent_type="gcs",
+            env=env,
         )
+        
+        self.swarm_link: SwarmLink = None
+        if network_sim is not None:
+            self.swarm_link = SwarmLink(agent_id=self.agent_id, network_sim=network_sim)
+
+    def initialize(self, state, time=0):
+        return super().initialize(state, time)
 
     def update(self, dt: float = 0.01) -> None:
         """

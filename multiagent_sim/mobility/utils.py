@@ -1,5 +1,8 @@
 import numpy as np
 
+from ..environment import Environment
+
+
 def random_positions(
     num_points: int,
     origin: np.ndarray = np.zeros(2),
@@ -29,6 +32,7 @@ def random_positions(
     positions[:, 0:2] = np.random.normal(origin, space, (num_points, 2))
     positions[:, 2] = altitude
     return positions
+
 
 def grid_positions(
     num_points: int,
@@ -67,3 +71,33 @@ def grid_positions(
             drone_id += 1
             if drone_id >= num_points:
                 return positions
+
+
+def environment_random_positions(num_positions: int, env: Environment) -> np.ndarray:
+    """
+    Generate random positions within the environment.
+
+    Parameters
+    ----------
+    num_positions : int
+        Number of random positions to generate.
+    env : Environment
+        The environment object containing the boundaries.
+
+    Returns
+    -------
+    np.ndarray
+        Array of shape (num_positions, 3) containing random positions in the
+        format [x, y, z].
+    """
+    positions = []
+    while len(positions) < num_positions:
+        x = np.random.uniform(env.boundary.left, env.boundary.right)
+        y = np.random.uniform(env.boundary.bottom, env.boundary.top)
+        z = env.get_elevation([x, y])
+        if not env.is_inside([x, y]) or env.is_collision(
+            [x, y, z], check_altitude=False
+        ):
+            continue
+        positions.append([x, y, z])
+    return np.array(positions)

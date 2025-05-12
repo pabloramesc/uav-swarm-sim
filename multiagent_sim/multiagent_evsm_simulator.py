@@ -8,13 +8,18 @@ https://opensource.org/licenses/MIT
 import time
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from .agents import Drone, AgentsManager, AgentsConfig, NeighborProvider
 from .environment import Environment
-from .mobility.evsm_position_controller import EVSMPositionConfig, EVSMPositionController
+from .mobility.evsm_position_controller import (
+    EVSMPositionConfig,
+    EVSMPositionController,
+)
 from .math.path_loss_model import signal_strength
 from .network import NetworkSimulator
 from .utils.logger import create_logger
+from .mobility.utils import grid_positions, environment_random_positions
 
 
 class MultiAgentEVSMSimulator:
@@ -32,10 +37,14 @@ class MultiAgentEVSMSimulator:
         self.num_users = num_users
         self.dt = dt
         self.environment = Environment(dem_path)
+        self.evsm_config = evsm_config
 
         if neihgbor_provider == "network":
             self.network_simulator = NetworkSimulator(
-                num_gcs=0, num_uavs=num_drones, num_users=0, verbose=True
+                num_gcs=1,
+                num_drones=self.num_drones,
+                num_users=self.num_users,
+                verbose=True,
             )
             self.network_simulator.launch_simulator(max_attempts=2)
         else:
@@ -71,37 +80,26 @@ class MultiAgentEVSMSimulator:
             return 0.0
         return time.time() - self.init_time
 
-    @property
-    def drone_states(self) -> np.ndarray:
-        """
-        A (N, 6) shape array with drone states [px, py, pz, vx, vy, vz] in meters and m/s,
-        where N is the number of drones.
-        """
-        return self.agents_manager.drones.get_states_array()
-
-    @property
-    def drone_positions(self) -> np.ndarray:
-        """
-        A (N, 3) shape array with drone positions [px, py, pz] in meters,
-        where N is the number of drones.
-        """
-        return self.agents_manager.drones.get_states_array()[:, 0:3]
-
-    @property
-    def drone_velocities(self) -> np.ndarray:
-        """
-        A (N, 3) shape array with drone velocities [vx, vy, vz] in m/s,
-        where N is the number of drones.
-        """
-        return self.agents_manager.drones.get_states_array()[:, 3:6]
-
-    def initialize(self, home: np.ndarray) -> None:
+    def initialize(self, home: ArrayLike) -> None:
         self.logger.info("Initializing simulation ...")
 
-        if positions is not None:
-            states = np.zeros((self.num_drones, 6), dtype=np.float32)
-            states[:, 0:3] = positions
-            self.agents_manager.initialize_all_drones(states)
+        gcs_state = np.zeros(6)
+        gcs_state[0:3] = np.asarray(home)
+        self.agents_manager.initialize_agent(global_id=0, state=gcs_state)
+
+        drone_states = np.zeros((self.num_drones, 6))
+        drone_states[:, 0:3] = grid_positions(
+            num_points=self.num_drones, origin=home, space=5.0, altitude=self.evsm_config.target_altitude
+        )
+        self.agents_manager.initialize_all_agents(
+            states=drone_states, agent_type="drone"
+        )
+
+        user_states = np.zeros((self.num_users, 6))
+        user_states[:, 0:3] = environment_random_positions(
+            num_positions=self.num_users, env=self.environment
+        )
+        self.agents_manager.initialize_all_agents(states=user_states, agent_type="user")
 
         self.init_time = time.time()
         self.sim_time = 0.0
@@ -202,17 +200,19 @@ class MultiAgentEVSMSimulator:
                     f"Drone {drone.agent_id} position controller is not EVSM"
                 )
 
-            indices = np.array(list(drone.drone_positions.keys()))
+            neighbor_ids = np.array(list(drone.drone_positions.keys()))
+            neighbor_indices = self.agents_manager.drones.get_indices(neighbor_ids)
             links_mask = controller.evsm.links_mask
 
             drone_links = np.zeros((self.num_drones,), dtype=bool)
-            if indices.size > 0 and indices.size == links_mask.size:
-                drone_links[indices] = links_mask
+            if neighbor_indices.size > 0 and neighbor_indices.shape == links_mask.shape:
+                drone_links[neighbor_indices] = links_mask
 
             if not np.any(drone_links):
                 self.logger.info(f"Drone {drone.agent_id} has no links.")
 
-            self.links_matrix[drone.agent_id, :] = drone_links
+            drone_index = self.agents_manager.drones.get_index(drone.agent_id)
+            self.links_matrix[drone_index, :] = drone_links
 
     def _update_edge_drones_mask(self) -> None:
         """

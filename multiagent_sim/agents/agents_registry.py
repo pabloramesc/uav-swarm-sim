@@ -11,17 +11,34 @@ class AgentsRegistry(ABC):
 
     def __init__(self):
         self.agents: dict[int, Agent] = {}
-    
+        self.id_to_index: dict[int, int] = {}
+
     @property
     def num_agents(self) -> int:
         """Returns the number of registered agents."""
         return len(self.agents)
+
+    def _rebuild_index_mapping(self) -> None:
+        """
+        Rebuilds the ID-to-index mapping whenever the registry changes.
+        """
+        self.id_to_index = {
+            agent_id: idx for idx, agent_id in enumerate(self.agents.keys())
+        }
 
     def register(self, agent: Agent) -> None:
         """Adds a new agent to the registry."""
         if agent.agent_id in self.agents:
             raise ValueError(f"Agent with ID {agent.agent_id} is already registered.")
         self.agents[agent.agent_id] = agent
+        self._rebuild_index_mapping()
+
+    def unregister(self, agent_id: int) -> None:
+        """Removes an agent from the registry."""
+        if agent_id not in self.agents:
+            raise KeyError(f"Agent with ID {agent_id} is not registered.")
+        del self.agents[agent_id]
+        self._rebuild_index_mapping()
 
     def get_all(self) -> list[Agent]:
         """Returns all registered agents."""
@@ -40,11 +57,13 @@ class AgentsRegistry(ABC):
         Returns an array of all agent states.
         If `exclude_id` is provided, excludes the agent with that ID.
         """
-        return np.array([
-            agent.state
-            for agent_id, agent in self.agents.items()
-            if agent_id != exclude_id
-        ])
+        return np.array(
+            [
+                agent.state
+                for agent_id, agent in self.agents.items()
+                if agent_id != exclude_id
+            ]
+        )
 
     def get_states_dict(self, exclude_id: int = None) -> dict[int, np.ndarray]:
         """
@@ -56,7 +75,7 @@ class AgentsRegistry(ABC):
             for agent_id, agent in self.agents.items()
             if agent_id != exclude_id
         }
-        
+
     def get_positions_dict(self, exclude_id: int = None) -> dict[int, np.ndarray]:
         """
         Returns a dictionary mapping agent IDs to their positions.
@@ -81,3 +100,19 @@ class AgentsRegistry(ABC):
             if 0.0 < np.linalg.norm(agent.position - position) < distance
         ]
         return np.array(positions)
+
+    def get_index(self, agent_id: int) -> int:
+        """
+        Returns the contiguous array index for a given global agent ID.
+        """
+        return self.id_to_index[agent_id]
+
+    def get_indices(self, agent_ids: list[int]) -> np.ndarray:
+        """
+        Given a list or array of global agent IDs, returns an array of their
+        contiguous indices.
+        """
+        try:
+            return np.array([self.id_to_index[agent_id] for agent_id in agent_ids])
+        except KeyError as e:
+            raise KeyError(f"Agent ID {e.args[0]} is not registered.")
