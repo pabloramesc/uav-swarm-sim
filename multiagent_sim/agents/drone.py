@@ -57,7 +57,6 @@ class Drone(Agent):
                 network_sim=network_sim,
                 local_bcast_interval=0.1,
                 global_bcast_interval=1.0,
-                position_timeout=5.0,
             )
 
         self.drone_positions: dict[int, np.ndarray] = None

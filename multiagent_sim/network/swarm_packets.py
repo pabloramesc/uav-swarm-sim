@@ -7,8 +7,6 @@ from numpy.typing import ArrayLike
 class PacketType(Enum):
     DATA = 0x00
     POSITION = 0x01
-    HEARTBEAT = 0x02
-    MESSAGE = 0x03
     ACKNOWLEDGE = 0xFF
 
 
@@ -165,50 +163,6 @@ class AcknowledgePacket(SwarmPacket):
         return self.__str__()
 
 
-class HeartbeatPacket(SwarmPacket):
-    def __init__(self):
-        super().__init__(PacketType.HEARTBEAT)
-
-    def set_heartbeat(self, agent_id: int, packet_id: int, timestamp: float):
-        self.set_header_fields(agent_id, packet_id, timestamp)
-        self.payload = b""  # No payload
-
-    def deserialize(self, packet: bytes) -> None:
-        if len(packet) != self.HEADER_SIZE:
-            raise ValueError(
-                f"HEARTBEAT packet must be exactly {self.HEADER_SIZE} bytes"
-            )
-        self._parse_header(packet)
-        self.payload = b""
-
-    def __str__(self):
-        info = self._build_description()[:-1]
-        return f"HeartbeatPacket({", ".join(info)})"
-
-    def __repr__(self):
-        return self.__str__()
-
-
-class MessagePacket(DataPacket):
-    def __init__(self):
-        super().__init__()
-        self.packet_type = PacketType.MESSAGE
-
-    def set_message(self, message: str):
-        self.set_payload(message.encode("utf-8"))
-
-    def get_message(self) -> str:
-        return self.payload.decode("utf-8")
-
-    def __str__(self):
-        info = self._build_description()[:-1]
-        info += "msg=" + self.get_message()
-        return f"Message({", ".join(info)})"
-
-    def __repr__(self):
-        return self.__str__()
-
-
 def parse_packet(data: bytes) -> SwarmPacket:
     if not data:
         raise ValueError("Packet is empty")
@@ -224,10 +178,6 @@ def parse_packet(data: bytes) -> SwarmPacket:
         packet = PositionPacket()
     elif packet_type == PacketType.ACKNOWLEDGE:
         packet = AcknowledgePacket()
-    elif packet_type == PacketType.HEARTBEAT:
-        packet = HeartbeatPacket()
-    elif packet_type == PacketType.MESSAGE:
-        packet = MessagePacket()
     else:
         raise ValueError(f"Unsuported packet type: {packet_type}")
 

@@ -37,6 +37,9 @@ while True:
     sim.update()
     gui.update(force_render=False, verbose=True)
 
+    if sim.sim_time % 10 == 0:
+        sim.network_simulator.verify_node_positions()
+
     # cr = sim.area_coverage_ratio()
     # print(f"Area coverage ratio: {cr * 100:.2f} %")
 

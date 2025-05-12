@@ -11,7 +11,7 @@ from ..environment import Environment
 from ..mobility.random_walker import SurfaceRandomWalker
 from ..network.network_simulator import NetworkSimulator
 from ..network.swarm_link import SwarmLink
-from .agent import Agent, AgentType
+from .agent import Agent
 
 
 class User(Agent):
@@ -34,18 +34,14 @@ class User(Agent):
                 agent_id=self.agent_id,
                 network_sim=network_sim,
                 global_bcast_interval=1.0,
-                local_bcast_interval=None,
-                ack_to_messages=True,
             )
 
         self.random_walk = SurfaceRandomWalker(env)
-        
 
     def initialize(self, state: np.ndarray, time: float = 0.0) -> None:
         super().initialize(state, time)
         self.random_walk.initialize(self.state)
         self.next_tx_msg: float = 0.0
-        self.last_msg_id: int = None
 
     def update(self, dt: float = 0.01) -> None:
         """
@@ -63,14 +59,20 @@ class User(Agent):
             self.swarm_link.update(self.time, self.position)
             self._send_random_message()
 
+        self.print_received_messages(clear=True)
+
     def _send_random_message(self) -> None:
         if self.time < self.next_tx_msg:
             return
+
+        dst_addr = self.swarm_link.iface.broadcast_address
+        msg = f"Hello from agent {self.agent_id}!"
+        self.last_msg_id = self.swarm_link.send_message(msg, dst_addr)
         
-        dst_addr = self.swarm_link.global_bcast_addr
-        self.last_msg_id = self.swarm_link.send_message(f"Hello from agent {self.agent_id}!", dst_addr)
-        
+        self.logger.debug(f"Sent msg: {msg}")
+
         self.next_tx_msg = self.time + np.random.uniform(1.0, 10.0)
-        
-    def _read_responses(self) -> None:
-        self.swarm_link.ack_registry[self.last_msg_id]
+
+    def print_received_messages(self, clear: bool = False) -> None:
+        for msg in self.swarm_link.get_messages(clear):
+            self.logger.debug(f"Received from {msg.source_id} msg: {msg.txt}")

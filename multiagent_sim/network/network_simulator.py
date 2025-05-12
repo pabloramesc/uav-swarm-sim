@@ -97,8 +97,9 @@ class NetworkSimulator:
                 return node
         raise ValueError(f"No node found with IP address {ip_address}")
 
-    def update(self) -> None:
+    def update(self, positions: np.ndarray) -> None:
         self.fetch_packets()
+        self.set_node_positions(positions)
 
     def launch_simulator(self, max_attempts: int = 1) -> None:
         attempt = 1
@@ -159,8 +160,8 @@ class NetworkSimulator:
             node_id_pos[node_id] = node_pos
         self.bridge.set_node_positions(node_id_pos)
 
-    def verify_node_positions(self) -> None:
-        node_id_pos = self.bridge.get_node_positions()
+    def verify_node_positions(self, timeout: float = 0.1) -> None:
+        node_id_pos = self.bridge.get_node_positions(timeout)
         for node_id, ns3_pos in node_id_pos.items():
             local_pos = self.nodes[node_id].position
             if not np.allclose(local_pos, ns3_pos):

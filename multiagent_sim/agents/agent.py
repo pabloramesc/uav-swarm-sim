@@ -11,7 +11,7 @@ from typing import Literal
 import numpy as np
 
 from ..environment.environment import Environment
-from ..network.swarm_link import SwarmLink
+from ..utils.logger import create_logger
 
 AgentType = Literal["drone", "user", "gcs"]
 
@@ -33,6 +33,8 @@ class Agent(ABC):
         self.agent_id = agent_id
         self.agent_type = agent_type
         self.environment = env
+        
+        self.logger = create_logger(f"Agent{agent_id}", level="INFO")
 
         self.time = 0.0
         self.state = np.zeros(6)  # px, py, pz, vx, vy, vz

@@ -89,7 +89,10 @@ class MultiAgentEVSMSimulator:
 
         drone_states = np.zeros((self.num_drones, 6))
         drone_states[:, 0:3] = grid_positions(
-            num_points=self.num_drones, origin=home, space=5.0, altitude=self.evsm_config.target_altitude
+            num_points=self.num_drones,
+            origin=home,
+            space=5.0,
+            altitude=self.evsm_config.target_altitude,
         )
         self.agents_manager.initialize_all_agents(
             states=drone_states, agent_type="drone"
@@ -123,7 +126,10 @@ class MultiAgentEVSMSimulator:
         self.sim_step += 1
 
         if self.network_simulator is not None:
-            self.network_simulator.update()
+            agent_states = np.array(
+                [agent.state for agent in self.agents_manager.agents]
+            )
+            self.network_simulator.update(agent_states[:, 0:3])
 
         self.agents_manager.update_agents(dt=dt)
 

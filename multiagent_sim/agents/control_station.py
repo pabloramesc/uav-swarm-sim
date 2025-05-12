@@ -35,10 +35,14 @@ class ControlStation(Agent):
             agent_type="gcs",
             env=env,
         )
-        
+
         self.swarm_link: SwarmLink = None
         if network_sim is not None:
-            self.swarm_link = SwarmLink(agent_id=self.agent_id, network_sim=network_sim)
+            self.swarm_link = SwarmLink(
+                agent_id=self.agent_id,
+                network_sim=network_sim,
+                global_bcast_interval=1.0,
+            )
 
     def initialize(self, state, time=0):
         return super().initialize(state, time)
@@ -55,3 +59,6 @@ class ControlStation(Agent):
             The time step in seconds (default is 0.01).
         """
         super().update(dt)
+
+        if self.swarm_link is not None:
+            self.swarm_link.update(self.time, self.state[0:3])
