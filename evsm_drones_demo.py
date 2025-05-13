@@ -11,7 +11,7 @@ from multiagent_sim.mobility.evsm_position_controller import EVSMPositionConfig
 from multiagent_sim.mobility.utils import grid_positions
 
 dt = 0.01
-num_drones = 25
+num_drones = 16
 
 evsm_config = EVSMPositionConfig(
     separation_distance=100.0,
@@ -38,5 +38,3 @@ while True:
 
     # cr = sim.area_coverage_ratio()
     # print(f"Area coverage ratio: {cr * 100:.2f} %")
-
-    sim.sync_to_real_time()

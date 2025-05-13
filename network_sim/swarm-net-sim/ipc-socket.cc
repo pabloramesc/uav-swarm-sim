@@ -12,6 +12,7 @@ using namespace std;
 
 IpcSocket::IpcSocket(const string &addr, uint16_t port)
     : m_addr(addr), m_port(port), m_sock(-1) {
+    is_remote = false;
     SetupSocket();
 }
 
@@ -30,6 +31,7 @@ void IpcSocket::Close() {
 }
 
 void IpcSocket::SetupSocket() {
+
     m_sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (m_sock < 0) {
         cerr << "[NS3:IpcSocket] ERROR: Failed to create socket. Error: "
@@ -101,6 +103,10 @@ int IpcSocket::ReadSocket(uint8_t *buffer, size_t size) {
 
     if (numBytes < 0) {
         return numBytes;
+    }
+
+    if (m_remoteLen > 0) {
+        is_remote = true;
     }
 
 #if DEBUG

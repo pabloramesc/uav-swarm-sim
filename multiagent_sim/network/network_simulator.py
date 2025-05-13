@@ -27,12 +27,11 @@ class SimNode:
     node_type: NodeType
     name: str = None
     addr: str = "0.0.0.0"
+    position: np.ndarray = None
 
 
 class NetworkSimulator:
-
     NETWORK_BASE = "10.0."
-
     NODE_TYPE_TO_PREFIX: dict[NodeType, str] = {
         "gcs": NETWORK_BASE + "1.",
         "drone": NETWORK_BASE + "2.",
@@ -54,8 +53,6 @@ class NetworkSimulator:
         self.bridge = SimBridge()
 
         self.ns3_process = None
-        self.ns3_init_time: float = None
-        self.ns3_last_time: float = None
 
         self.logger = create_logger(
             "NetworkSimulator", level="INFO" if verbose else "WARNING"
@@ -71,12 +68,10 @@ class NetworkSimulator:
         return len(self.nodes)
 
     @property
-    def elapsed_time(self) -> float:
-        if self.ns3_init_time is None:
-            raise ValueError("NS-3 simulator has not been launched yet.")
-        if self.ns3_last_time is None:
-            raise ValueError("No packets have been sent or received yet.")
-        return self.ns3_last_time - self.ns3_init_time
+    def ns3_time(self) -> float:
+        if self.bridge.last_sim_time is None:
+            return 0.0
+        return self.bridge.last_sim_time
 
     def get_broadcast_address(self) -> str:
         return self.NETWORK_BASE + "255.255"
@@ -97,46 +92,44 @@ class NetworkSimulator:
                 return node
         raise ValueError(f"No node found with IP address {ip_address}")
 
-    def update(self, positions: np.ndarray) -> None:
+    def update(self, positions: np.ndarray = None, check: bool = False) -> None:
         self.fetch_packets()
-        self.set_node_positions(positions)
+        
+        if positions is not None:
+            self.set_node_positions(positions)
+            
+        if check:
+            try:
+                self.verify_node_positions(timeout=0.1)
+            except Exception as err:
+                self.logger.warning(f"⚠️  Erro verifying positions: {err}")
 
     def launch_simulator(self, max_attempts: int = 1) -> None:
         attempt = 1
         while attempt <= max_attempts:
+            self.logger.info(
+                f"➡️  Initializing NS-3 simulator... (attempt {attempt}/{max_attempts})"
+            )
+
             try:
-                self.logger.info(
-                    f"➡️  Initializing NS-3 simulator... (attempt {attempt}/{max_attempts})"
-                )
-
                 self._kill_previous_ns3()
-
-                self._launch_ns3_simulator()
-                time.sleep(1.0)
-
-                self.logger.info("Verifying NS-3 connection...")
+                self._launch_ns3_simulator(wait=1.0)
                 self._verify_ns3_connection(max_attempts=5)
-                self.logger.info("NS-3 connection verified.")
-
-                self.logger.info("Verifying NS-3 nodes...")
                 self._verify_ns3_nodes()
-                self.logger.info("NS-3 nodes verified.")
-
-                self._update_ns3_init_time()
 
                 self.logger.info(
                     f"✅ NS-3 simulator successfully launched for {self.num_nodes} nodes "
                     f"({self.num_gcs} GCSs, {self.num_drones} drones, and {self.num_users} users)."
                 )
 
+                self.init_time = self.bridge.request_sim_time()
+                self.real_init_time = time.time()
+
                 return
 
             except Exception as err:
-                if attempt < max_attempts:
-                    self.logger.warning(
-                        f"⚠️  Failed to launch NS-3 simulator: {err}. Retrying..."
-                    )
-                    self._terminate_ns3_simulator()
+                self.logger.warning(f"⚠️  Launch attempt {attempt} failed: {err}")
+                self._terminate_ns3_simulator()
                 attempt += 1
 
         if attempt > max_attempts:
@@ -144,10 +137,13 @@ class NetworkSimulator:
 
     def shutdown_simulator(self, timeout: float = 1.0) -> None:
         self.logger.info("Terminating NS-3 simulator...")
-        self.bridge.stop_ns3()
+        self.bridge.stop_simulation()
         time.sleep(timeout)
         self._terminate_ns3_simulator(timeout)
         self.ns3_process = None
+        self.init_time = None
+        self.real_init_time = None
+        self.bridge
 
     def set_node_positions(self, positions: np.ndarray) -> None:
         if positions.shape != (self.num_nodes, 3):
@@ -161,8 +157,8 @@ class NetworkSimulator:
         self.bridge.set_node_positions(node_id_pos)
 
     def verify_node_positions(self, timeout: float = 0.1) -> None:
-        node_id_pos = self.bridge.get_node_positions(timeout)
-        for node_id, ns3_pos in node_id_pos.items():
+        positions = self.bridge.request_node_positions(timeout)
+        for node_id, ns3_pos in positions.items():
             local_pos = self.nodes[node_id].position
             if not np.allclose(local_pos, ns3_pos):
                 raise Exception(
@@ -177,10 +173,6 @@ class NetworkSimulator:
         for packet in packets:
             self._validate_node_id(packet.node_id)
             self.node_packets[packet.node_id].append(packet)
-
-        if len(packets) > 0:
-            self.ns3_last_time = packets[-1].egress_time
-
         return
 
     def get_node_packets(self, node_id: int, delete: bool = False) -> list[SimPacket]:
@@ -200,39 +192,18 @@ class NetworkSimulator:
 
     def _create_nodes(self) -> None:
         node_id = 0
-
-        for id in range(self.num_gcs):
-            gcs = SimNode(
-                node_id=node_id,
-                node_type="gcs",
-                name=f"gcs{id}",
-                addr=self.NODE_TYPE_TO_PREFIX["gcs"] + str(id + 1),
-            )
-            self.nodes.append(gcs)
-            self.node_packets[node_id] = []
-            node_id += 1
-
-        for id in range(self.num_drones):
-            drone = SimNode(
-                node_id=node_id,
-                node_type="drone",
-                name=f"drone{id}",
-                addr=self.NODE_TYPE_TO_PREFIX["drone"] + str(id + 1),
-            )
-            self.nodes.append(drone)
-            self.node_packets[node_id] = []
-            node_id += 1
-
-        for id in range(self.num_users):
-            user = SimNode(
-                node_id=node_id,
-                node_type="user",
-                name=f"user{id}",
-                addr=self.NODE_TYPE_TO_PREFIX["user"] + str(id + 1),
-            )
-            self.nodes.append(user)
-            self.node_packets[node_id] = []
-            node_id += 1
+        for count, node_type in (
+            (self.num_gcs, "gcs"),
+            (self.num_drones, "drone"),
+            (self.num_users, "user"),
+        ):
+            prefix = self.NODE_TYPE_TO_PREFIX[node_type]
+            for i in range(count):
+                self.nodes.append(
+                    SimNode(node_id, node_type, f"{node_type}{i}", prefix + str(i + 1))
+                )
+                self.node_packets[node_id] = []
+                node_id += 1
 
     def _rewrite_ns3_code(self) -> None:
         subprocess.run(["sh", "rewrite_ns3_code.sh"], cwd="./network_sim", check=True)
@@ -257,7 +228,7 @@ class NetworkSimulator:
         subprocess.run(["pkill", "-f", "ns3"], check=True)
         self.logger.info("Previous NS-3 process killed.")
 
-    def _launch_ns3_simulator(self) -> None:
+    def _launch_ns3_simulator(self, wait: float = 1.0) -> None:
         sim_cmd = (
             "scratch/swarm-net-sim/main "
             f"--nGCS={self.num_gcs} --nUAV={self.num_drones} --nUser={self.num_users}"
@@ -265,40 +236,38 @@ class NetworkSimulator:
         self.ns3_process = subprocess.Popen(
             ["./ns3", "run", sim_cmd], cwd="./network_sim/ns-3", preexec_fn=os.setsid
         )
+        time.sleep(wait)
 
     def _terminate_ns3_simulator(self, timeout: float = 1.0) -> None:
         if self.ns3_process and self.ns3_process.poll() is None:
             self.logger.info("NS-3 process is still running. Terminating...")
-            
             self.ns3_process.terminate()  # Send termination signal
             self.ns3_process.wait(timeout)  # Wait for the process to terminate
-            
         self.logger.info("🛑 NS-3 process terminated.")
-        
+
     def _kill_ns3_process(self) -> None:
         if self.ns3_process and self.ns3_process.poll() is None:
             self.logger.warning("⚠️  NS-3 process is still running. Killing...")
-            
             pgid = os.getpgid(self.ns3_process.pid)
             os.killpg(pgid, signal.SIGKILL)
-            
             self.ns3_process.wait()
             self.ns3_process = None
-            
             self.logger.info("💀 NS-3 process killed.")
 
     def _verify_ns3_connection(self, max_attempts: int = 2) -> None:
+        self.logger.info("Verifying NS-3 connection...")
         is_running = False
         for _ in range(max_attempts):
             is_running = self.bridge.is_ns3_running()
             if is_running:
                 break
-
         if not is_running:
-            raise Exception("Unable to connect to NS-3 simulator")
+            raise Exception("NS-3 simulator is not responding.")
+        self.logger.info("NS-3 connection verified.")
 
     def _verify_ns3_nodes(self) -> None:
-        addresses = self.bridge.get_node_addresses()
+        self.logger.info("Verifying NS-3 nodes...")
+        addresses = self.bridge.request_node_addresses()
         for node_id, node_addr in addresses.items():
             node = self.nodes[node_id]
             if node.node_id != node_id:
@@ -310,6 +279,7 @@ class NetworkSimulator:
                     f"NS-3 node addr {node_addr} does not match local node addr {node.addr}"
                 )
             self._validate_node_type_address(node.node_type, node.addr)
+        self.logger.info("NS-3 nodes verified.")
 
     def _validate_node_id(self, id: int) -> None:
         if id < 0:
@@ -349,22 +319,6 @@ class NetworkSimulator:
             raise ValueError(
                 "At least one node (GCS, drone, or user) must be present in the simulation."
             )
-
-    def _update_ns3_init_time(self) -> None:
-        self.ns3_init_time = self.bridge.get_ns3_time(timeout=0.1)
-        if self.ns3_init_time is None:
-            raise ValueError("Failed to get NS-3 initialization time.")
-        self.ns3_last_time = self.ns3_init_time
-
-    def _update_ns3_last_time(self) -> None:
-        self.ns3_last_time = self.bridge.get_ns3_time(timeout=0.1)
-        if self.ns3_last_time is None:
-            raise ValueError("Failed to get NS-3 last time.")
-        if self.ns3_last_time < self.ns3_init_time:
-            raise ValueError(
-                "NS-3 last time cannot be less than NS-3 initialization time."
-            )
-        return
 
     def _on_exit_signal(self, signum, frame):
         self.logger.warning(f"⚠️  Received signal {signum}, shutting down NS-3 ...")

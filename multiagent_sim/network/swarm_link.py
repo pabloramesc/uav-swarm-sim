@@ -48,8 +48,8 @@ class SwarmLink:
                 interface=self.iface, interval=global_bcast_interval, mode="global"
             )
 
-    def update(self, now: float, position: np.ndarray) -> None:
-        self.time = now
+    def update(self, time: float, position: np.ndarray) -> None:
+        self.time = time
         self.position = position.copy()
 
         # Receive raw packets
@@ -63,14 +63,14 @@ class SwarmLink:
             if pkt.packet_type == PacketType.DATA:
                 self.data_packets.append(pkt)
             elif pkt.packet_type == PacketType.POSITION:
-                self.position_provider.process(pkt, now)
+                self.position_provider.process(pkt, time)
 
         # Prune stale positions
-        self.position_provider.prune(now)
+        self.position_provider.prune(time)
 
         # Broadcast as needed
         for svc in self.broadcasters.values():
-            svc.update(now, self.position)
+            svc.update(time, self.position)
 
     def send_message(self, msg: str, dst_addr: str) -> None:
         pkt = DataPacket()

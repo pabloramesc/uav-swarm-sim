@@ -5,7 +5,7 @@ from multiagent_sim.network.sim_bridge import SimBridge, SimPacket
 import numpy as np
 
 # Run update_net_sim.sh at the beginning
-subprocess.run(["sh", "update_code.sh"], cwd="./network_sim", check=True)
+subprocess.run(["sh", "rewrite_ns3_code.sh"], cwd="./network_sim", check=True)
 
 # Launch the NS3 simulation
 print("Starting NS-3 simulation...")
@@ -15,7 +15,7 @@ ns3_process = subprocess.Popen(
 )
 time.sleep(5.0)
 
-bridge = SimBridge()
+bridge = SimBridge(loglevel="DEBUG")
 time.sleep(1.0)
 
 # Wait until NS-3 responds to heartbeat
@@ -26,7 +26,7 @@ while not bridge.is_ns3_running():
 print("NS-3 process is running.")
 
 # Query and print the current NS-3 simulation time
-sim_time = bridge.get_ns3_time()
+sim_time = bridge.request_sim_time()
 if sim_time is not None:
     print(f"Initial NS-3 simulation time: {sim_time:.6f} s")
 else:
@@ -49,14 +49,16 @@ time.sleep(1.0)
 
 # Get and print node positions
 print("Getting node positions...")
-positions = bridge.get_node_positions()
+positions = bridge.request_node_positions()
+print("Received node positions:")
 for node_id, node_pos in positions.items():
     print(f"- Node {node_id} position: {node_pos}")
 time.sleep(1.0)
 
 # Get and print node addresses
 print("Getting node addresses...")
-addresses = bridge.get_node_addresses()
+addresses = bridge.request_node_addresses()
+print("Received node addresses:")
 for node_id, ip_addr in addresses.items():
     print(f"- Node {node_id} has IP address {ip_addr}")
     
@@ -73,10 +75,10 @@ print("Reading egress packets...")
 egress_packets = bridge.read_egress_packets()
 print(f"Received {len(egress_packets)} egress packets:")
 for packet in egress_packets:
-    print(">>>", packet)
+    print("-", packet)
 
 # Final simulation time
-sim_time = bridge.get_ns3_time()
+sim_time = bridge.request_sim_time()
 if sim_time is not None:
     print(f"Final NS-3 simulation time: {sim_time:.6f} s")
 else:
@@ -84,7 +86,7 @@ else:
 
 # Stop NS-3 and clean up
 print("Stopping NS-3 simulation...")
-bridge.stop_ns3()
+bridge.stop_simulation()
 time.sleep(1.0)
 
 # Ensure the NS-3 process is terminated

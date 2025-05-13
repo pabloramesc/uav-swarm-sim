@@ -3,7 +3,7 @@ from multiagent_sim.network.network_simulator import NetworkSimulator, SimPacket
 import time
 import numpy as np
 
-net_sim = NetworkSimulator(num_gcs=0, num_uavs=2, num_users=0, verbose=True)
+net_sim = NetworkSimulator(num_gcs=0, num_drones=2, num_users=0, verbose=True)
 
 link0 = SwarmLink(
     agent_id=0,
@@ -33,7 +33,7 @@ while t < 60.0:
     link0.update(time=t, position=np.zeros(3))
     link1.update(time=t, position=np.random.rand(3))
     
-    for drone_id, pos in link0.drone_positions.items():
+    for drone_id, pos in link0.position_provider.neighbors.items():
         if pos.time > prev_pos_time:
             prev_pos_time = pos.time
             print(f"At {t:.2f}s, Drone {drone_id} position: {pos.position}, time: {pos.time}")

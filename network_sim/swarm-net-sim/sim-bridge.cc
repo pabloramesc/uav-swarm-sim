@@ -28,7 +28,7 @@ SimBridge::~SimBridge() {
     if (m_running) StopSimulation();
 }
 
-void SimBridge::PollSocket() {
+void SimBridge::ScheduleScoketPolling() {
     for (int i = 0; i < 100; i++) {
         int numBytes = m_ipcSocket.ReadSocket(m_buffer, sizeof(m_buffer));
 
@@ -46,12 +46,24 @@ void SimBridge::PollSocket() {
     }
 
     if (m_running) {
-        Simulator::Schedule(Seconds(m_pollingInterval), &SimBridge::PollSocket, this);
+        Simulator::Schedule(Seconds(m_pollingInterval), &SimBridge::ScheduleScoketPolling, this);
+    }
+}
+
+void SimBridge::ScheduleStatusReport() {
+    if (m_ipcSocket.is_remote) {
+        ReplySimTime();
+        ReplyAllPositions();
+    }
+
+    if (m_running) {
+        Simulator::Schedule(Seconds(1.0), &SimBridge::ScheduleStatusReport, this);
     }
 }
 
 void SimBridge::StartPolling() {
-    Simulator::ScheduleNow(&SimBridge::PollSocket, this);
+    Simulator::ScheduleNow(&SimBridge::ScheduleScoketPolling, this);
+    // Simulator::ScheduleNow(&SimBridge::ScheduleStatusReport, this);
     m_running = true;
 }
 

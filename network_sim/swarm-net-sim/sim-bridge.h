@@ -32,7 +32,7 @@ enum SimCommandCode {
 
 class SimBridge {
 public:
-    SimBridge(float pollingInterval = 0.1);
+    SimBridge(float pollingInterval = 0.01);
     ~SimBridge();
 
     void RegisterNode(int nodeId, Ptr<Node> node);
@@ -40,7 +40,8 @@ public:
     void StopSimulation();
 
 private:
-    void PollSocket();
+    void ScheduleScoketPolling();
+    void ScheduleStatusReport();
 
     void RxCallback(Ptr<Socket> socket);
 

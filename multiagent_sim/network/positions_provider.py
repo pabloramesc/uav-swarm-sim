@@ -8,7 +8,7 @@ from .swarm_packets import PositionPacket
 @dataclass
 class NeighborInfo:
     node: SimNode
-    last_seen: float
+    time: float
     position: np.ndarray
     valid: bool = True
 
@@ -33,7 +33,7 @@ class PositionsProvider:
             return
         node = self.network.get_node(source_id)
         info = NeighborInfo(
-            node=node, last_seen=now, position=packet.get_position(), valid=True
+            node=node, time=now, position=packet.get_position(), valid=True
         )
         self.neighbors[source_id] = info
 
@@ -42,7 +42,7 @@ class PositionsProvider:
         Invalidate any neighbor whose last update exceeds the timeout.
         """
         for info in self.neighbors.values():
-            if info.valid and now - info.last_seen > self.timeout:
+            if info.valid and now - info.time > self.timeout:
                 info.valid = False
 
     def get_positions(self, node_type: NodeType = None) -> dict[int, np.ndarray]:

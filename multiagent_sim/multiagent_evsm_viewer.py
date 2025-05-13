@@ -48,6 +48,8 @@ class MultiAgentViewerEVSM:
 
         self.t0: float = None
         self.last_render_time: float = None
+        
+        self.background_image: AxesImage = None
 
         self.fig = plt.figure(figsize=fig_size)
         self.ax = self.fig.add_subplot()
@@ -79,9 +81,9 @@ class MultiAgentViewerEVSM:
             self._plot_elevation_map()
 
         self._initiate_plots()
+        self._update_agent_points()
+        self._plot_rssi_heatmap()
         self._configure_axis()
-        
-        self.background_image: AxesImage = None
 
         self.fig.canvas.draw_idle()
         self.fig.canvas.flush_events()
@@ -120,7 +122,7 @@ class MultiAgentViewerEVSM:
         # plt.pause(0.1)
 
         if verbose:
-            self._print_fps()
+            self._print_sim_status()
 
         self.last_render_time = self.time
 
@@ -278,8 +280,11 @@ class MultiAgentViewerEVSM:
         self.t0 = time.time()
         self.last_render_time = 0.0
 
-    def _print_fps(self) -> None:
+    def _print_sim_status(self) -> None:
         fps = 1.0 / self.time_since_render if self.time_since_render > 0.0 else 0.0
+        ns3_time = self.sim.network_simulator.ns3_time
+        ns3_rtt = self.sim.network_simulator.bridge.mean_rtt * 1e3
         print(
-            f"real time: {self.time:.2f} s, sim time: {self.sim.sim_time:.2f} s, FPS: {fps:.2f}"
+            f"real time: {self.time:.2f} s, sim time: {self.sim.sim_time:.2f} s, "
+            f"NS-3 time: {ns3_time:.2f} s, NS-3 RTT: {ns3_rtt:.3} ms, FPS: {fps:.2f}"
         )

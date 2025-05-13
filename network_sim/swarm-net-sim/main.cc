@@ -75,6 +75,12 @@ int main(int argc, char *argv[]) {
     mobility.Install(allNodes);
 
     // --- AODV routing configuration ---
+    // Config::SetDefault("ns3::aodv::RoutingProtocol::HelloInterval", TimeValue(Seconds(2)));
+    // Config::SetDefault("ns3::aodv::RoutingProtocol::ActiveRouteTimeout", TimeValue(Seconds(20)));
+    // Config::SetDefault("ns3::aodv::RoutingProtocol::RequestRateLimit", UintegerValue(3));
+    // Config::SetDefault("ns3::aodv::RoutingProtocol::ErrorRateLimit", UintegerValue(1));
+    // Config::SetDefault("ns3::aodv::RoutingProtocol::EnableHello", BooleanValue(true));
+
     AodvHelper aodv;
     Ipv4ListRoutingHelper list;
     list.Add(aodv, 100);

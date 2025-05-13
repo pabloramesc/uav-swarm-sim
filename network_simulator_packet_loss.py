@@ -40,7 +40,7 @@ user0 = net_sim.get_node_from_name("user0")
 user1 = net_sim.get_node_from_name("user1")
 
 t0 = time.time()
-net_sim._update_ns3_init_time()
+net_sim.check_sync()
 next_tx_time = 0.0
 packet_count = 0
 received_ids = set()
@@ -91,8 +91,8 @@ print(f"Total packets sent:     {packet_count}")
 print(f"Total packets received: {len(received_ids)}")
 print(f"Total packets lost:     {lost_packets}")
 
-print(f"Simulation time: {t_sim:.2f} s")
-net_sim._update_ns3_last_time()
+net_sim.check_sync()
+print(f"Real elapsed time: {net_sim.real_elapsed_time:.2f} s")
 print(f"NS-3 elapsed time: {net_sim.elapsed_time:.2f} s")
 
 net_sim.shutdown_simulator()

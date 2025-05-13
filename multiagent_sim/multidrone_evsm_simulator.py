@@ -29,6 +29,8 @@ class MultiDroneEVSMSimulator:
     and swarm behavior using position controllers.
     """
 
+    SYNC_TOLERANCE = 0.1
+
     def __init__(
         self,
         num_drones: int,
@@ -151,20 +153,39 @@ class MultiDroneEVSMSimulator:
         self.sim_step += 1
 
         if self.network_simulator is not None:
-            self.network_simulator.update()
+            drone_positions = None
+            if self.sim_step % 10 == 0:
+                drone_states = np.array(
+                    [drone.state for drone in self.agents_manager.drones.get_all()]
+                )
+                drone_positions = drone_states[:, 0:3]
+            check = self.sim_step % 100 == 0
+            self.network_simulator.update(drone_positions, check)
 
         self.agents_manager.update_agents(dt=dt)
 
         self._update_links_matrix()
         self._update_edge_drones_mask()
+        
+        self._sync_to_real_time()
 
-    def sync_to_real_time(self) -> None:
+    def _sync_to_real_time(self) -> None:
         """
         Synchronizes the simulation time with real time, ensuring that the simulation
         does not run faster than real time.
         """
-        if self.sim_time - self.real_time > self.dt:
-            time.sleep(self.sim_time - self.real_time - self.dt)
+        real_delta = self.sim_time - self.real_time
+        if real_delta > self.SYNC_TOLERANCE:
+            time.sleep(real_delta)
+
+        while True:
+            ns3_delta = self.sim_time - self.network_simulator.ns3_time
+            if ns3_delta < self.SYNC_TOLERANCE:
+                break
+            try:
+                self.network_simulator.bridge.request_sim_time(timeout=ns3_delta)
+            except TimeoutError:
+                self.network_simulator.fetch_packets()
 
     def area_coverage_ratio(
         self,

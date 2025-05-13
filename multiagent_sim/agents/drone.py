@@ -55,8 +55,8 @@ class Drone(Agent):
             self.swarm_link = SwarmLink(
                 agent_id=self.agent_id,
                 network_sim=network_sim,
-                local_bcast_interval=0.1,
-                global_bcast_interval=1.0,
+                local_bcast_interval=0.2,
+                global_bcast_interval=2.0,
             )
 
         self.drone_positions: dict[int, np.ndarray] = None

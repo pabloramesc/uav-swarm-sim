@@ -23,6 +23,8 @@ from .mobility.utils import grid_positions, environment_random_positions
 
 
 class MultiAgentEVSMSimulator:
+    
+    SYNC_TOLERANCE = 0.1
 
     def __init__(
         self,
@@ -126,10 +128,14 @@ class MultiAgentEVSMSimulator:
         self.sim_step += 1
 
         if self.network_simulator is not None:
-            agent_states = np.array(
-                [agent.state for agent in self.agents_manager.agents]
-            )
-            self.network_simulator.update(agent_states[:, 0:3])
+            agent_positions = None
+            if self.sim_step % 10 == 0:
+                agent_states = np.array(
+                    [agent.state for agent in self.agents_manager.agents]
+                )
+                agent_positions = agent_states[:, 0:3]
+            check = self.sim_step % 100 == 0
+            self.network_simulator.update(agent_positions, check)
 
         self.agents_manager.update_agents(dt=dt)
 
@@ -143,6 +149,26 @@ class MultiAgentEVSMSimulator:
         """
         if self.sim_time - self.real_time > self.dt:
             time.sleep(self.sim_time - self.real_time - self.dt)
+        
+        self._sync_to_real_time()
+
+    def _sync_to_real_time(self) -> None:
+        """
+        Synchronizes the simulation time with real time, ensuring that the simulation
+        does not run faster than real time.
+        """
+        real_delta = self.sim_time - self.real_time
+        if real_delta > self.SYNC_TOLERANCE:
+            time.sleep(real_delta)
+
+        while True:
+            ns3_delta = self.sim_time - self.network_simulator.ns3_time
+            if ns3_delta < self.SYNC_TOLERANCE:
+                break
+            try:
+                self.network_simulator.bridge.request_sim_time(timeout=ns3_delta)
+            except TimeoutError:
+                self.network_simulator.fetch_packets()
 
     def area_coverage_ratio(
         self,

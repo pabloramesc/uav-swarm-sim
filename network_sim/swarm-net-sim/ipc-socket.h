@@ -14,6 +14,8 @@ public:
     void SendToRemote(const uint8_t *data, size_t size);
     void Close();
 
+    bool is_remote;
+
 private:
     void SetupSocket();
 
