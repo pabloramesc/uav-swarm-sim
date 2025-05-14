@@ -2,6 +2,13 @@ import numpy as np
 from numba import njit
 
 
+def rssi_to_signal_quality(
+    rssi: np.ndarray, vmin: float = -90.0, vmax: float = -30.0
+) -> np.ndarray:
+    quality = (rssi - vmin) / (vmax - vmin)
+    return np.clip(quality, 0.0, 1.0)
+
+
 def signal_strength(
     tx_positions: np.ndarray,
     rx_positions: np.ndarray,
@@ -39,10 +46,10 @@ def signal_strength(
     """
     if tx_positions.shape[0] == 0:
         return np.zeros(rx_positions.shape[0])
-    
+
     tx_positions = np.atleast_2d(tx_positions)
     rx_positions = np.atleast_2d(rx_positions)
-    
+
     rx_power = _signal_strength_numba(tx_positions, rx_positions, f, n, tx_power)
 
     if mode == "total":

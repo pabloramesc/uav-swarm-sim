@@ -102,7 +102,7 @@ class NetworkSimulator:
             try:
                 self.verify_node_positions(timeout=0.1)
             except Exception as err:
-                self.logger.warning(f"⚠️  Erro verifying positions: {err}")
+                self.logger.warning(f"⚠️  Error verifying positions: {err}")
 
     def launch_simulator(self, max_attempts: int = 1) -> None:
         attempt = 1
@@ -160,9 +160,10 @@ class NetworkSimulator:
         positions = self.bridge.request_node_positions(timeout)
         for node_id, ns3_pos in positions.items():
             local_pos = self.nodes[node_id].position
-            if not np.allclose(local_pos, ns3_pos):
+            if not np.allclose(local_pos, ns3_pos, atol=1.0):
+                error = np.linalg.norm(local_pos - ns3_pos)
                 raise Exception(
-                    f"Node {node_id} local position ({local_pos}) does not match NS-3 position ({ns3_pos})"
+                    f"Node {node_id} local position does not match NS-3 position. Error: {error:.2f} m"
                 )
 
     def send_packet(self, packet: SimPacket) -> None:

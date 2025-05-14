@@ -5,12 +5,12 @@ import numpy as np
 from .agents.drone import Drone
 from .environment import Environment
 from .math.path_loss_model import signal_strength
-from .position_control.sdqn_position_control import SDQNConfig, SDQNPostionController
+from .mobility.sdqn_position_controller import SDQNConfig, SDQNPostionController
 from .sdqn.central_agent import CentralAgent
 from .sdqn.reward_manager import RewardManager
 
 
-class MultidroneGymSDQN:
+class MultidroneSDQNGym:
     def __init__(
         self,
         num_drones: int,

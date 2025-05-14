@@ -5,33 +5,44 @@ This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
 
-from multiagent_sim.multiagent_evsm_viewer import MultiAgentViewerEVSM
-from multiagent_sim.multiagent_evsm_simulator import MultiAgentEVSMSimulator
+import numpy as np
+
 from multiagent_sim.mobility.evsm_position_controller import EVSMPositionConfig
+from multiagent_sim.multiagent_simulator import MultiAgentSimulator
+from multiagent_sim.multiagent_viewer import MultiAgentViewer
 
 dt = 0.01
 num_drones = 25
 num_users = 10
+size = 500.0
 
 evsm_config = EVSMPositionConfig(
-    separation_distance=100.0,
+    separation_distance=250.0,
     obstacle_distance=10.0,
     max_acceleration=10.0,
-    target_speed=15.0,
+    target_speed=10.0,
     target_altitude=10.0,
     initial_natural_length=5.0,
     natural_length_rate=2.0,
 )
-sim = MultiAgentEVSMSimulator(
+sim = MultiAgentSimulator(
     num_drones, num_users, dt, evsm_config=evsm_config, neihgbor_provider="network"
 )
-sim.environment.set_rectangular_boundary([-200.0, -200.0], [+200.0, +200.0])
-sim.environment.add_circular_obstacle([50.0, 50.0], 25.0)
-sim.environment.add_rectangular_obstacle([-125.0, 0.0], [-100.0, +100.0])
-sim.environment.add_rectangular_obstacle([50.0, -100.0], [100.0, -50.0])
-sim.initialize(home=[-100.0, -100.0, 0.0])
+sim.environment.set_rectangular_boundary([-size, -size], [+size, +size])
+for _ in range(5):
+    center = np.random.uniform(-size, +size, size=(2,))
+    radius = np.random.uniform(5.0, 50.0)
+    sim.environment.add_circular_obstacle(center, radius)
 
-gui = MultiAgentViewerEVSM(sim)
+for _ in range(5):
+    bottom_left = np.random.uniform(-size, +size, size=(2,))
+    width_height = np.random.uniform(10.0, 100.0, size=(2,))
+    top_right = bottom_left + width_height
+    sim.environment.add_rectangular_obstacle(bottom_left, top_right)
+
+sim.initialize(home=[0.0, 0.0, 0.0])
+
+gui = MultiAgentViewer(sim)
 
 while True:
     sim.update()

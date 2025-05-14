@@ -22,7 +22,7 @@ from .network import NetworkSimulator
 from .utils.logger import create_logger
 
 
-class MultiAgentEVSMSimulator:
+class MultiAgentSimulator:
 
     SYNC_TOLERANCE = 0.1
 

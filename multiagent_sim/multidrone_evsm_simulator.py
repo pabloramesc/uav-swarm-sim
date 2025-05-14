@@ -64,7 +64,7 @@ class MultiDroneEVSMSimulator:
             self.network_simulator = None
 
         agents_config = AgentsConfig(
-            num_drones=num_drones, drones_neighbor_provider=neihgbor_provider
+            num_drones=num_drones, neighbor_provider=neihgbor_provider
         )
         self.agents_manager = AgentsManager(
             agents_config=agents_config,

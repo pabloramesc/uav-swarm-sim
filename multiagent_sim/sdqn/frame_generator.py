@@ -17,7 +17,6 @@ from .utils import (
     VisitedCells,
     distances_to_obstacles,
     gaussian_decay,
-    rssi_to_signal_quality,
 )
 
 

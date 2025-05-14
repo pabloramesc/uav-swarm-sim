@@ -1,4 +1,5 @@
 #include "ns3/aodv-module.h"
+#include "ns3/olsr-module.h"
 #include "ns3/core-module.h"
 #include "ns3/internet-module.h"
 #include "ns3/mobility-module.h"
@@ -74,19 +75,26 @@ int main(int argc, char *argv[]) {
     mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
     mobility.Install(allNodes);
 
-    // --- AODV routing configuration ---
+    // --- Ad-hoc routing configuration ---
     // Config::SetDefault("ns3::aodv::RoutingProtocol::HelloInterval", TimeValue(Seconds(2)));
     // Config::SetDefault("ns3::aodv::RoutingProtocol::ActiveRouteTimeout", TimeValue(Seconds(20)));
     // Config::SetDefault("ns3::aodv::RoutingProtocol::RequestRateLimit", UintegerValue(3));
     // Config::SetDefault("ns3::aodv::RoutingProtocol::ErrorRateLimit", UintegerValue(1));
     // Config::SetDefault("ns3::aodv::RoutingProtocol::EnableHello", BooleanValue(true));
 
-    AodvHelper aodv;
     Ipv4ListRoutingHelper list;
-    list.Add(aodv, 100);
-    InternetStackHelper stack;
-    stack.SetRoutingHelper(aodv);
-    stack.Install(allNodes);
+    // AodvHelper aodv;
+    // list.Add(aodv, 100);
+    OlsrHelper olsr;
+    list.Add(olsr, 100);
+    
+    InternetStackHelper uavStack;
+    uavStack.SetRoutingHelper(list);
+    uavStack.Install(uavNodes);
+
+    InternetStackHelper defaultStack;
+    defaultStack.Install(gcsNodes);
+    defaultStack.Install(userNodes);
 
     // --- IP address assignment ---
     Ipv4AddressHelper ipv4;

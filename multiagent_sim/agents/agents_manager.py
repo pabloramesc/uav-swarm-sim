@@ -12,7 +12,7 @@ from ..mobility.evsm_position_controller import (
     EVSMPositionConfig,
     EVSMPositionController,
 )
-from ..mobility.sdqn_swarming import SDQNPositionConfig, SDQNPositionController
+from ..mobility.sdqn_position_controller import SDQNPositionConfig, SDQNPositionController
 from ..network.network_simulator import NetworkSimulator
 from ..network.swarm_link import SwarmLink
 from .agent import Agent, AgentType
@@ -27,8 +27,8 @@ class AgentsConfig:
     num_gcs: int = 0
     num_drones: int = 0
     num_users: int = 0
-    drones_swarming_type: SwarmingType = "evsm"
-    drones_neighbor_provider: NeighborProvider = "registry"
+    swarming_type: SwarmingType = "evsm"
+    neighbor_provider: NeighborProvider = "registry"
 
 
 class AgentsManager:
@@ -107,7 +107,7 @@ class AgentsManager:
 
     def _create_drone(self, agent_id: int) -> Drone:
         controller: SwarmPositionController = None
-        if self.agents_config.drones_swarming_type == "evsm":
+        if self.agents_config.swarming_type == "evsm":
             config = (
                 self.swarming_config
                 if self.swarming_config is not None
@@ -116,7 +116,7 @@ class AgentsManager:
             controller = EVSMPositionController(
                 config=config, environment=self.environment
             )
-        elif self.agents_config.drones_swarming_type == "sdqn":
+        elif self.agents_config.swarming_type == "sdqn":
             config = (
                 self.swarming_config
                 if self.swarming_config is not None
@@ -125,7 +125,7 @@ class AgentsManager:
             controller = SDQNPositionController(config=config, env=self.environment)
         else:
             raise ValueError(
-                f"Invalid swarming controller type: {self.agents_config.drones_swarming_type}"
+                f"Invalid swarming controller type: {self.agents_config.swarming_type}"
             )
 
         drone = Drone(
@@ -135,7 +135,7 @@ class AgentsManager:
             network_sim=self.network_simulator,
             drones_registry=self.drones,
             users_registry=self.users,
-            neighbor_provider=self.agents_config.drones_neighbor_provider,
+            neighbor_provider=self.agents_config.neighbor_provider,
         )
 
         return drone
