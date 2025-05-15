@@ -1,8 +1,8 @@
 import numpy as np
 
-from simulator.environment import Environment
-from simulator.math.distances import pairwise_self_distances
-from simulator.math.path_loss_model import signal_strength
+from ..environment import Environment
+from ..math.distances import pairwise_self_distances
+from ..math.path_loss_model import signal_strength
 
 from .utils import (
     gaussian_decay,

@@ -50,5 +50,3 @@ while True:
 
     # cr = sim.area_coverage_ratio()
     # print(f"Area coverage ratio: {cr * 100:.2f} %")
-
-    sim.sync_to_real_time()

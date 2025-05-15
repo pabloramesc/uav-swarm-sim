@@ -16,12 +16,12 @@ from numpy.typing import ArrayLike
 
 from simulator.multidrone_gym_sdqn import MultidroneGymSDQN
 
-from ..math.path_loss_model import signal_strength, signal_strength_map
+from .math.path_loss_model import signal_strength, signal_strength_map
 
 AspectRatios = Literal["auto", "equal"]
 
 
-class MultiDroneViewerSDQN:
+class MultiAgentSDQNViewer:
     """
     A viewer for visualizing the MultiDroneSimulator in a 2D environment.
 

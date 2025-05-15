@@ -19,6 +19,24 @@ def distances_to_obstacles(env: Environment, pos: np.ndarray) -> np.ndarray:
     return np.min(distances, axis=0)
 
 
+def obstacles_binary_map(env: Environment, cell_positions: np.ndarray) -> np.ndarray:
+    if cell_positions.ndim != 3 or cell_positions.shape[2] != 2:
+        raise ValueError("Cell positions must be a numpy array of shape (N, M, 2)")
+    frame_shape = cell_positions.shape[0:2]
+    matrix = np.zeros(frame_shape)
+    flat_cell_positions = cell_positions.reshape(-1, 2)
+
+    if env.boundary is not None:
+        is_inside = env.boundary.is_inside(flat_cell_positions)
+        matrix += ~is_inside.reshape(frame_shape)
+
+    for obs in env.obstacles:
+        is_inside = obs.is_inside(flat_cell_positions)
+        matrix += is_inside.reshape(frame_shape)
+
+    return np.clip(matrix, 0.0, 1.0)
+
+
 class VisitedCells:
 
     def __init__(self, cell_size: float = 1.0):

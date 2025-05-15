@@ -122,7 +122,7 @@ class AgentsManager:
                 if self.swarming_config is not None
                 else SDQNPositionConfig()
             )
-            controller = SDQNPositionController(config=config, env=self.environment)
+            controller = SDQNPositionController(config=config, environment=self.environment)
         else:
             raise ValueError(
                 f"Invalid swarming controller type: {self.agents_config.swarming_type}"

@@ -6,9 +6,9 @@ https://opensource.org/licenses/MIT
 """
 
 import numpy as np
-from simulator.gui.multidrone_viewer_sdqn_gym import MultiDroneViewerSDQN
-from simulator.multidrone_gym_sdqn import MultidroneGymSDQN
-from simulator.position_control.sdqn_position_control import SDQNConfig
+from multiagent_sim.multiagent_sdqn_viewer import MultiAgentSDQNViewer
+from multiagent_sim.multiagent_sdqn_gym import MultiAgentSDQNGym
+from multiagent_sim.mobility.sdqn_position_controller import SDQNPositionConfig
 
 dt = 0.1
 num_drones = 16
@@ -16,10 +16,8 @@ num_drones = 16
 xy_min = (-200.0, -200.0)
 xy_max = (+200.0, +200.0)
 
-config = SDQNConfig(
-    num_cells=64, num_actions=9, visible_distance=100.0, target_height=0.0
-)
-sim = MultidroneGymSDQN(
+config = SDQNPositionConfig(num_cells=100, frame_radius=500.0, target_height=10.0)
+sim = MultiAgentSDQNGym(
     num_drones, dt, config, model_path="sdqn-model-04.keras", train=False
 )
 sim.environment.set_rectangular_boundary(xy_min, xy_max)
@@ -37,7 +35,7 @@ for _ in range(0):
 
 sim.initialize()
 
-gui = MultiDroneViewerSDQN(sim)
+gui = MultiAgentSDQNViewer(sim)
 
 
 while True:

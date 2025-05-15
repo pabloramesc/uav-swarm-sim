@@ -54,6 +54,7 @@ class EVSMPositionController(SwarmPositionController):
         environment: Environment,
     ):
         super().__init__(config, environment)
+        self.update_period = 0.1
 
         # Natural length parameters
         self._initial_nat_length = config.initial_natural_length
@@ -80,7 +81,7 @@ class EVSMPositionController(SwarmPositionController):
         )
 
         # Neighbor positions cache
-        self._neighbor_drone_positions: dict[int, np.ndarray] = {}
+        self._drone_positions: dict[int, np.ndarray] = {}
 
     def initialize(
         self,
@@ -91,7 +92,7 @@ class EVSMPositionController(SwarmPositionController):
         super().initialize(time, state)
         if drone_positions is None:
             raise ValueError("`drone_positions` is required for initialization")
-        self._neighbor_drone_positions = drone_positions.copy()
+        self._drone_positions = drone_positions.copy()
 
     def update(
         self,
@@ -106,15 +107,15 @@ class EVSMPositionController(SwarmPositionController):
 
         # Check for changes in neighbor topology
         force_update = False
-        if drone_positions.keys() != self._neighbor_drone_positions.keys():
+        if drone_positions.keys() != self._drone_positions.keys():
             force_update = True
 
-        self._neighbor_drone_positions = drone_positions.copy()
+        self._drone_positions = drone_positions.copy()
 
         # Prepare neighbor array for EVSM
         neighbors_array = (
-            np.array(list(self._neighbor_drone_positions.values()))[:, 0:2]
-            if self._neighbor_drone_positions
+            np.array(list(self._drone_positions.values()))[:, 0:2]
+            if self._drone_positions
             else np.zeros((0, 2))
         )
 
@@ -164,3 +165,9 @@ class EVSMPositionController(SwarmPositionController):
         Update altitude controller setpoint.
         """
         self._target_altitude = altitude
+
+    def _needs_update(self, time: float) -> bool:
+        if time is None or self.last_update_time is None:
+            return True
+        elapsed_time = time - self.last_update_time
+        return elapsed_time > self.update_period

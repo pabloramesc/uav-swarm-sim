@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from ..environment import Environment
-from ..sdqn.frame_generator import FrameGenerator
+from ..sdqn.local_agent import LocalAgent
 from .altitude_controller import AltitudeController
 from .swarm_position_controller import SwarmPositionController, SwarmPositionConfig
 from .position_controller import PositionController
@@ -19,8 +19,7 @@ from .position_controller import PositionController
 @dataclass
 class SDQNPositionConfig(SwarmPositionConfig):
     num_cells: int = 64
-    num_actions: int = 9
-    visible_distance: float = 100.0  # in meters
+    frame_radius: float = 100.0  # in meters
     obstacle_distance: float = 10.0  # in meters
     agent_mass: float = 1.0  # simple equivalence between force and acceleration
     max_acceleration: float = 10.0  # 1 g aprox. 9.81 m/s^2
@@ -29,56 +28,88 @@ class SDQNPositionConfig(SwarmPositionConfig):
 
 
 class SDQNPositionController(SwarmPositionController):
-    def __init__(self, config: SDQNPositionConfig, env: Environment) -> None:
-        super().__init__(config, env)
-        self.config = config
+    def __init__(
+        self,
+        config: SDQNPositionConfig,
+        environment: Environment,
+        local_agent: LocalAgent,
+    ) -> None:
+        super().__init__(config, environment)
         self.update_period = 0.1
 
-        cell_size = 2 * config.visible_distance / config.num_cells
+        self.local_agent = local_agent
 
-        self.dqns = FrameGenerator(
-            env=self.env,
-            sense_radius=config.visible_distance,
-            num_cells=config.num_cells,
-            num_actions=config.num_actions,
-        )
+        self.cell_size = 2 * config.frame_radius / config.num_cells
+
         self.altitude_hold = AltitudeController(
-            kp=config.max_acceleration / cell_size,
+            kp=config.max_acceleration / self.cell_size,
             kd=config.max_acceleration / config.target_velocity,
         )
         self.position_controller = PositionController(
-            kp=config.max_acceleration / cell_size,
+            kp=config.max_acceleration / self.cell_size,
             kd=config.max_acceleration / config.target_velocity,
         )
 
         self.last_update_time: float = None
         self.target_position = np.zeros(2)  # px, py
 
+        # Neighbor positions cache
+        self._drone_positions: dict[int, np.ndarray] = {}
+        self._user_positions: dict[int, np.ndarray] = {}
+
     def initialize(
         self,
+        time: float,
         state: np.ndarray,
-        neighbor_positions: np.ndarray,
-        time: float = None,
+        drone_positions: dict[int, np.ndarray] = None,
+        user_positions: dict[int, np.ndarray] = None,
     ) -> None:
-        super().initialize(state, neighbor_positions, time=time)
-        self.dqns.reset(self.state[0:2], self.neighbor_positions[:, 0:2], time)
+        super().initialize(time, state)
+        if drone_positions is None:
+            raise ValueError("`drone_positions` is required for initialization")
+        if user_positions is None:
+            raise ValueError("`user_positions` is required for initialization")
+
+        self._drone_positions = drone_positions.copy()
+        self._user_positions = user_positions.copy()
+
         self.last_update_time: float = None
         self.target_position = state[0:2]  # px, py
 
     def update(
         self,
+        time: float,
         state: np.ndarray,
-        neighbor_positions: np.ndarray,
-        user_positions: np.ndarray = None,
-        time: float = None,
+        drone_positions: dict[int, np.ndarray] = None,
+        user_positions: dict[int, np.ndarray] = None,
     ) -> np.ndarray:
         """
         Updates the DQNS controller's state and computes the control output.
         """
-        super().update(state, neighbor_positions, user_positions, time)
+        super().update(time, state)
+
+        if drone_positions is not None:
+            self._drone_positions = drone_positions.copy()
+
+        if user_positions is not None:
+            self._user_positions = user_positions.copy()
 
         if self._needs_update(time):
-            self.dqns.update(state[0:2], neighbor_positions[:, 0:2], time)
+            drones_array = (
+                np.array(list(self._drone_positions.values()))[:, 0:2]
+                if self._drone_positions
+                else np.zeros((0, 2))
+            )
+            users_array = (
+                np.array(list(self._user_positions.values()))[:, 0:2]
+                if self._user_positions
+                else np.zeros((0, 2))
+            )
+            self.local_agent.update(
+                position=state[0:2], drones=drones_array, users=users_array
+            )
+
+        self.target_position = self.cell_size * self.local_agent.displacement
 
         control = np.zeros(3)
 
@@ -100,12 +131,8 @@ class SDQNPositionController(SwarmPositionController):
     def get_frame(self) -> np.ndarray:
         return self.dqns.compute_state_frame()
 
-    def set_target_position(self, action: int) -> None:
-        self.target_position = self.dqns.calculate_target_position(action)
-
     def _needs_update(self, time: float) -> bool:
-        # if time is None or self.last_update_time is None:
-        #     return True
-        # elapsed_time = time - self.last_update_time
-        # return elapsed_time > self.update_period
-        return True
+        if time is None or self.last_update_time is None:
+            return True
+        elapsed_time = time - self.last_update_time
+        return elapsed_time > self.update_period

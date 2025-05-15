@@ -143,16 +143,8 @@ class MultiAgentEVSMSimulator:
         self._update_links_matrix()
         self._update_edge_drones_mask()
 
-    def sync_to_real_time(self) -> None:
-        """
-        Synchronizes the simulation time with real time, ensuring that the simulation
-        does not run faster than real time.
-        """
-        if self.sim_time - self.real_time > self.dt:
-            time.sleep(self.sim_time - self.real_time - self.dt)
-
         self._sync_to_real_time()
-
+        
     def _sync_to_real_time(self) -> None:
         """
         Synchronizes the simulation time with real time, ensuring that the simulation

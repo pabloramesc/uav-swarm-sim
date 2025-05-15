@@ -6,12 +6,12 @@ https://opensource.org/licenses/MIT
 """
 
 from typing import Literal
-
+from abc import ABC, abstractmethod
 import numpy as np
 
 from ..environment import Environment
 from ..math.distances import distances_from_point, pairwise_cross_distances
-from ..math.path_loss_model import signal_strength
+from ..math.path_loss_model import signal_strength, rssi_to_signal_quality
 
 from .utils import (
     VisitedCells,
@@ -20,7 +20,152 @@ from .utils import (
 )
 
 
-class FrameGenerator:
+class FrameGenerator(ABC):
+    def __init__(
+        self, env: Environment, num_channels: int, channel_shape: tuple[int, int]
+    ):
+        self.env = env
+        self.num_channels = num_channels
+        self.channel_shape = channel_shape
+        self.frame_shape = (*channel_shape, num_channels)
+        self.channel_names = [f"ch{i}" for i in range(num_channels)]
+
+        self.position = np.zeros(2)
+        self.drones = np.zeros((0, 2))
+        self.users = np.zeros((0, 2))
+
+    def update(
+        self, position: np.ndarray, drones: np.ndarray, users: np.ndarray
+    ) -> None:
+        self.position = position
+        self.drones = drones
+        self.users = users
+
+    @abstractmethod
+    def generate_frame(self) -> np.ndarray:
+        pass
+
+
+class SimpleFrameGenerator(FrameGenerator):
+    def __init__(
+        self,
+        env: Environment,
+        num_cells: int = 64,
+        frame_radius: float = 100.0,
+        collision_distance: float = 10.0,
+    ):
+        super().__init__(env, num_channels=3, channel_shape=(num_cells, num_cells))
+        self.num_cells = num_cells
+        self.frame_radius = frame_radius
+        self.collision_distance = collision_distance
+
+        self.cell_resolution = 2 * frame_radius / num_cells
+        self.channel_names = ["Collision risk", "Drones signal", "Users coverage"]
+
+        self.cell_positions = np.zeros((*self.channel_shape, 2))
+
+    def update(
+        self, position: np.ndarray, drones: np.ndarray, users: np.ndarray
+    ) -> None:
+        super().update(position, drones, users)
+        self._update_cells_positions()
+
+    def set_frame_radius(self, frame_radius: float) -> None:
+        if frame_radius < 0.0:
+            raise ValueError("Frame radius must be positive")
+        self.frame_radius = frame_radius
+        self._update_cells_positions()
+
+    def generate_frame(self) -> np.ndarray:
+        collision_risk = self.collision_risk_heatmap()
+        drones_signal = self.drones_signal_heatmap()
+        users_coverage = self.users_coverage_heatmap()
+
+        frame = np.zeros(self.frame_shape)
+        frame[..., 0] = self.set_center_cells(collision_risk, value=1.0)
+        frame[..., 1] = self.set_center_cells(drones_signal, value=1.0)
+        frame[..., 2] = self.set_center_cells(users_coverage, value=1.0)
+        return (frame * 255.0).astype(np.uint8)
+
+    def set_center_cells(self, matrix: np.ndarray, value: float = 1.0) -> np.ndarray:
+        center = self.num_cells // 2
+        if self.num_cells % 2 == 0:  # Even-sized matrix
+            matrix[center - 1 : center + 1, center - 1 : center + 1] = value
+        else:  # Odd-sized matrix
+            matrix[center - 1 : center + 2, center - 1 : center + 2] = value
+        return matrix
+
+    def _update_cells_positions(self) -> None:
+        dx = np.linspace(-self.frame_radius, +self.frame_radius, self.num_cells)
+        dy = np.linspace(-self.frame_radius, +self.frame_radius, self.num_cells)
+        xs = dx + self.position[0]
+        ys = dy + self.position[1]
+        x_grid, y_grid = np.meshgrid(xs, ys)
+        self.cell_positions = np.stack((x_grid, y_grid), axis=-1)
+
+    def poisitions_to_cell_indices(self, positions: np.ndarray) -> np.ndarray:
+        indices = ((positions - self.cell_positions[0, 0]) // self.cell_size).astype(
+            np.int32
+        )
+        # Filter out indices that are outside the frame
+        valid_mask = (
+            (indices[:, 0] >= 0)
+            & (indices[:, 0] < self.num_cells)
+            & (indices[:, 1] >= 0)
+            & (indices[:, 1] < self.num_cells)
+        )
+        return indices[valid_mask]
+
+    def positions_binary_map(self, positions: np.ndarray) -> np.ndarray:
+        indices = self.poisitions_to_cell_indices(positions)
+        matrix = np.zeros((self.num_cells, self.num_cells))
+        matrix[indices[:, 1], indices[:, 0]] = 1.0
+        return matrix
+
+    def obstacles_repulsion_heatmap(self) -> np.ndarray:
+        flat_cell_positions = self.cell_positions.reshape(-1, 2)
+        obstacles_distances = distances_to_obstacles(self.env, flat_cell_positions)
+        heatmap = obstacles_distances.reshape(self.channel_shape)
+        return gaussian_decay(heatmap, sigma=10.0)
+
+    def drones_repulsion_heatmap(self) -> np.ndarray:
+        if self.visible_neighbors.shape[0] == 0:
+            return np.zeros((self.num_cells, self.num_cells))
+        flat_cell_positions = self.cell_positions.reshape(-1, 2)
+        neighbor_distances = pairwise_cross_distances(self.drones, flat_cell_positions)
+        nearest_distances = np.min(neighbor_distances, axis=0)
+        heatmap = nearest_distances.reshape(self.channel_shape)
+        return gaussian_decay(heatmap, sigma=50.0)
+
+    def collision_risk_heatmap(self) -> np.ndarray:
+        obstacles_heatmap = self.obstacles_repulsion_heatmap()
+        drones_heatmap = self.drones_repulsion_heatmap()
+        collision_heatmap = np.maximum(obstacles_heatmap, drones_heatmap)
+        return np.clip(collision_heatmap, 0.0, 1.0)
+
+    def drones_signal_heatmap(self) -> np.ndarray:
+        if self.drones.shape[0] == 0:
+            return np.zeros(self.channel_shape)
+
+        flat_cell_positions = self.cell_positions.reshape(-1, 2)
+        rssi = signal_strength(
+            self.drones, flat_cell_positions, f=2412, n=2.4, tx_power=20, mode="max"
+        )
+        quality = rssi_to_signal_quality(rssi)
+        drones = self.positions_binary_map(self.drones)
+        return np.clip(quality + drones, 0.0, 1.0)
+
+    def users_coverage_heatmap(self) -> np.ndarray:
+        flat_cell_positions = self.cell_positions.reshape(-1, 2)
+        rssi = signal_strength(
+            self.position, flat_cell_positions, f=2412, n=2.4, tx_power=20, mode="max"
+        )
+        quality = rssi_to_signal_quality(rssi)
+        users = self.positions_binary_map(self.users)
+        return np.clip(quality + users, 0.0, 1.0)
+
+
+class _FrameGenerator:
     """
     SDQN (Swarm Deep Q-Network)
     """
@@ -30,7 +175,6 @@ class FrameGenerator:
         env: Environment,
         sense_radius: float = 100.0,
         num_cells: int = 100,
-        num_actions: int = 9,
     ) -> None:
         """
         Initialize the DQNS class.
@@ -43,14 +187,11 @@ class FrameGenerator:
             The sensing radius of the drone (default is 100.0).
         num_cells : int, optional
             The number of cells in the sensing grid (default is 100).
-        num_actions : int, optional
-            The number of possible actions (default is 9).
         """
         self.env = env
 
         self.sense_radius = sense_radius
         self.num_cells = num_cells
-        self.num_actions = num_actions
 
         self.cell_size = 2 * sense_radius / num_cells
 
@@ -60,8 +201,8 @@ class FrameGenerator:
 
         self.time = 0.0
         self.position = np.zeros(2)
-        self.neighbors = np.zeros((0, 2))
-        self.visible_neighbors = np.zeros((0, 2))
+        self.drone_positions = np.zeros((0, 2))
+        self.user_positions = np.zeros((0, 2))
 
         self.cell_positions: np.ndarray = None
 
@@ -128,27 +269,6 @@ class FrameGenerator:
         if len(self.positions_history) > self.max_history:
             self.positions_history.pop(0)
 
-    def obstacles_matrix(self) -> np.ndarray:
-        """
-        Generates a binary matrix indicating whether each cell is inside an
-        obstacle boundary.
-
-        Returns
-        -------
-        np.ndarray
-            A binary matrix of shape (num_cells, num_cells) with 1.0 for cells
-            inside obstacles and 0.0 otherwise.
-        """
-        matrix = np.zeros((self.num_cells, self.num_cells), dtype=np.float32)
-        flat_cell_positions = self.cell_positions.reshape(-1, 2)
-        if self.env.boundary is not None:
-            is_inside = self.env.boundary.is_inside(flat_cell_positions)
-            matrix += ~is_inside.reshape(self.channel_shape)
-        for obs in self.env.obstacles:
-            is_inside = obs.is_inside(flat_cell_positions)
-            matrix += is_inside.reshape(self.channel_shape)
-        return np.clip(matrix, 0.0, 1.0)  # Ensure values are binary (0.0 or 1.0)
-
     def rssi_heatmap(self, units: Literal["watts", "dbm"] = "watts") -> np.ndarray:
         """
         Generate a heatmap matrix using the signal strength map.
@@ -195,37 +315,6 @@ class FrameGenerator:
 
         return (rssi_heatmap > rx_sense).astype(np.float32)
 
-    def poisitions_to_cell_indices(self, positions: np.ndarray) -> np.ndarray:
-        indices = ((positions - self.cell_positions[0, 0]) // self.cell_size).astype(
-            np.int32
-        )
-        # Filter out indices that are outside the frame
-        valid_mask = (
-            (indices[:, 0] >= 0)
-            & (indices[:, 0] < self.num_cells)
-            & (indices[:, 1] >= 0)
-            & (indices[:, 1] < self.num_cells)
-        )
-        return indices[valid_mask]
-
-    def neighbors_binary_map(self) -> np.ndarray:
-        """
-        Generate a binary matrix indicating the presence of visible neighbors
-        in each cell.
-
-        Returns
-        -------
-        np.ndarray
-            A binary matrix of shape (num_cells, num_cells) with 1.0 for cells
-            containing neighbors and 0.0 otherwise.
-        """
-        indices = self.poisitions_to_cell_indices(self.visible_neighbors)
-
-        matrix = np.zeros((self.num_cells, self.num_cells), dtype=np.float32)
-        matrix[indices[:, 1], indices[:, 0]] = 1.0
-
-        return matrix
-
     def collision_matrix(self) -> np.ndarray:
         obstacles_matrix = self.obstacles_matrix()
         neighbors_matrix = self.neighbors_binary_map()
@@ -236,7 +325,9 @@ class FrameGenerator:
         if self.visible_neighbors.shape[0] == 0:
             return np.zeros(self.channel_shape)
         flat_cell_positions = self.cell_positions.reshape(-1, 2)
-        distances = pairwise_cross_distances(self.visible_neighbors, flat_cell_positions)
+        distances = pairwise_cross_distances(
+            self.visible_neighbors, flat_cell_positions
+        )
         heatmap = distances.reshape(
             self.visible_neighbors.shape[0], self.num_cells, self.num_cells
         )
@@ -393,37 +484,3 @@ class FrameGenerator:
         # frame[..., 1] = self.set_center_cells(position_heatmap, value=0.0)
         frame[..., 2] = self.set_center_cells(motion_map, value=1.0)
         return (frame * 255.0).astype(np.uint8)
-
-    def calculate_target_position(self, action: int) -> np.ndarray:
-        """
-        Calculate the target position based on the given action.
-
-        Parameters
-        ----------
-        action : int
-            The action index. Action 0 corresponds to staying in the current
-            position.
-
-        Returns
-        -------
-        np.ndarray
-            The target position as a 2D coordinate.
-
-        Raises
-        ------
-        ValueError
-            If the action is less than 0.
-        """
-        if action < 0:
-            raise ValueError("Action must be equal or greater than 0.")
-
-        if action == 0:
-            return self.position
-
-        num_quads = self.num_actions - 1
-        angle = (
-            2 * np.pi * (action - 1) / num_quads
-        )  # Divide the quadrant into equal angles
-        delta_position = self.cell_size * np.array([np.cos(angle), np.sin(angle)])
-
-        return self.position + delta_position

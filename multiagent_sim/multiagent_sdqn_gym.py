@@ -5,25 +5,26 @@ import numpy as np
 from .agents import Drone, AgentsManager, AgentsConfig
 from .environment import Environment
 from .math.path_loss_model import signal_strength
-from .mobility.sdqn_position_controller import SDQNConfig, SDQNPostionController
-from .sdqn.central_agent import CentralAgent
+from .mobility.sdqn_position_controller import SDQNPositionConfig, SDQNPositionController
+from .sdqn.sdqn_agent import SDQNAgent
 from .sdqn.reward_manager import RewardManager
 
 
-class MultidroneSDQNGym:
+class MultiAgentSDQNGym:
     def __init__(
         self,
         num_drones: int,
         num_users: int,
         dt: float = 0.01,
-        sdqn_config: SDQNConfig = None,
+        dem_path: str = None,
+        sdqn_config: SDQNPositionConfig = None,
         model_path: str = None,
     ) -> None:
         self.num_drones = num_drones
         self.num_users = num_users
-        self.config = sdqn_config or SDQNConfig()
         self.dt = dt
-        self.environment = Environment()
+        self.environment = Environment(dem_path)
+        self.sdqn_config = sdqn_config
 
         agents_config = AgentsConfig(
             num_gcs=1,
@@ -35,13 +36,10 @@ class MultidroneSDQNGym:
         self.agents_manager = AgentsManager(
             agents_config=agents_config,
         )
-
-        self.drone_states = np.zeros((self.num_drones, 6))  # px, py, pz, vx, vy, vz
-        self.initial_states = np.zeros((self.num_drones, 6))
-
-        self.central_agent = CentralAgent(
+        
+        self.central_agent = SDQNAgent(
             num_drones=self.num_drones,
-            num_cells=self.config.num_cells,
+            num_cells=self.sdqn_config.num_cells,
             num_channels=controller.dqns.frame_shape[-1],
             training_mode=train,
             model_path=model_path,
@@ -154,7 +152,7 @@ class MultidroneSDQNGym:
         self.last_update_time = self.sim_time
 
     def compute_frames(self) -> np.ndarray:
-        frames = np.zeros(self.central_agent.states_shape, dtype=np.uint8)
+        frames = np.zeros(self.central_agent.frames_shape, dtype=np.uint8)
         for i, drone in enumerate(self.drones):
             dqns: SDQNPostionController = self._get_drone_position_controller(drone)
             frame = dqns.get_frame()
