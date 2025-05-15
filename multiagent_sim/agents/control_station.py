@@ -27,13 +27,13 @@ class ControlStation(Agent):
     def __init__(
         self,
         agent_id: int,
-        env: Environment,
+        environment: Environment,
         network_sim: NetworkSimulator = None,
     ):
         super().__init__(
             agent_id=agent_id,
             agent_type="gcs",
-            env=env,
+            environment=environment,
         )
 
         self.swarm_link: SwarmLink = None

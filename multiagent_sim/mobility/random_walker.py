@@ -41,7 +41,7 @@ class SurfaceRandomWalker:
         vel = (1 - self.turning_rate) * vel + self.turning_rate * target_vel
 
         # Obstacle avoidance
-        vel += self._obstacle_avoidance(pos)
+        # vel += self._obstacle_avoidance(pos)
 
         # Speed limiting
         speed = np.linalg.norm(vel)

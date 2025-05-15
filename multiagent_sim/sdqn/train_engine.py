@@ -1,6 +1,6 @@
 import numpy as np
 
-from .sdqn_agent import SDQNAgent
+from .sdqn_wrapper import SDQNWrapper
 from .central_agent import CentralAgent
 from .reward_manager import RewardManager
 from .frame_generators import SimpleFrameGenerator
@@ -14,7 +14,7 @@ class TrainEngine:
     def __init__(self, num_drones: int, env: Environment) -> None:
 
         dummy_frame_generator = SimpleFrameGenerator(env)
-        sdqn = SDQNAgent(
+        sdqn = SDQNWrapper(
             frame_shape=dummy_frame_generator.frame_shape,
             num_actions=7,
             train_mode=True,
@@ -74,40 +74,4 @@ class TrainEngine:
             frames[i] = agent.update_action(action)
         return actions
 
-    @property
-    def train_steps(self) -> int:
-        return self.central_agent.dqn_agent.train_steps
-
-    @property
-    def train_elapsed(self) -> float:
-        return self.central_agent.dqn_agent.train_elapsed
-
-    @property
-    def train_speed(self) -> float:
-        return self.central_agent.dqn_agent.train_speed or np.nan
-
-    @property
-    def memory_size(self) -> int:
-        return self.central_agent.dqn_agent.memory.size
-
-    @property
-    def epsilon(self) -> float:
-        return self.central_agent.policy.epsilon
-
-    @property
-    def accuracy(self) -> float:
-        if (
-            self.central_agent.train_metrics is not None
-            and "accuracy" in self.central_agent.train_metrics
-        ):
-            return self.central_agent.train_metrics["accuracy"]
-        return np.nan
-
-    @property
-    def loss(self) -> float:
-        if (
-            self.central_agent.train_metrics is not None
-            and "loss" in self.central_agent.train_metrics
-        ):
-            return self.central_agent.train_metrics["loss"]
-        return np.nan
+   

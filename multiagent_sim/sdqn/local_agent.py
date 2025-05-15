@@ -1,5 +1,5 @@
 from .frame_generators import FrameGenerator, SimpleFrameGenerator
-from .actions import Action, ZoomableAction, action_to_displacement
+from .actions import Action, action_to_displacement
 
 import numpy as np
 
@@ -30,15 +30,14 @@ class LocalAgent:
         self.users = users.copy()
 
     def generate_frame(self) -> np.ndarray:
-        self.last_frame = self.frame_generator.generate_frame()
-        return self.last_frame
+        frame = self.frame_generator.generate_frame()
+        self.last_frame = frame
+        return frame
         
     def update_action(self, action: Action) -> None:
-        self.last_action = action
-        
-        if self.last_action == ZoomableAction.ZOOM_IN:
+        if action == Action.ZOOM_IN:
             new_radius = self.frame_generator.frame_radius / 2
-        elif self.last_action == ZoomableAction.ZOOM_OUT:
+        elif action == Action.ZOOM_OUT:
             new_radius = self.frame_generator.frame_radius * 2
         else:
             new_radius = None
@@ -47,4 +46,5 @@ class LocalAgent:
             new_radius = np.clip(new_radius, 0.1, 10e3)
             self.frame_generator.set_frame_radius(new_radius)
             
-        self.displacement = action_to_displacement(self.last_action)
+        self.displacement = action_to_displacement(action)
+        self.last_action = action

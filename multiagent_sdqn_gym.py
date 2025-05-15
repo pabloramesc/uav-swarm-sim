@@ -18,7 +18,7 @@ xy_max = (+200.0, +200.0)
 
 config = SDQNPositionConfig(num_cells=100, frame_radius=500.0, target_height=10.0)
 sim = MultiAgentSDQNGym(
-    num_drones, dt, config, model_path="sdqn-model-04.keras", train=False
+    num_drones, dt, config, model_path="data/models/sdqn-m01.keras", train=False
 )
 sim.environment.set_rectangular_boundary(xy_min, xy_max)
 

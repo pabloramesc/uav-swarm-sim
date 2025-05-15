@@ -9,9 +9,6 @@ class Action(IntEnum):
     DOWN = 2
     LEFT = 3
     RIGHT = 4
-
-
-class ZoomableAction(Action):
     ZOOM_IN = 5
     ZOOM_OUT = 6
 

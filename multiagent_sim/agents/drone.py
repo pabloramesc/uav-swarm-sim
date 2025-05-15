@@ -27,14 +27,14 @@ class Drone(Agent):
     def __init__(
         self,
         agent_id: int,
-        env: Environment,
+        environment: Environment,
         position_controller: SwarmPositionController,
-        network_sim: NetworkSimulator,
+        network_sim: NetworkSimulator = None,
         drones_registry: AgentsRegistry = None,
         users_registry: AgentsRegistry = None,
         neighbor_provider: NeighborProvider = "registry",
     ):
-        super().__init__(agent_id=agent_id, agent_type="drone", env=env)
+        super().__init__(agent_id=agent_id, agent_type="drone", environment=environment)
         self.position_controller = position_controller
         self.drones_registry = drones_registry
         self.users_registry = users_registry

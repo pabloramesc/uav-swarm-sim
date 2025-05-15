@@ -2,12 +2,21 @@ import time
 
 import numpy as np
 
-from .agents import Drone, AgentsManager, AgentsConfig
+from .agents import Agent, AgentsRegistry, ControlStation, Drone, User
 from .environment import Environment
 from .math.path_loss_model import signal_strength
-from .mobility.sdqn_position_controller import SDQNPositionConfig, SDQNPositionController
-from .sdqn.sdqn_agent import SDQNAgent
+from .mobility.sdqn_position_controller import (
+    SDQNPositionConfig,
+    SDQNPositionController,
+)
+from .sdqn.sdqn_wrapper import SDQNWrapper
 from .sdqn.reward_manager import RewardManager
+from .sdqn.frame_generators import SimpleFrameGenerator
+from .sdqn.actions import Action
+from .sdqn.central_agent import CentralAgent
+from .sdqn.local_agent import LocalAgent
+from .mobility.utils import environment_random_positions
+from .utils.logger import create_logger
 
 
 class MultiAgentSDQNGym:
@@ -26,169 +35,145 @@ class MultiAgentSDQNGym:
         self.environment = Environment(dem_path)
         self.sdqn_config = sdqn_config
 
-        agents_config = AgentsConfig(
-            num_gcs=1,
-            num_drones=num_drones,
-            num_users=num_users,
-            swarming_type="sdqn",
-            neighbor_provider="registry",
-        )
-        self.agents_manager = AgentsManager(
-            agents_config=agents_config,
-        )
-        
-        self.central_agent = SDQNAgent(
-            num_drones=self.num_drones,
-            num_cells=self.sdqn_config.num_cells,
-            num_channels=controller.dqns.frame_shape[-1],
-            training_mode=train,
-            model_path=model_path,
-        )
-        self.model_path = self.central_agent.model_path
+        self.sdqn_agent = self._create_sdqn_central_agent()
+        self.reward_manager = self._create_reward_manager()
 
-        self.reward_manager = RewardManager(self.environment)
+        self.agents = self._create_agents()
 
-        self.real_t0: float = None
-        self.sim_time: float = None
-        self.sim_steps: int = None
+        self.init_time: float = None
+        self.sim_time = 0.0
+        self.sim_step = 0
 
-        self.last_update_time: float = None
+        self.logger = create_logger(name="MultiDroneEVSMSimulator", level="INFO")
 
-        self.prev_actions: np.ndarray = None
         self.prev_frames: np.ndarray = None
-
-        self.frames: np.ndarray = None
-        self.actions: np.ndarray = None
-        self.rewards: np.ndarray = None
-        self.dones: np.ndarray = None
+        self.prev_actions: np.ndarray = None
 
     @property
     def real_time(self) -> float:
         return time.time() - self.real_t0
 
-    @property
-    def drone_positions(self) -> np.ndarray:
-        """
-        A (N, 3) shape array with drone positions [px, py, pz] in meters,
-        where N is the number of drones.
-        """
-        return self.drone_states[:, 0:3]
+    def _create_sdqn_central_agent(self) -> CentralAgent:
+        frame_shape = SimpleFrameGenerator.calculate_frame_shape()
+        num_actions = len(Action)
+        wrapper = SDQNWrapper(
+            frame_shape, num_actions, model_path=self.model_path, train_mode=True
+        )
+        return CentralAgent(wrapper)
 
-    @property
-    def drone_velocities(self) -> np.ndarray:
-        """
-        A (N, 3) shape array with drone velocities [vx, vy, vz] in m/s,
-        where N is the number of drones.
-        """
-        return self.drone_states[:, 3:6]
+    def _create_reward_manager(self) -> RewardManager:
+        cell_size = SimpleFrameGenerator.calculate_cell_size()
+        manager = RewardManager(env=self.environment, cell_size=cell_size)
+        return manager
 
-    def initialize(self) -> None:
-        self.drone_states = np.zeros((self.num_drones, 6))
-        self.initial_states = np.zeros((self.num_drones, 6))
+    def _create_agents(self) -> list[Agent]:
+        agents: list[Agent] = []
+
+        self.gcs = ControlStation(
+            agent_id=len(agents),
+            environment=self.environment,
+            network_sim=self.network_simulator,
+        )
+        agents.append(self.gcs)
+
+        self.drones = AgentsRegistry()
+        self.users = AgentsRegistry()
 
         for i in range(self.num_drones):
-            self.initial_states[i, 0:2] = self._generate_random_position()
-
-        for i, drone in enumerate(self.drones):
-            indices = np.arange(self.num_drones)
-            neighbor_indices = indices[indices != i]
-            drone.initialize(
-                state=self.initial_states[i, :],
-                neighbor_states=self.initial_states[neighbor_indices, :],
-                neighbor_ids=neighbor_indices,
-                time=0.0,
+            frame_gen = SimpleFrameGenerator(env=self.environment)
+            local = LocalAgent(agent_id=i, frame_generator=frame_gen)
+            self.sdqn_agent.register_agent(local)
+            sdqn = SDQNPositionController(
+                config=self.sdqn_config, environment=self.environment, local_agent=local
             )
+            drone = Drone(
+                agent_id=len(agents),
+                environment=self.environment,
+                position_controller=sdqn,
+                network_sim=self.network_simulator,
+                drones_registry=self.drones,
+                users_registry=self.users,
+                neighbor_provider=self.neihgbor_provider,
+            )
+            self.drones.register(drone)
+            agents.append(drone)
 
-        self._get_drone_states()
-        self.initial_states = np.copy(self.drone_states)
+        for _ in range(self.num_users):
+            user = User(
+                agent_id=len(agents),
+                environment=self.environment,
+                network_sim=self.network_simulator,
+            )
+            self.users.register(user)
+            agents.append(user)
 
-        self.prev_frames = self.compute_frames()
-        self.prev_actions = self.compute_actions(self.prev_frames)
-        self.set_target_positions(self.prev_actions)
-        self.frames = self.prev_frames
-        self.actions = self.prev_actions
-        self.rewards = np.zeros(self.num_drones)
-        self.dones = np.zeros(self.num_drones, dtype=bool)
+        return agents
 
+    def initialize(self) -> None:
+        self.logger.info("Initializing simulation ...")
+
+        self.gcs.initialize(state=np.zeros(6))
+
+        drone_states = np.zeros((self.num_drones, 6))
+        drone_states[:, 0:3] = environment_random_positions(
+            num_positions=self.num_drones, env=self.environment
+        )
+        self.drones.initialize(states=drone_states)
+
+        user_states = np.zeros((self.num_users, 6))
+        user_states[:, 0:3] = environment_random_positions(
+            num_positions=self.num_users, env=self.environment
+        )
+        self.users.initialize(states=user_states)
+
+        self.init_time = time.time()
         self.sim_time = 0.0
         self.sim_steps = 0
-        self.real_t0 = time.time()
-        self.last_update_time = 0.0
+
+        self.sdqn_agent.step()
+        self.prev_frames = self.sdqn_agent.last_frames
+        self.prev_actions = self.sdqn_agent.last_actions
+
+        self.logger.info("✅ Initialization completed.")
 
     def update(self, dt: float = None) -> None:
         dt = dt if dt is not None else self.dt
         self.sim_time += dt
         self.sim_steps += 1
 
-        for drone in self.drones:
-            drone.update(dt)
-        self._get_drone_states()
-        self._set_neighbors()
+        self.gcs.update(dt)
+        self.drones.update(dt)
+        self.users.update(dt)
 
-        if not self._needs_update():
-            return None
+        rewards, dones = self.reward_manager.update()
+        self.reset_collided_drones(dones)
 
-        self.frames = self.compute_frames()
-        self.actions = self.compute_actions(self.frames)
-        self.set_target_positions(self.actions)
+        self.sdqn_agent.step()
 
-        self.rewards, self.dones = self.reward_manager.update(
-            self.drone_positions, self.sim_time
-        )
-        self.reset_collided_drones(self.dones)
-
-        self.central_agent.add_experiences(
-            states=self.prev_frames,
-            next_states=self.frames,
+        self.sdqn_agent.sdqn.add_experiences(
+            frames=self.prev_frames,
             actions=self.prev_actions,
-            rewards=self.rewards,
-            dones=self.dones,
+            next_frames=self.sdqn_agent.last_frames,
+            rewards=rewards,
+            dones=dones,
         )
+        
+        self.sdqn_agent.sdqn.train()
 
-        self.central_agent.train()
-
-        self.prev_frames = self.frames
-        self.prev_actions = self.actions
-        self.last_update_time = self.sim_time
-
-    def compute_frames(self) -> np.ndarray:
-        frames = np.zeros(self.central_agent.frames_shape, dtype=np.uint8)
-        for i, drone in enumerate(self.drones):
-            dqns: SDQNPostionController = self._get_drone_position_controller(drone)
-            frame = dqns.get_frame()
-            frames[i] = frame
-        return frames
-
-    def compute_actions(self, frames: np.ndarray) -> np.ndarray:
-        actions = self.central_agent.act(frames)
-        return actions
-
-    def set_target_positions(self, actions: np.ndarray) -> None:
-        for i, drone in enumerate(self.drones):
-            dqns: SDQNPostionController = self._get_drone_position_controller(drone)
-            dqns.set_target_position(actions[i])
+        self.prev_frames = self.sdqn_agent.last_frames
+        self.prev_actions = self.sdqn_agent.last_actions
 
     def reset_collided_drones(self, dones: np.ndarray) -> None:
         done_indices = np.arange(self.num_drones)[dones]
         for i in done_indices:
-            # Reset initial states to random position inside boundary
-            self.initial_states[i, :] = 0.0
-            self.initial_states[i, 0:2] = self._generate_random_position()
-
-            # Get neighbors indices (same as ids)
-            indices = np.arange(self.num_drones)
-            neighbor_ids = indices[indices != i]
-
-            # Initialize collided drone
-            drone: Drone = self.drones[i]
-            drone.initialize(
-                state=self.initial_states[i, :],
-                neighbor_states=self.drone_states[neighbor_ids],
-                neighbor_ids=neighbor_ids,
+            state = np.zeros(6)
+            state[0:3] = environment_random_positions(
+                num_positions=1, env=self.environment
             )
+            drone: Drone = self.drones[i]
+            drone.initialize(state)
 
-        if self.verbose and np.any(dones):
-            print("⚠️ Reset drones to initial states:", done_indices)
+            self.logger.warning(f"⚠️  Reset drone {i} to initial states")
 
     def area_coverage(self, num_points: int = 1000, rx_sens: float = -80.0) -> float:
         eval_points = np.zeros((num_points, 3))
@@ -220,49 +205,16 @@ class MultiAgentSDQNGym:
 
     def training_status_str(self) -> str:
         return (
-            f"Train steps: {self.central_agent.train_steps}, "
-            f"Train speed: {self.central_agent.train_speed:.2f} sps, "
-            f"Memory size: {self.central_agent.memory_size}, "
-            f"Epsilon: {self.central_agent.epsilon:.4f}, "
-            f"Loss: {self.central_agent.loss:.4e}, "
-            f"Accuracy: {self.central_agent.accuracy*100:.2f} %"
+            f"Train steps: {self.sdqn_agent.sdqn.train_steps}, "
+            f"Train speed: {self.sdqn_agent.train_speed:.2f} sps, "
+            f"Memory size: {self.sdqn_agent.memory_size}, "
+            f"Epsilon: {self.sdqn_agent.epsilon:.4f}, "
+            f"Loss: {self.sdqn_agent.loss:.4e}, "
+            f"Accuracy: {self.sdqn_agent.accuracy*100:.2f} %"
         )
-
-    def _get_drone_states(self) -> None:
-        """
-        Updates the `drone_states` array with the current states of all drones.
-        """
-        for i, drone in enumerate(self.drones):
-            self.drone_states[i, 0:3] = drone.position
-            self.drone_states[i, 3:6] = drone.velocity
-
-    def _set_drone_states(self) -> None:
-        """
-        Updates the states of all drones with the values in the `drone_states` array.
-        """
-        for i, drone in enumerate(self.drones):
-            drone.state[0:3] = self.drone_states[i, 0:3]
-            drone.state[3:6] = self.drone_states[i, 3:6]
-
-    def _set_neighbors(self) -> None:
-        for i, drone in enumerate(self.drones):
-            indices = np.arange(self.num_drones)
-            neighbor_ids = indices[indices != i]
-            neighbor_states = self.drone_states[neighbor_ids]
-            drone.set_neighbors(neighbor_ids, neighbor_states)
 
     def _needs_update(self) -> bool:
         if self.sim_time is None or self.last_update_time is None:
             raise Exception("Bad time initialization.")
         elapsed_time = self.sim_time - self.last_update_time
         return elapsed_time > self.update_period
-
-    def _get_drone_position_controller(self, drone: Drone) -> SDQNPostionController:
-        if not isinstance(drone.position_controller, SDQNPostionController):
-            raise Exception(f"Drone {drone.agent_id} position controller is not DQNS")
-        return drone.position_controller
-
-    def _generate_random_position(self) -> np.ndarray:
-        px = np.random.uniform(*self.environment.boundary_xlim)
-        py = np.random.uniform(*self.environment.boundary_ylim)
-        return np.array([px, py])

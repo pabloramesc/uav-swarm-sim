@@ -54,7 +54,8 @@ class EVSMPositionController(SwarmPositionController):
         environment: Environment,
     ):
         super().__init__(config, environment)
-        self.update_period = 0.1
+        self.control_update_period = 0.1
+        self.springs_update_period = 1.0
 
         # Natural length parameters
         self._initial_nat_length = config.initial_natural_length
@@ -80,8 +81,11 @@ class EVSMPositionController(SwarmPositionController):
             kd=config.max_acceleration / config.target_speed,
         )
 
-        # Neighbor positions cache
-        self._drone_positions: dict[int, np.ndarray] = {}
+        self.control_force = np.zeros(3)
+        self.drone_positions: dict[int, np.ndarray] = {}
+        
+        self._last_control_update_time: float = None
+        self._last_springs_update_time: float = None
 
     def initialize(
         self,
@@ -91,8 +95,8 @@ class EVSMPositionController(SwarmPositionController):
     ) -> None:
         super().initialize(time, state)
         if drone_positions is None:
-            raise ValueError("`drone_positions` is required for initialization")
-        self._drone_positions = drone_positions.copy()
+            raise ValueError("Drone positions is required for initialization")
+        self.drone_positions = drone_positions
 
     def update(
         self,
@@ -105,45 +109,53 @@ class EVSMPositionController(SwarmPositionController):
         """
         super().update(time, state)
 
-        # Check for changes in neighbor topology
-        force_update = False
-        if drone_positions.keys() != self._drone_positions.keys():
-            force_update = True
+        if not self._need_update_control(time):
+            return self.control_force
+        self._last_control_update_time = time
 
-        self._drone_positions = drone_positions.copy()
+        update_springs = False
+        topology_changed = drone_positions.keys() != self.drone_positions.keys()
+        if topology_changed or self._need_update_springs(time):
+            update_springs = True
+            self._last_springs_update_time = time
+            self.drone_positions = drone_positions
 
-        # Prepare neighbor array for EVSM
-        neighbors_array = (
-            np.array(list(self._drone_positions.values()))[:, 0:2]
-            if self._drone_positions
-            else np.zeros((0, 2))
-        )
+        if self.drone_positions:
+            neighbors = np.stack([pos[0:2] for pos in self.drone_positions.values()])
+        else:
+            neighbors = np.zeros((0, 2))
 
-        # Update EVSM natural length
         self._update_natural_length(time)
 
-        # Initialize control vector [Fx, Fy, Fz]
-        control_force = np.zeros(3)
-
-        # Horizontal EVSM force
-        control_force[:2] = self.evsm.update(
+        # Horizontal control force (EVSM - Extended Virtual Spring Mesh)
+        self.control_force[0:2] = self.evsm.update(
             position=state[0:2],
             velocity=state[3:5],
-            neighbors=neighbors_array,
+            neighbors=neighbors,
             time=time,
-            force_update=force_update,
+            update_springs=update_springs,
         )
 
-        # Vertical force via PD altitude controller
+        # Vertical control force (PD altitude controller)
         ground_elevation = self.env.get_elevation(state[0:2])
         desired_alt = ground_elevation + self._target_altitude
-        control_force[2] = self.vertical_controller.control(
+        self.control_force[2] = self.vertical_controller.control(
             target_altitude=desired_alt,
             altitude=state[2],
             vspeed=state[5],
         )
 
-        return control_force
+        return self.control_force
+
+    def _need_update_control(self, time: float) -> bool:
+        if self._last_control_update_time is None:
+            return True
+        return (time - self._last_control_update_time) >= self.control_update_period
+
+    def _need_update_springs(self, time: float) -> bool:
+        if self._last_springs_update_time is None:
+            return True
+        return (time - self._last_springs_update_time) >= self.springs_update_period
 
     def _update_natural_length(self, time: float) -> None:
         """
@@ -165,9 +177,3 @@ class EVSMPositionController(SwarmPositionController):
         Update altitude controller setpoint.
         """
         self._target_altitude = altitude
-
-    def _needs_update(self, time: float) -> bool:
-        if time is None or self.last_update_time is None:
-            return True
-        elapsed_time = time - self.last_update_time
-        return elapsed_time > self.update_period

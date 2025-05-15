@@ -25,14 +25,14 @@ class Agent(ABC):
         self,
         agent_id: int,
         agent_type: AgentType,
-        env: Environment,
+        environment: Environment,
     ):
         """
         Initializes an agent with a unique ID, type, and environment.
         """
         self.agent_id = agent_id
         self.agent_type = agent_type
-        self.environment = env
+        self.environment = environment
         
         self.logger = create_logger(f"Agent{agent_id}", level="INFO")
 

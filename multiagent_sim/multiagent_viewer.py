@@ -9,14 +9,14 @@ import time
 from typing import Literal
 
 import matplotlib
+import matplotlib.colors as mcolors
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.image import AxesImage
 from numpy.typing import ArrayLike
-import matplotlib.colors as mcolors
 
-from .math.path_loss_model import signal_strength_map, rssi_to_signal_quality
-from .multiagent_evsm_simulator import MultiAgentEVSMSimulator
+from .math.path_loss_model import rssi_to_signal_quality, signal_strength_map
+from .multiagent_simulator import MultiAgentSimulator
 from .utils.logger import create_logger
 
 AspectRatios = Literal["auto", "equal"]
@@ -29,7 +29,7 @@ class MultiAgentViewer:
 
     def __init__(
         self,
-        sim: MultiAgentEVSMSimulator,
+        sim: MultiAgentSimulator,
         xlim: tuple[float, float] = None,
         ylim: tuple[float, float] = None,
         fig_size: tuple[float, float] = None,
@@ -55,7 +55,7 @@ class MultiAgentViewer:
         self.fig = plt.figure(figsize=fig_size)
         self.ax = self.fig.add_subplot()
 
-        self.logger = create_logger(name="MultiDroneViewerEVSM", level="INFO")
+        self.logger = create_logger(name="MultiAgentViewer", level="INFO")
 
         self.reset()
 
@@ -84,7 +84,7 @@ class MultiAgentViewer:
         self._initiate_plots()
         self._update_agent_points()
         self._plot_rssi_heatmap()
-        self._configure_axis()
+        self._configure_axes()
 
         self.fig.canvas.draw_idle()
         self.fig.canvas.flush_events()
@@ -130,8 +130,8 @@ class MultiAgentViewer:
     def _initiate_plots(self) -> None:
         (self.link_lines,) = self.ax.plot([], [], "b-", lw=0.5, label="springs")
         (self.drone_points,) = self.ax.plot([], [], "co", label="drones")
-        (self.edge_drone_points,) = self.ax.plot([], [], "ro", label="edge drones")
-        (self.user_points,) = self.ax.plot([], [], "mx", label="users")
+        (self.edge_drone_points,) = self.ax.plot([], [], "mo", label="edge drones")
+        (self.user_points,) = self.ax.plot([], [], "rx", label="users")
         (self.gcs_points,) = self.ax.plot([], [], "k*", label="GCS")
         self._plot_avoid_regions()
 
@@ -154,13 +154,13 @@ class MultiAgentViewer:
             )
 
     def _update_agent_points(self) -> None:
-        self.gcs_states = self.sim.agents_manager.control_stations.get_states_array()
+        self.gcs_states = np.atleast_2d(self.sim.gcs.state)
         self.gcs_points.set_data(self.gcs_states[:, 0], self.gcs_states[:, 1])
 
-        self.user_states = self.sim.agents_manager.users.get_states_array()
+        self.user_states = self.sim.users.get_states_array()
         self.user_points.set_data(self.user_states[:, 0], self.user_states[:, 1])
 
-        self.drone_states = self.sim.agents_manager.drones.get_states_array()
+        self.drone_states = self.sim.drones.get_states_array()
         self.drone_points.set_data(
             self.drone_states[~self.sim.edge_drones_mask, 0],
             self.drone_states[~self.sim.edge_drones_mask, 1],
@@ -189,7 +189,7 @@ class MultiAgentViewer:
         self.xlim = (south_west[0], north_east[0]) if self.xlim is None else self.xlim
         self.ylim = (south_west[1], north_east[1]) if self.ylim is None else self.ylim
 
-    def _configure_axis(self) -> None:
+    def _configure_axes(self) -> None:
         self.ax.set_title("Multi-agent EVSM simulation")
         self.ax.set_xlabel("X (m)")
         self.ax.set_ylabel("Y (m)")
@@ -223,9 +223,6 @@ class MultiAgentViewer:
         )
 
     def _plot_rssi_heatmap(self) -> None:
-        """
-        Plots received signal strength heatmap in real time.
-        """
         # Generate the grid for the heatmap
         xs = np.linspace(self.xlim[0], self.xlim[1], 100)
         ys = np.linspace(self.ylim[0], self.ylim[1], 100)

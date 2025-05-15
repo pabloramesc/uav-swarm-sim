@@ -14,7 +14,7 @@ from .numba_helpers import (
     control_force,
     damping_force,
     exploration_force,
-    links_matrix,
+    springs_matrix,
     sweep_angle,
 )
 from ..utils.logger import create_logger
@@ -50,24 +50,18 @@ class EVSM:
             Natural length of the virtual spring (default is 50.0).
         """
         self.env = env
-
         self.ln = ln
         self.ks = ks
         self.kd = kd
         self.d_obs = d_obs
         self.k_obs = k_obs
         self.k_expl = k_expl
-
         self.max_force = max_force
 
         self.state = np.zeros(4)  # [px, py, vx, vy]
         self.neighbors = np.zeros((0, 2))  # [px, py] of neighbors
-        self.links_mask = np.zeros((0,), dtype=bool)
-
+        self.springs_mask = np.zeros((0,), dtype=bool)
         self.sweep_angle: SweepAngle = None
-
-        self.last_update_time: float = None
-        self.min_update_period = 1.0
         self.exploration_force: np.ndarray = None
 
     @property
@@ -86,7 +80,7 @@ class EVSM:
         velocity: np.ndarray,
         neighbors: np.ndarray,
         time: float = None,
-        force_update: bool = True,
+        update_springs: bool = True,
     ) -> np.ndarray:
         """
         Updates the state of the agent's position, velocity, and neighbors.
@@ -98,13 +92,11 @@ class EVSM:
         velocity : np.ndarray
             A (2,) array with the velocity [vx, vy] of the agent in m/s.
         neighbors : np.ndarray
-            A (N,2) array with the positions [px, py] of the visible neighbors
+            A (N, 2) array with the positions [px, py] of the visible neighbors
             in meters.
-        time : float, optional
-            The current simulation time in seconds. Default is None.
-        force_update : bool, optional
-            Whether to force `links_mask` and `sweep_angle` update. Recommended
-            when neighbors or environment change. Default is True.
+        update_springs : bool, optional
+            Whether to force `springs_mask` and `sweep_angle` update.
+            Recommended when neighbors or environment change. Default is True.
 
         Returns
         -------
@@ -114,24 +106,15 @@ class EVSM:
         self.state[0:2] = position.copy()
         self.state[2:4] = velocity.copy()
         self.neighbors = neighbors.copy()
-        return self._calculate_total_force(time, force_update)
+        return self._calculate_total_force(update_springs)
 
-    def _calculate_total_force(
-        self, time: float = None, force_update: bool = True
-    ) -> np.ndarray:
+    def _calculate_total_force(self, update_springs: bool = True) -> np.ndarray:
         """
-        Update the links mask and compute the total force acting on the agent.
+        Update the springs mask and compute the total force acting on the agent.
         """
-        exploration_force = None
-        if force_update or self._needs_update(time):
-            self.links_mask = self._calculate_links()
+        if update_springs:
+            self.springs_mask = self._calculate_springs_mask()
             self.sweep_angle = self._calculate_sweep_angle()
-
-            exploration_force = (
-                self._calculate_exploration_force() if self.is_edge_robot() else None
-            )
-
-            self.last_update_time = time
 
         damping_force = self._calculate_damping_force()
 
@@ -141,17 +124,11 @@ class EVSM:
 
         control_force = self._calculate_control_force()
 
-        if exploration_force is not None:
-            self.exploration_force = self._limit_force(exploration_force)
-            return control_force + damping_force + self.exploration_force
+        if self.is_edge_robot():
+            exploration_force = self._calculate_exploration_force()
+            return control_force + damping_force + exploration_force
 
         return control_force + damping_force
-
-    def _needs_update(self, time: float) -> bool:
-        if time is None or self.last_update_time is None:
-            return True
-        elapsed_time = time - self.last_update_time
-        return elapsed_time > self.min_update_period
 
     def _limit_force(self, force: np.ndarray) -> np.ndarray:
         force_mag = np.linalg.norm(force)
@@ -159,11 +136,11 @@ class EVSM:
             return self.max_force * force / force_mag
         return force
 
-    def _calculate_links(self) -> np.ndarray:
-        return links_matrix(self.position, self.neighbors)
+    def _calculate_springs_mask(self) -> np.ndarray:
+        return springs_matrix(self.position, self.neighbors)
 
     def _calculate_control_force(self) -> np.ndarray:
-        linked_neighbors = self.neighbors[self.links_mask]
+        linked_neighbors = self.neighbors[self.springs_mask]
         return control_force(self.position, linked_neighbors, ln=self.ln, ks=self.ks)
 
     def _calculate_damping_force(self) -> np.ndarray:
@@ -175,13 +152,14 @@ class EVSM:
         region_distances, region_directions = (
             self._get_avoidance_distances_and_directions()
         )
-        return exploration_force(
+        force = exploration_force(
             region_distances,
             region_directions,
             self.sweep_angle.to_tuple(),
             ln=self.ln,
             ks=self.k_expl,
         )
+        return self._limit_force(force)
 
     def _calculate_obstacles_force(self) -> np.ndarray:
         region_distances, region_directions = (

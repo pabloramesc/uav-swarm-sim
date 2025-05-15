@@ -21,12 +21,14 @@ class User(Agent):
     The user agent performs a random walk within the environment.
     """
 
-    def __init__(self, agent_id: int, env: Environment, network_sim: NetworkSimulator):
+    def __init__(
+        self, agent_id: int, environment: Environment, network_sim: NetworkSimulator
+    ):
         """
         Initializes the user agent with a unique ID, maximum speed, and maximum acceleration.
 
         """
-        super().__init__(agent_id=agent_id, agent_type="user", env=env)
+        super().__init__(agent_id=agent_id, agent_type="user", environment=environment)
 
         self.swarm_link = None
         if network_sim is not None:
@@ -36,7 +38,7 @@ class User(Agent):
                 global_bcast_interval=1.0,
             )
 
-        self.random_walk = SurfaceRandomWalker(env)
+        self.random_walk = SurfaceRandomWalker(environment)
 
     def initialize(self, state: np.ndarray, time: float = 0.0) -> None:
         super().initialize(state, time)
@@ -68,7 +70,7 @@ class User(Agent):
         dst_addr = self.swarm_link.iface.broadcast_address
         msg = f"Hello from agent {self.agent_id}!"
         self.last_msg_id = self.swarm_link.send_message(msg, dst_addr)
-        
+
         self.logger.debug(f"Sent msg: {msg}")
 
         self.next_tx_msg = self.time + np.random.uniform(1.0, 10.0)

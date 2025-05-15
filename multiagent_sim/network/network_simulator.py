@@ -60,8 +60,8 @@ class NetworkSimulator:
 
         atexit.register(self._kill_ns3_process)
 
-        signal.signal(signal.SIGINT, self._on_exit_signal)
-        signal.signal(signal.SIGTERM, self._on_exit_signal)
+        # signal.signal(signal.SIGINT, self._on_exit_signal)
+        # signal.signal(signal.SIGTERM, self._on_exit_signal)
 
     @property
     def num_nodes(self) -> int:

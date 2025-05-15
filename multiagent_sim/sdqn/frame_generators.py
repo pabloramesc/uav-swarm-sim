@@ -34,6 +34,12 @@ class FrameGenerator(ABC):
         self.drones = np.zeros((0, 2))
         self.users = np.zeros((0, 2))
 
+    @staticmethod
+    def calculate_frame_shape(
+        num_channels: int, channel_shape: tuple[int, int]
+    ) -> tuple[int, int, int]:
+        return (*channel_shape, num_channels)
+
     def update(
         self, position: np.ndarray, drones: np.ndarray, users: np.ndarray
     ) -> None:
@@ -59,10 +65,20 @@ class SimpleFrameGenerator(FrameGenerator):
         self.frame_radius = frame_radius
         self.collision_distance = collision_distance
 
-        self.cell_resolution = 2 * frame_radius / num_cells
+        self.cell_size = self.calculate_cell_size(num_cells, frame_radius)
         self.channel_names = ["Collision risk", "Drones signal", "Users coverage"]
 
         self.cell_positions = np.zeros((*self.channel_shape, 2))
+
+    @staticmethod
+    def calculate_frame_shape(num_cells: int = 64) -> tuple[int, int, int]:
+        return super().calculate_frame_shape(
+            num_channels=3, channel_shape=(num_cells, num_cells)
+        )()
+        
+    @staticmethod
+    def calculate_cell_size(num_cells: int = 64, frame_radius: float = 100.0) -> float:
+        return 2 * frame_radius * num_cells
 
     def update(
         self, position: np.ndarray, drones: np.ndarray, users: np.ndarray

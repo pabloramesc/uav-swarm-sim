@@ -14,8 +14,7 @@ import tensorflow as tf
 from dqn import DQNAgent, EpsilonGreedyPolicy, ExperiencesBatch, PriorityReplayBuffer
 
 
-
-class SDQNAgent:
+class SDQNWrapper:
 
     def __init__(
         self,
@@ -164,8 +163,7 @@ class SDQNAgent:
         )
 
         return model
-    
-    
+
     def check_frame(self, frame: np.ndarray) -> None:
         if frame.dtype != np.uint8:
             raise ValueError("Frame must be an uint8 numpy array.")
@@ -174,3 +172,35 @@ class SDQNAgent:
 
     def check_frames(self, frames: np.ndarray) -> None:
         self.check_frame(frames[0])
+
+    @property
+    def train_steps(self) -> int:
+        return self.dqn_agent.train_steps
+
+    @property
+    def train_elapsed(self) -> float:
+        return self.dqn_agent.train_elapsed
+
+    @property
+    def train_speed(self) -> float:
+        return self.dqn_agent.train_speed or np.nan
+
+    @property
+    def memory_size(self) -> int:
+        return self.dqn_agent.memory.size
+
+    @property
+    def epsilon(self) -> float:
+        return self.policy.epsilon
+
+    @property
+    def accuracy(self) -> float:
+        if self.train_metrics is not None and "accuracy" in self.train_metrics:
+            return self.train_metrics["accuracy"]
+        return np.nan
+
+    @property
+    def loss(self) -> float:
+        if self.train_metrics is not None and "loss" in self.train_metrics:
+            return self.central_agent.train_metrics["loss"]
+        return np.nan

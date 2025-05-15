@@ -18,8 +18,7 @@ from .position_controller import PositionController
 
 @dataclass
 class SDQNPositionConfig(SwarmPositionConfig):
-    num_cells: int = 64
-    frame_radius: float = 100.0  # in meters
+    displacement: float = 10.0 # in meters
     obstacle_distance: float = 10.0  # in meters
     agent_mass: float = 1.0  # simple equivalence between force and acceleration
     max_acceleration: float = 10.0  # 1 g aprox. 9.81 m/s^2
@@ -39,14 +38,12 @@ class SDQNPositionController(SwarmPositionController):
 
         self.local_agent = local_agent
 
-        self.cell_size = 2 * config.frame_radius / config.num_cells
-
         self.altitude_hold = AltitudeController(
-            kp=config.max_acceleration / self.cell_size,
+            kp=config.max_acceleration / config.displacement,
             kd=config.max_acceleration / config.target_velocity,
         )
         self.position_controller = PositionController(
-            kp=config.max_acceleration / self.cell_size,
+            kp=config.max_acceleration / config.displacement,
             kd=config.max_acceleration / config.target_velocity,
         )
 

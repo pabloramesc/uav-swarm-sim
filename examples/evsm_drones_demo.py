@@ -6,7 +6,7 @@ https://opensource.org/licenses/MIT
 """
 
 from multiagent_sim.multidrone_evsm_viewer import MultiDroneViewerEVSM
-from multiagent_sim.multidrone_evsm_simulator import MultiDroneEVSMSimulator
+from multiagent_sim.old.multidrone_evsm_simulator import MultiDroneEVSMSimulator
 from multiagent_sim.mobility.evsm_position_controller import EVSMPositionConfig
 from multiagent_sim.mobility.utils import grid_positions
 

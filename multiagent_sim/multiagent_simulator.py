@@ -10,7 +10,7 @@ import time
 import numpy as np
 from numpy.typing import ArrayLike
 
-from .agents import AgentsConfig, AgentsManager, Drone, NeighborProvider
+from .agents import Agent, AgentsRegistry, ControlStation, Drone, NeighborProvider, User
 from .environment import Environment
 from .math.path_loss_model import signal_strength
 from .mobility.evsm_position_controller import (
@@ -20,6 +20,7 @@ from .mobility.evsm_position_controller import (
 from .mobility.utils import environment_random_positions, grid_positions
 from .network import NetworkSimulator
 from .utils.logger import create_logger
+from .utils.exit_signal import register_exit_signal
 
 
 class MultiAgentSimulator:
@@ -40,6 +41,7 @@ class MultiAgentSimulator:
         self.dt = dt
         self.environment = Environment(dem_path)
         self.evsm_config = evsm_config
+        self.neihgbor_provider = neihgbor_provider
 
         if neihgbor_provider == "network":
             self.network_simulator = NetworkSimulator(
@@ -52,19 +54,7 @@ class MultiAgentSimulator:
         else:
             self.network_simulator = None
 
-        agents_config = AgentsConfig(
-            num_gcs=1,
-            num_drones=num_drones,
-            num_users=num_users,
-            swarming_type="evsm",
-            neighbor_provider=neihgbor_provider,
-        )
-        self.agents_manager = AgentsManager(
-            agents_config=agents_config,
-            swarming_config=evsm_config,
-            environment=self.environment,
-            network_simulator=self.network_simulator,
-        )
+        self.agents = self._create_agents()
 
         self.init_time: float = None
         self.sim_time = 0.0
@@ -72,7 +62,9 @@ class MultiAgentSimulator:
 
         self.edge_drones_mask = np.zeros((self.num_drones,), dtype=bool)
 
-        self.logger = create_logger(name="MultiDroneEVSMSimulator", level="INFO")
+        self.logger = create_logger(name="MultiAgentSimulator", level="INFO")
+
+        register_exit_signal()
 
     @property
     def real_time(self) -> float:
@@ -83,12 +75,52 @@ class MultiAgentSimulator:
             return 0.0
         return time.time() - self.init_time
 
+    def _create_agents(self) -> list[Agent]:
+        agents: list[Agent] = []
+
+        self.gcs = ControlStation(
+            agent_id=len(agents),
+            environment=self.environment,
+            network_sim=self.network_simulator,
+        )
+        agents.append(self.gcs)
+
+        self.drones = AgentsRegistry()
+        self.users = AgentsRegistry()
+
+        for _ in range(self.num_drones):
+            evsm = EVSMPositionController(
+                config=self.evsm_config, environment=self.environment
+            )
+            drone = Drone(
+                agent_id=len(agents),
+                environment=self.environment,
+                position_controller=evsm,
+                network_sim=self.network_simulator,
+                drones_registry=self.drones,
+                users_registry=self.users,
+                neighbor_provider=self.neihgbor_provider,
+            )
+            self.drones.register(drone)
+            agents.append(drone)
+
+        for _ in range(self.num_users):
+            user = User(
+                agent_id=len(agents),
+                environment=self.environment,
+                network_sim=self.network_simulator,
+            )
+            self.users.register(user)
+            agents.append(user)
+
+        return agents
+
     def initialize(self, home: ArrayLike) -> None:
         self.logger.info("Initializing simulation ...")
 
         gcs_state = np.zeros(6)
         gcs_state[0:3] = np.asarray(home)
-        self.agents_manager.initialize_agent(global_id=0, state=gcs_state)
+        self.gcs.initialize(state=gcs_state)
 
         drone_states = np.zeros((self.num_drones, 6))
         drone_states[:, 0:3] = grid_positions(
@@ -97,15 +129,13 @@ class MultiAgentSimulator:
             space=5.0,
             altitude=self.evsm_config.target_altitude,
         )
-        self.agents_manager.initialize_all_agents(
-            states=drone_states, agent_type="drone"
-        )
+        self.drones.initialize(states=drone_states)
 
         user_states = np.zeros((self.num_users, 6))
         user_states[:, 0:3] = environment_random_positions(
             num_positions=self.num_users, env=self.environment
         )
-        self.agents_manager.initialize_all_agents(states=user_states, agent_type="user")
+        self.users.initialize(states=user_states)
 
         self.init_time = time.time()
         self.sim_time = 0.0
@@ -131,25 +161,17 @@ class MultiAgentSimulator:
         if self.network_simulator is not None:
             agent_positions = None
             if self.sim_step % 10 == 0:
-                agent_states = np.array(
-                    [agent.state for agent in self.agents_manager.agents]
-                )
+                agent_states = np.array([agent.state for agent in self.agents])
                 agent_positions = agent_states[:, 0:3]
             check = self.sim_step % 100 == 0 and agent_positions is None
             self.network_simulator.update(agent_positions, check)
 
-        self.agents_manager.update_agents(dt=dt)
+        self.gcs.update(dt)
+        self.drones.update(dt)
+        self.users.update(dt)
 
         self._update_links_matrix()
         self._update_edge_drones_mask()
-
-    def sync_to_real_time(self) -> None:
-        """
-        Synchronizes the simulation time with real time, ensuring that the simulation
-        does not run faster than real time.
-        """
-        if self.sim_time - self.real_time > self.dt:
-            time.sleep(self.sim_time - self.real_time - self.dt)
 
         self._sync_to_real_time()
 
@@ -221,7 +243,7 @@ class MultiAgentSimulator:
         self.links_matrix = np.full(
             (self.num_drones, self.num_drones), False, dtype=bool
         )
-        for drone in self.agents_manager.drones.get_all():
+        for drone in self.drones.get_all():
             drone: Drone = drone
             controller: EVSMPositionController = drone.position_controller
 
@@ -233,25 +255,25 @@ class MultiAgentSimulator:
                     f"Drone {drone.agent_id} position controller is not EVSM"
                 )
 
-            neighbor_ids = np.array(list(drone.drone_positions.keys()))
-            neighbor_indices = self.agents_manager.drones.get_indices(neighbor_ids)
-            links_mask = controller.evsm.links_mask
+            neighbor_ids = np.array(list(controller.drone_positions.keys()))
+            neighbor_indices = self.drones.get_indices(neighbor_ids)
+            springs_mask = controller.evsm.springs_mask
 
-            drone_links = np.zeros((self.num_drones,), dtype=bool)
-            if neighbor_indices.size > 0 and neighbor_indices.shape == links_mask.shape:
-                drone_links[neighbor_indices] = links_mask
+            drone_springs = np.zeros((self.num_drones,), dtype=bool)
+            if neighbor_indices.size > 0:
+                drone_springs[neighbor_indices] = springs_mask
 
-            if not np.any(drone_links):
-                self.logger.info(f"Drone {drone.agent_id} has no links.")
+            if not np.any(drone_springs):
+                self.logger.info(f"Drone {drone.agent_id} has no springs.")
 
-            drone_index = self.agents_manager.drones.get_index(drone.agent_id)
-            self.links_matrix[drone_index, :] = drone_links
+            drone_index = self.drones.get_index(drone.agent_id)
+            self.links_matrix[drone_index, :] = drone_springs
 
     def _update_edge_drones_mask(self) -> None:
         """
         Updates the mask indicating which drones are at the edge of the swarm.
         """
-        for i, drone in enumerate(self.agents_manager.drones.get_all()):
+        for i, drone in enumerate(self.drones.get_all()):
             drone: Drone = drone
             controller: EVSMPositionController = drone.position_controller
 

@@ -8,18 +8,21 @@ https://opensource.org/licenses/MIT
 import time
 from typing import Literal
 
+
+import matplotlib
+import matplotlib.colors as mcolors
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.image import AxesImage
-from matplotlib.lines import Line2D
 from numpy.typing import ArrayLike
 
-from simulator.multidrone_gym_sdqn import MultidroneGymSDQN
+from .multiagent_sdqn_gym import MultiAgentSDQNGym
 
 from .math.path_loss_model import signal_strength, signal_strength_map
 
-AspectRatios = Literal["auto", "equal"]
+AspectRatio = Literal["auto", "equal"]
 
+matplotlib.use("Agg")
 
 class MultiAgentSDQNViewer:
     """
@@ -32,29 +35,26 @@ class MultiAgentSDQNViewer:
 
     def __init__(
         self,
-        sim: MultidroneGymSDQN,
+        sim: MultiAgentSDQNGym,
         xlim: tuple[float, float] = None,
         ylim: tuple[float, float] = None,
-        zlim: tuple[float, float] = None,
         fig_size: tuple[float, float] = None,
         min_fps: float = 10.0,
-        aspect_ratio: AspectRatios = "equal",
+        aspect_ratio: AspectRatio = "equal",
     ):
+        plt.ion()
+
         self.sim = sim
         self.xlim = xlim
         self.ylim = ylim
-        self.zlim = zlim
         self.min_fps = min_fps
         self.max_fps = 60.0
-        if aspect_ratio not in AspectRatios.__args__:
-            raise ValueError("Aspect ratio must be 'auto' or 'equal'")
         self.aspect_ratio = aspect_ratio
 
         self.t0: float = None
         self.fps: float = None
         self.last_render_time: float = None
 
-        self.drone_points: Line2D = None
         self.im1: AxesImage = None
         self.im2: AxesImage = None
         self.im3: AxesImage = None
@@ -73,12 +73,8 @@ class MultiAgentSDQNViewer:
         return time.time() - self.t0
 
     @property
-    def elapsed_time(self) -> float:
+    def time_since_render(self) -> float:
         return self.time - self.last_render_time
-
-    @property
-    def current_fps(self) -> float:
-        return 1.0 / self.elapsed_time if self.elapsed_time > 0.0 else self.max_fps
 
     def reset(self) -> None:
         """
@@ -90,13 +86,17 @@ class MultiAgentSDQNViewer:
         self.ax1.clear()
         self.ax2.clear()
         self.ax3.clear()
+        self.ax4.clear()
 
         self._reset_timers()
         self._calculate_axis_limits()
         self._initiate_plots()
         self._configure_axes()
 
-        plt.pause(0.01)
+        self.fig.canvas.draw_idle()
+        self.fig.canvas.flush_events()
+        # plt.pause(1.0)
+        self.last_render_time = self.time
 
     def update(
         self,
@@ -119,12 +119,12 @@ class MultiAgentSDQNViewer:
         if not (force_render or self._need_render()):
             return
 
-        self._plot_signal_heatmap()
+        self._plot_rssi_heatmap()
         self._update_drone_points()
 
-        self._plot_drone_collision_frame()
-        self._plot_drone_exploration_frame()
-        self._plot_drone_flow_map_frame()
+        self._plot_frame_ch1()
+        self._plot_frame_ch2()
+        self._plot_frame_ch3()
 
         plt.pause(0.01)
 
@@ -142,8 +142,11 @@ class MultiAgentSDQNViewer:
         )
 
     def _initiate_plots(self) -> None:
-        (self.drone_points,) = self.ax1.plot([], [], "ko", ms=2.0)
+        (self.drone_points,) = self.ax.plot([], [], "bo", label="drones")
+        (self.user_points,) = self.ax.plot([], [], "rx", label="users")
+        self._plot_avoid_regions()
 
+    def _plot_avoid_regions(self) -> None:
         if self.sim.environment.boundary is not None:
             self.ax1.plot(*self.sim.environment.boundary.shape.exterior.coords.xy, "r-")
 
@@ -157,9 +160,10 @@ class MultiAgentSDQNViewer:
             )
 
     def _update_drone_points(self) -> None:
+        drone_states = self.sim.drones.get_states_array()
         self.drone_points.set_data(
-            self.sim.drone_states[:, 0],
-            self.sim.drone_states[:, 1],
+            drone_states[:, 0],
+            drone_states[:, 1],
         )
 
     def _calculate_axis_limits(self) -> None:
@@ -183,16 +187,17 @@ class MultiAgentSDQNViewer:
         self.ax1.set_ylabel("Y (m)")
         self.ax1.set_aspect(self.aspect_ratio)
         self.ax1.grid(True)
+        self.ax1.legend(loc="upper right")
 
-        self.ax2.set_title("Drone Collision Heatmap")
+        self.ax2.set_title("Collision Heatmap")
         self.ax2.set_xlabel("X (pixels)")
         self.ax2.set_ylabel("Y (pixels)")
 
-        self.ax3.set_title("Drone RSSI Heatmap")
+        self.ax3.set_title("Drones Heatmap")
         self.ax3.set_xlabel("X (pixels)")
         self.ax3.set_ylabel("Y (pixels)")
 
-        self.ax4.set_title("Drone Motion Map")
+        self.ax4.set_title("Coverage Heatmap")
         self.ax4.set_xlabel("X (pixels)")
         self.ax4.set_ylabel("Y (pixels)")
 
@@ -204,10 +209,7 @@ class MultiAgentSDQNViewer:
         if self.ylim:
             self.ax1.set_ylim(*self.ylim)
 
-    def _plot_signal_heatmap(self) -> None:
-        """
-        Plots the 2D transmitter power heatmap in real time.
-        """
+    def _plot_rssi_heatmap(self) -> None:
         # Generate the grid for the heatmap
         xs = np.linspace(self.xlim[0], self.xlim[1], 100)
         ys = np.linspace(self.ylim[0], self.ylim[1], 100)
@@ -219,18 +221,21 @@ class MultiAgentSDQNViewer:
 
         # Plot the heatmap
         if self.im1 is None:
+            cmap = plt.cm.get_cmap("turbo", 11)  # 11 discrete colors
+            norm = mcolors.BoundaryNorm(boundaries=np.linspace(0, 100, 11), ncolors=10)
             self.im1 = self.ax1.imshow(
                 heatmap,
                 extent=[self.xlim[0], self.xlim[1], self.ylim[0], self.ylim[1]],
                 origin="lower",
-                cmap="turbo",  # Use a visually appealing colormap
+                cmap=cmap,
+                norm=norm,
                 alpha=0.7,
             )
         else:
             self.im1.set_data(heatmap)
 
-    def _plot_drone_collision_frame(self, drone_id: int = 0) -> None:
-        frame = self.sim.frames[drone_id, ..., 0]
+    def _plot_frame_ch1(self, drone_id: int = 0) -> None:
+        frame = self.sim.sdqn_agent.last_frames[drone_id, ..., 0]
         if self.im2 is None:
             self.im2 = self.ax2.imshow(
                 frame, origin="lower", cmap="gray", vmin=0, vmax=255
@@ -238,21 +243,20 @@ class MultiAgentSDQNViewer:
         else:
             self.im2.set_data(frame)
 
-    def _plot_drone_exploration_frame(self, drone_id: int = 0) -> None:
-        frame = self.sim.frames[drone_id, ..., 1]
-        # frame = (frame / 127.5) - 1.0
+    def _plot_frame_ch2(self, drone_id: int = 0) -> None:
+        frame = self.sim.sdqn_agent.last_frames[drone_id, ..., 1]
         if self.im3 is None:
             self.im3 = self.ax3.imshow(
-                frame, origin="lower", cmap="bwr", vmin=0, vmax=255
+                frame, origin="lower", cmap="turbo", vmin=0, vmax=255
             )
         else:
             self.im3.set_data(frame)
 
-    def _plot_drone_flow_map_frame(self, drone_id: int = 0) -> None:
-        frame = self.sim.frames[drone_id, ..., 2]
+    def _plot_frame_ch3(self, drone_id: int = 0) -> None:
+        frame = self.sim.sdqn_agent.last_frames[drone_id, ..., 2]
         if self.im4 is None:
             self.im4 = self.ax4.imshow(
-                frame, origin="lower", cmap="viridis", vmin=0, vmax=255
+                frame, origin="lower", cmap="turbo", vmin=0, vmax=255
             )
         else:
             self.im4.set_data(frame)
@@ -264,5 +268,4 @@ class MultiAgentSDQNViewer:
 
     def _reset_timers(self) -> None:
         self.t0 = time.time()
-        self.fps = 0.0
         self.last_render_time = 0.0

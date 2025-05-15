@@ -32,22 +32,22 @@ class RewardManager:
         self.expire_time = 60.0
 
     def update(
-        self, drone_positions: np.ndarray, time: float
+        self, drones: np.ndarray, users: np.ndarray, time: float
     ) -> tuple[np.ndarray, np.ndarray]:
 
-        pairwise_distances = pairwise_self_distances(drone_positions)
+        pairwise_distances = pairwise_self_distances(drones)
         pairwise_distances[pairwise_distances <= 0.0] = np.inf
         nearest_distances = np.min(pairwise_distances, axis=-1)
         connected_neighbors = np.sum(pairwise_distances < self.d_max, axis=0)
 
-        r_coll = self.collision_penalty(drone_positions, nearest_distances)
+        r_coll = self.collision_penalty(drones, nearest_distances)
         r_conn = self.connectivity_rewards(connected_neighbors)
-        r_expl = self.exploration_rewards(drone_positions, time)
+        r_expl = self.exploration_rewards(drones, time)
         # r_expl = self.coverage_rewards(drone_positions) + r_coll
         # r_expl = self.distance_rewards(nearest_distances) + r_coll
         # r_expl[connected_neighbors == 0] = 0.0
 
-        self._update_visited_cells(drone_positions, time)
+        self._update_visited_cells(drones, time)
 
         rewards = self.w_coll * r_coll + self.w_conn * r_conn + self.w_expl * r_expl
         rewards = np.clip(rewards, -1.0, +1.0)
