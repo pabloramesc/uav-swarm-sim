@@ -18,7 +18,7 @@ from .position_controller import PositionController
 
 @dataclass
 class SDQNPositionConfig(SwarmPositionConfig):
-    displacement: float = 10.0 # in meters
+    displacement: float = 10.0  # in meters
     obstacle_distance: float = 10.0  # in meters
     agent_mass: float = 1.0  # simple equivalence between force and acceleration
     max_acceleration: float = 10.0  # 1 g aprox. 9.81 m/s^2
@@ -46,6 +46,8 @@ class SDQNPositionController(SwarmPositionController):
             kp=config.max_acceleration / config.displacement,
             kd=config.max_acceleration / config.target_velocity,
         )
+        
+        self._displacement = config.displacement
 
         self.last_update_time: float = None
         self.target_position = np.zeros(2)  # px, py
@@ -62,13 +64,11 @@ class SDQNPositionController(SwarmPositionController):
         user_positions: dict[int, np.ndarray] = None,
     ) -> None:
         super().initialize(time, state)
-        if drone_positions is None:
-            raise ValueError("`drone_positions` is required for initialization")
-        if user_positions is None:
-            raise ValueError("`user_positions` is required for initialization")
 
-        self._drone_positions = drone_positions.copy()
-        self._user_positions = user_positions.copy()
+        self._drone_positions = drone_positions
+        self._user_positions = user_positions
+
+        self._update_local_agent()
 
         self.last_update_time: float = None
         self.target_position = state[0:2]  # px, py
@@ -86,27 +86,15 @@ class SDQNPositionController(SwarmPositionController):
         super().update(time, state)
 
         if drone_positions is not None:
-            self._drone_positions = drone_positions.copy()
+            self._drone_positions = drone_positions
 
         if user_positions is not None:
-            self._user_positions = user_positions.copy()
+            self._user_positions = user_positions
 
         if self._needs_update(time):
-            drones_array = (
-                np.array(list(self._drone_positions.values()))[:, 0:2]
-                if self._drone_positions
-                else np.zeros((0, 2))
-            )
-            users_array = (
-                np.array(list(self._user_positions.values()))[:, 0:2]
-                if self._user_positions
-                else np.zeros((0, 2))
-            )
-            self.local_agent.update(
-                position=state[0:2], drones=drones_array, users=users_array
-            )
+            self._update_local_agent()
 
-        self.target_position = self.cell_size * self.local_agent.displacement
+        self.target_position = self._displacement * self.local_agent.direction
 
         control = np.zeros(3)
 
@@ -133,3 +121,15 @@ class SDQNPositionController(SwarmPositionController):
             return True
         elapsed_time = time - self.last_update_time
         return elapsed_time > self.update_period
+
+    def _update_local_agent(self) -> None:
+        drones_array = self._positions_dict_to_array(self._drone_positions)
+        users_array = self._positions_dict_to_array(self._user_positions)
+        self.local_agent.update(
+            position=self.state[0:2], drones=drones_array, users=users_array
+        )
+
+    def _positions_dict_to_array(self, positions: dict[int, np.ndarray]) -> np.ndarray:
+        if positions is None or len(positions) == 0:
+            return np.zeros((0, 2))
+        return np.array([pos[0:2] for pos in positions.values()])

@@ -20,14 +20,15 @@ class LocalAgent:
         
         self.last_frame: np.ndarray = None
         self.last_action: int = None
-        self.displacement = np.zeros(2)
+        self.direction = np.zeros(2)
 
     def update(
         self, position: np.ndarray, drones: np.ndarray, users: np.ndarray
     ) -> None:
-        self.position = position.copy()
-        self.drones = drones.copy()
-        self.users = users.copy()
+        self.position = position
+        self.drones = drones
+        self.users = users
+        self.frame_generator.update(position, drones, users)
 
     def generate_frame(self) -> np.ndarray:
         frame = self.frame_generator.generate_frame()
@@ -46,5 +47,5 @@ class LocalAgent:
             new_radius = np.clip(new_radius, 0.1, 10e3)
             self.frame_generator.set_frame_radius(new_radius)
             
-        self.displacement = action_to_displacement(action)
+        self.direction = action_to_displacement(action)
         self.last_action = action

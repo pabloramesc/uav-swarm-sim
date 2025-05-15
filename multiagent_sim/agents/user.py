@@ -22,7 +22,7 @@ class User(Agent):
     """
 
     def __init__(
-        self, agent_id: int, environment: Environment, network_sim: NetworkSimulator
+        self, agent_id: int, environment: Environment, network_sim: NetworkSimulator = None
     ):
         """
         Initializes the user agent with a unique ID, maximum speed, and maximum acceleration.
@@ -60,8 +60,7 @@ class User(Agent):
         if self.swarm_link is not None:
             self.swarm_link.update(self.time, self.position)
             self._send_random_message()
-
-        self.print_received_messages(clear=True)
+            self.print_received_messages(clear=True)
 
     def _send_random_message(self) -> None:
         if self.time < self.next_tx_msg:

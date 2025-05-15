@@ -8,21 +8,20 @@ https://opensource.org/licenses/MIT
 import time
 from typing import Literal
 
-
 import matplotlib
-import matplotlib.colors as mcolors
 import numpy as np
+from matplotlib import colors as mcolors
 from matplotlib import pyplot as plt
 from matplotlib.image import AxesImage
 from numpy.typing import ArrayLike
 
+from .math.path_loss_model import rssi_to_signal_quality, signal_strength_map
 from .multiagent_sdqn_gym import MultiAgentSDQNGym
-
-from .math.path_loss_model import signal_strength, signal_strength_map
 
 AspectRatio = Literal["auto", "equal"]
 
-matplotlib.use("Agg")
+matplotlib.use("Qt5Agg")
+
 
 class MultiAgentSDQNViewer:
     """
@@ -51,10 +50,6 @@ class MultiAgentSDQNViewer:
         self.max_fps = 60.0
         self.aspect_ratio = aspect_ratio
 
-        self.t0: float = None
-        self.fps: float = None
-        self.last_render_time: float = None
-
         self.im1: AxesImage = None
         self.im2: AxesImage = None
         self.im3: AxesImage = None
@@ -76,6 +71,12 @@ class MultiAgentSDQNViewer:
     def time_since_render(self) -> float:
         return self.time - self.last_render_time
 
+    @property
+    def current_fps(self) -> float:
+        if self.time_since_render > 0.0:
+            return 1.0 / self.time_since_render
+        return 0.0
+
     def reset(self) -> None:
         """
         Resets the viewer to its initial state.
@@ -92,6 +93,8 @@ class MultiAgentSDQNViewer:
         self._calculate_axis_limits()
         self._initiate_plots()
         self._configure_axes()
+
+        self._update_agent_points()
 
         self.fig.canvas.draw_idle()
         self.fig.canvas.flush_events()
@@ -119,8 +122,8 @@ class MultiAgentSDQNViewer:
         if not (force_render or self._need_render()):
             return
 
+        self._update_agent_points()
         self._plot_rssi_heatmap()
-        self._update_drone_points()
 
         self._plot_frame_ch1()
         self._plot_frame_ch2()
@@ -131,19 +134,19 @@ class MultiAgentSDQNViewer:
         if verbose:
             print(self.viewer_status_str())
 
-        self.fps = 0.9 * self.fps + 0.1 * self.current_fps
+        # self.fps = 0.9 * self.fps + 0.1 * self.current_fps
         self.last_render_time = self.time
 
     def viewer_status_str(self) -> str:
         return (
             f"Real time: {self.time:.2f} s, "
             f"Sim time: {self.sim.sim_time:.2f} s, "
-            f"FPS: {self.fps:.2f}"
+            f"FPS: {self.current_fps:.2f}"
         )
 
     def _initiate_plots(self) -> None:
-        (self.drone_points,) = self.ax.plot([], [], "bo", label="drones")
-        (self.user_points,) = self.ax.plot([], [], "rx", label="users")
+        (self.drone_points,) = self.ax1.plot([], [], "bo", label="drones")
+        (self.user_points,) = self.ax1.plot([], [], "rx", label="users")
         self._plot_avoid_regions()
 
     def _plot_avoid_regions(self) -> None:
@@ -159,11 +162,16 @@ class MultiAgentSDQNViewer:
                 hatch="///",
             )
 
-    def _update_drone_points(self) -> None:
-        drone_states = self.sim.drones.get_states_array()
+    def _update_agent_points(self) -> None:
+        self.drone_states = self.sim.drones.get_states_array()
         self.drone_points.set_data(
-            drone_states[:, 0],
-            drone_states[:, 1],
+            self.drone_states[:, 0],
+            self.drone_states[:, 1],
+        )
+        self.user_states = self.sim.users.get_states_array()
+        self.user_points.set_data(
+            self.user_states[:, 0],
+            self.user_states[:, 1],
         )
 
     def _calculate_axis_limits(self) -> None:
@@ -215,9 +223,10 @@ class MultiAgentSDQNViewer:
         ys = np.linspace(self.ylim[0], self.ylim[1], 100)
 
         # Calculate the heatmap using the simulator's tx_power_heatmap method
-        heatmap = signal_strength_map(
-            self.sim.drone_positions, xs, ys, f=2.4e3, mode="max"
+        rssi = signal_strength_map(
+            self.drone_states[:, 0:3], xs, ys, f=2412, n=2.4, mode="max"
         )
+        heatmap = rssi_to_signal_quality(rssi, vmin=-80.0)
 
         # Plot the heatmap
         if self.im1 is None:
@@ -262,7 +271,7 @@ class MultiAgentSDQNViewer:
             self.im4.set_data(frame)
 
     def _need_render(self) -> bool:
-        if self.fps > self.max_fps:
+        if self.current_fps > self.max_fps:
             return False
         return self.sim.sim_time > self.time or self.current_fps < self.min_fps
 

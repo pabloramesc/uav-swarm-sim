@@ -59,8 +59,8 @@ class Drone(Agent):
                 global_bcast_interval=2.0,
             )
 
-        self.drone_positions: dict[int, np.ndarray] = None
-        self.user_positions: dict[int, np.ndarray] = None
+        self.drone_positions: dict[int, np.ndarray] = {}
+        self.user_positions: dict[int, np.ndarray] = {}
 
         self.mass = 1.0  # 1 kg for simple equivalence between force and acceleration
         self.max_acc = 10.0  # aprox. 1 g = 9.81 m/s^2
@@ -71,9 +71,14 @@ class Drone(Agent):
         time: float = 0.0,
     ):
         super().initialize(state, time)
-        self._update_neighbors()
+
+        self.drone_positions = {}
+        self.user_positions = {}
         self.position_controller.initialize(
-            time, state, drone_positions=self.drone_positions
+            time,
+            state,
+            drone_positions=self.drone_positions,
+            user_positions=self.user_positions,
         )
 
     def update(self, dt: float = 0.01) -> None:
@@ -94,7 +99,10 @@ class Drone(Agent):
 
         # Compute control force using the position controller
         control_force = self.position_controller.update(
-            time=self.time, state=self.state, drone_positions=self.drone_positions
+            time=self.time,
+            state=self.state,
+            drone_positions=self.drone_positions,
+            user_positions=self.user_positions,
         )
 
         # Limit the acceleration to the maximum allowable value

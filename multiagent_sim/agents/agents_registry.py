@@ -141,4 +141,4 @@ class AgentsRegistry(ABC):
         return len(self._agent_list)
 
     def __getitem__(self, index: int) -> Agent:
-        return self._agent_list[index]
+        return self._agents_list[index]

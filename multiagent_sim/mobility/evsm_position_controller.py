@@ -92,6 +92,7 @@ class EVSMPositionController(SwarmPositionController):
         time: float,
         state: np.ndarray,
         drone_positions: dict[int, np.ndarray] = None,
+        user_positions: dict[int, np.ndarray] = None,
     ) -> None:
         super().initialize(time, state)
         if drone_positions is None:
@@ -103,6 +104,7 @@ class EVSMPositionController(SwarmPositionController):
         time: float,
         state: np.ndarray,
         drone_positions: dict[int, np.ndarray] = None,
+        user_positions: dict[int, np.ndarray] = None,
     ) -> np.ndarray:
         """
         Compute control forces: [Fx, Fy, Fz]

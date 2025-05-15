@@ -33,7 +33,8 @@ class MultiAgentSDQNGym:
         self.num_users = num_users
         self.dt = dt
         self.environment = Environment(dem_path)
-        self.sdqn_config = sdqn_config
+        self.sdqn_config = sdqn_config if sdqn_config else SDQNPositionConfig()
+        self.model_path = model_path
 
         self.sdqn_agent = self._create_sdqn_central_agent()
         self.reward_manager = self._create_reward_manager()
@@ -44,43 +45,38 @@ class MultiAgentSDQNGym:
         self.sim_time = 0.0
         self.sim_step = 0
 
-        self.logger = create_logger(name="MultiDroneEVSMSimulator", level="INFO")
+        self.logger = create_logger(name="MultiAgentSDQNGym", level="INFO")
 
         self.prev_frames: np.ndarray = None
         self.prev_actions: np.ndarray = None
 
     @property
     def real_time(self) -> float:
-        return time.time() - self.real_t0
+        return time.time() - self.init_time
 
     def _create_sdqn_central_agent(self) -> CentralAgent:
         frame_shape = SimpleFrameGenerator.calculate_frame_shape()
-        num_actions = len(Action)
+        num_actions = 5  # len(Action)
         wrapper = SDQNWrapper(
             frame_shape, num_actions, model_path=self.model_path, train_mode=True
         )
         return CentralAgent(wrapper)
 
     def _create_reward_manager(self) -> RewardManager:
-        cell_size = SimpleFrameGenerator.calculate_cell_size()
-        manager = RewardManager(env=self.environment, cell_size=cell_size)
+        manager = RewardManager(env=self.environment)
         return manager
 
     def _create_agents(self) -> list[Agent]:
         agents: list[Agent] = []
 
-        self.gcs = ControlStation(
-            agent_id=len(agents),
-            environment=self.environment,
-            network_sim=self.network_simulator,
-        )
+        self.gcs = ControlStation(agent_id=len(agents), environment=self.environment)
         agents.append(self.gcs)
 
         self.drones = AgentsRegistry()
         self.users = AgentsRegistry()
 
         for i in range(self.num_drones):
-            frame_gen = SimpleFrameGenerator(env=self.environment)
+            frame_gen = SimpleFrameGenerator(env=self.environment, frame_radius=250.0)
             local = LocalAgent(agent_id=i, frame_generator=frame_gen)
             self.sdqn_agent.register_agent(local)
             sdqn = SDQNPositionController(
@@ -90,20 +86,15 @@ class MultiAgentSDQNGym:
                 agent_id=len(agents),
                 environment=self.environment,
                 position_controller=sdqn,
-                network_sim=self.network_simulator,
                 drones_registry=self.drones,
                 users_registry=self.users,
-                neighbor_provider=self.neihgbor_provider,
+                neighbor_provider="registry",
             )
             self.drones.register(drone)
             agents.append(drone)
 
         for _ in range(self.num_users):
-            user = User(
-                agent_id=len(agents),
-                environment=self.environment,
-                network_sim=self.network_simulator,
-            )
+            user = User(agent_id=len(agents), environment=self.environment)
             self.users.register(user)
             agents.append(user)
 
@@ -133,6 +124,10 @@ class MultiAgentSDQNGym:
         self.sdqn_agent.step()
         self.prev_frames = self.sdqn_agent.last_frames
         self.prev_actions = self.sdqn_agent.last_actions
+        
+        self.sim_time = 0.0
+        self.sim_steps = 0
+        self.init_time = time.time()
 
         self.logger.info("✅ Initialization completed.")
 
@@ -144,8 +139,15 @@ class MultiAgentSDQNGym:
         self.gcs.update(dt)
         self.drones.update(dt)
         self.users.update(dt)
+        
+        self.drone_states = self.drones.get_states_array()
+        self.user_states = self.users.get_states_array()
 
-        rewards, dones = self.reward_manager.update()
+        rewards, dones = self.reward_manager.update(
+            drones=self.drone_states[:, 0:2],
+            users=self.user_states[:, 0:2],
+            time=self.sim_time,
+        )
         self.reset_collided_drones(dones)
 
         self.sdqn_agent.step()
@@ -157,7 +159,7 @@ class MultiAgentSDQNGym:
             rewards=rewards,
             dones=dones,
         )
-        
+
         self.sdqn_agent.sdqn.train()
 
         self.prev_frames = self.sdqn_agent.last_frames
@@ -190,7 +192,7 @@ class MultiAgentSDQNGym:
         if not np.any(in_area):
             return 0.0
         tx_power = signal_strength(
-            self.drone_positions, eval_points[in_area], f=2.4e3, mode="max"
+            self.drone_states[:, 0:3], eval_points[in_area], f=2.4e3, mode="max"
         )
         in_range = tx_power > rx_sens
         return np.sum(in_range) / np.sum(in_area)
@@ -206,11 +208,11 @@ class MultiAgentSDQNGym:
     def training_status_str(self) -> str:
         return (
             f"Train steps: {self.sdqn_agent.sdqn.train_steps}, "
-            f"Train speed: {self.sdqn_agent.train_speed:.2f} sps, "
-            f"Memory size: {self.sdqn_agent.memory_size}, "
-            f"Epsilon: {self.sdqn_agent.epsilon:.4f}, "
-            f"Loss: {self.sdqn_agent.loss:.4e}, "
-            f"Accuracy: {self.sdqn_agent.accuracy*100:.2f} %"
+            f"Train speed: {self.sdqn_agent.sdqn.train_speed:.2f} sps, "
+            f"Memory size: {self.sdqn_agent.sdqn.memory_size}, "
+            f"Epsilon: {self.sdqn_agent.sdqn.epsilon:.4f}, "
+            f"Loss: {self.sdqn_agent.sdqn.loss:.4e}, "
+            f"Accuracy: {self.sdqn_agent.sdqn.accuracy*100:.2f} %"
         )
 
     def _needs_update(self) -> bool:

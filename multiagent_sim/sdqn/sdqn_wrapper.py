@@ -64,10 +64,10 @@ class SDQNWrapper:
         self.dqn_agent.load_model(self.model_path, compile=True)
         self.dqn_agent.model.summary()
 
-        if self.frame_shape != self.dqn_agent.model.input_shape:
+        if self.frame_shape != self.dqn_agent.model.input_shape[1:]:
             raise ValueError("Frame shape does not match model input shape")
 
-        if self.num_actions != self.dqn_agent.model.outpus_size:
+        if self.num_actions != self.dqn_agent.model.output_shape[1]:
             raise ValueError("The number of actions does not match the output size")
 
         self.train_metrics: dict = None
@@ -128,7 +128,7 @@ class SDQNWrapper:
         dict
             Training metrics, or None if training is not performed.
         """
-        if not self.training_mode:
+        if not self.train_mode:
             return None
 
         if self.dqn_agent.memory.size < self.min_train_samples:

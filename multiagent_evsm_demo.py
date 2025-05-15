@@ -29,7 +29,9 @@ evsm_config = EVSMPositionConfig(
 sim = MultiAgentSimulator(
     num_drones, num_users, dt, evsm_config=evsm_config, neihgbor_provider="network"
 )
+
 sim.environment.set_rectangular_boundary([-size, -size], [+size, +size])
+
 for _ in range(5):
     center = np.random.uniform(-size, +size, size=(2,))
     radius = np.random.uniform(5.0, 50.0)

@@ -34,6 +34,7 @@ class MultiAgentViewer:
         ylim: tuple[float, float] = None,
         fig_size: tuple[float, float] = None,
         min_fps: float = 10.0,
+        max_fps: float = 60.0,
         aspect_ratio: AspectRatios = "equal",
         background_type: BackgroundType = "rssi",
     ):
@@ -44,11 +45,9 @@ class MultiAgentViewer:
         self.xlim = xlim
         self.ylim = ylim
         self.min_fps = min_fps
+        self.max_fps = max_fps
         self.aspect_ratio = aspect_ratio
         self.background_type = background_type
-
-        self.t0: float = None
-        self.last_render_time: float = None
 
         self.background_image: AxesImage = None
 
@@ -66,6 +65,12 @@ class MultiAgentViewer:
     @property
     def time_since_render(self) -> float:
         return self.time - self.last_render_time
+
+    @property
+    def current_fps(self) -> float:
+        if self.time_since_render > 0.0:
+            return 1.0 / self.time_since_render
+        return 0.0
 
     def reset(self) -> None:
         """
@@ -130,8 +135,8 @@ class MultiAgentViewer:
     def _initiate_plots(self) -> None:
         (self.link_lines,) = self.ax.plot([], [], "b-", lw=0.5, label="springs")
         (self.drone_points,) = self.ax.plot([], [], "co", label="drones")
-        (self.edge_drone_points,) = self.ax.plot([], [], "mo", label="edge drones")
-        (self.user_points,) = self.ax.plot([], [], "rx", label="users")
+        (self.edge_drone_points,) = self.ax.plot([], [], "ro", label="edge drones")
+        (self.user_points,) = self.ax.plot([], [], "mx", label="users")
         (self.gcs_points,) = self.ax.plot([], [], "k*", label="GCS")
         self._plot_avoid_regions()
 
@@ -268,21 +273,18 @@ class MultiAgentViewer:
         return links_x, links_y
 
     def _need_render(self) -> bool:
-        min_render_period = 1.0 / self.min_fps
-        return (
-            self.sim.sim_time >= self.time
-            or self.time_since_render >= min_render_period
-        )
+        if self.current_fps > self.max_fps:
+            return False
+        return self.sim.sim_time > self.time or self.current_fps < self.min_fps
 
     def _reset_timers(self) -> None:
         self.t0 = time.time()
         self.last_render_time = 0.0
 
     def _print_sim_status(self) -> None:
-        fps = 1.0 / self.time_since_render if self.time_since_render > 0.0 else 0.0
         ns3_time = self.sim.network_simulator.ns3_time
         ns3_rtt = self.sim.network_simulator.bridge.mean_rtt * 1e3
         print(
             f"real time: {self.time:.2f} s, sim time: {self.sim.sim_time:.2f} s, "
-            f"NS-3 time: {ns3_time:.2f} s, NS-3 RTT: {ns3_rtt:.3} ms, FPS: {fps:.2f}"
+            f"NS-3 time: {ns3_time:.2f} s, NS-3 RTT: {ns3_rtt:.3} ms, FPS: {self.current_fps:.2f}"
         )

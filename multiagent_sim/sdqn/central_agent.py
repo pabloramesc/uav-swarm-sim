@@ -40,7 +40,7 @@ class CentralAgent:
         return
     
     def generate_frames(self) -> np.ndarray:
-        frames = np.zeros((self.num_agents, *self.sdqn.frame_shape))
+        frames = np.zeros((self.num_agents, *self.sdqn.frame_shape), dtype=np.uint8)
         for i, agent in enumerate(self.agents):
             frame = agent.generate_frame()
             self.sdqn.check_frame(frame)

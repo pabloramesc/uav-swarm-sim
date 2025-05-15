@@ -72,13 +72,11 @@ class SimpleFrameGenerator(FrameGenerator):
 
     @staticmethod
     def calculate_frame_shape(num_cells: int = 64) -> tuple[int, int, int]:
-        return super().calculate_frame_shape(
-            num_channels=3, channel_shape=(num_cells, num_cells)
-        )()
-        
+        return (num_cells, num_cells, 3)
+
     @staticmethod
     def calculate_cell_size(num_cells: int = 64, frame_radius: float = 100.0) -> float:
-        return 2 * frame_radius * num_cells
+        return 2 * frame_radius / num_cells
 
     def update(
         self, position: np.ndarray, drones: np.ndarray, users: np.ndarray
@@ -145,7 +143,7 @@ class SimpleFrameGenerator(FrameGenerator):
         return gaussian_decay(heatmap, sigma=10.0)
 
     def drones_repulsion_heatmap(self) -> np.ndarray:
-        if self.visible_neighbors.shape[0] == 0:
+        if self.drones.shape[0] == 0:
             return np.zeros((self.num_cells, self.num_cells))
         flat_cell_positions = self.cell_positions.reshape(-1, 2)
         neighbor_distances = pairwise_cross_distances(self.drones, flat_cell_positions)
@@ -166,7 +164,7 @@ class SimpleFrameGenerator(FrameGenerator):
         flat_cell_positions = self.cell_positions.reshape(-1, 2)
         rssi = signal_strength(
             self.drones, flat_cell_positions, f=2412, n=2.4, tx_power=20, mode="max"
-        )
+        ).reshape(self.channel_shape)
         quality = rssi_to_signal_quality(rssi)
         drones = self.positions_binary_map(self.drones)
         return np.clip(quality + drones, 0.0, 1.0)
@@ -175,7 +173,7 @@ class SimpleFrameGenerator(FrameGenerator):
         flat_cell_positions = self.cell_positions.reshape(-1, 2)
         rssi = signal_strength(
             self.position, flat_cell_positions, f=2412, n=2.4, tx_power=20, mode="max"
-        )
+        ).reshape(self.channel_shape)
         quality = rssi_to_signal_quality(rssi)
         users = self.positions_binary_map(self.users)
         return np.clip(quality + users, 0.0, 1.0)
