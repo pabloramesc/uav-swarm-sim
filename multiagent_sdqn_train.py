@@ -20,7 +20,7 @@ num_drones = 16
 num_users = 10
 size = 500.0
 
-config = SDQNPositionConfig(target_height=10.0)
+config = SDQNPositionConfig(displacement=10.0, target_height=10.0)
 sim = MultiAgentSDQNGym(
     num_drones,
     num_users,

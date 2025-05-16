@@ -124,7 +124,7 @@ class MultiAgentSDQNGym:
         self.sdqn_agent.step()
         self.prev_frames = self.sdqn_agent.last_frames
         self.prev_actions = self.sdqn_agent.last_actions
-        
+
         self.sim_time = 0.0
         self.sim_steps = 0
         self.init_time = time.time()
@@ -139,11 +139,11 @@ class MultiAgentSDQNGym:
         self.gcs.update(dt)
         self.drones.update(dt)
         self.users.update(dt)
-        
+
         self.drone_states = self.drones.get_states_array()
         self.user_states = self.users.get_states_array()
 
-        rewards, dones = self.reward_manager.update(
+        self.rewards, dones = self.reward_manager.update(
             drones=self.drone_states[:, 0:2],
             users=self.user_states[:, 0:2],
             time=self.sim_time,
@@ -156,7 +156,7 @@ class MultiAgentSDQNGym:
             frames=self.prev_frames,
             actions=self.prev_actions,
             next_frames=self.sdqn_agent.last_frames,
-            rewards=rewards,
+            rewards=self.rewards,
             dones=dones,
         )
 
@@ -192,7 +192,12 @@ class MultiAgentSDQNGym:
         if not np.any(in_area):
             return 0.0
         tx_power = signal_strength(
-            self.drone_states[:, 0:3], eval_points[in_area], f=2.4e3, mode="max"
+            tx_positions=self.drone_states[:, 0:3],
+            rx_positions=eval_points[in_area],
+            f=2412,
+            n=2.4,
+            tx_power=20.0,
+            mode="max",
         )
         in_range = tx_power > rx_sens
         return np.sum(in_range) / np.sum(in_area)

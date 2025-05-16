@@ -51,5 +51,3 @@ while True:
     sim.update()
     gui.update(force_render=False, verbose=True)
 
-    # cr = sim.area_coverage_ratio()
-    # print(f"Area coverage ratio: {cr * 100:.2f} %")

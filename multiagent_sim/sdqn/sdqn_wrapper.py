@@ -202,5 +202,5 @@ class SDQNWrapper:
     @property
     def loss(self) -> float:
         if self.train_metrics is not None and "loss" in self.train_metrics:
-            return self.central_agent.train_metrics["loss"]
+            return self.train_metrics["loss"]
         return np.nan

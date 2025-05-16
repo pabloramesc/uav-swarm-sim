@@ -133,10 +133,10 @@ class MultiAgentViewer:
         self.last_render_time = self.time
 
     def _initiate_plots(self) -> None:
-        (self.link_lines,) = self.ax.plot([], [], "b-", lw=0.5, label="springs")
-        (self.drone_points,) = self.ax.plot([], [], "co", label="drones")
-        (self.edge_drone_points,) = self.ax.plot([], [], "ro", label="edge drones")
-        (self.user_points,) = self.ax.plot([], [], "mx", label="users")
+        (self.link_lines,) = self.ax.plot([], [], "g-", lw=0.5, label="springs")
+        (self.drone_points,) = self.ax.plot([], [], "bx", label="drones")
+        (self.edge_drone_points,) = self.ax.plot([], [], "rx", label="edge drones")
+        (self.user_points,) = self.ax.plot([], [], "mo", label="users")
         (self.gcs_points,) = self.ax.plot([], [], "k*", label="GCS")
         self._plot_avoid_regions()
 
@@ -288,3 +288,5 @@ class MultiAgentViewer:
             f"real time: {self.time:.2f} s, sim time: {self.sim.sim_time:.2f} s, "
             f"NS-3 time: {ns3_time:.2f} s, NS-3 RTT: {ns3_rtt:.3} ms, FPS: {self.current_fps:.2f}"
         )
+        cr = self.sim.area_coverage_ratio()
+        print(f"Area coverage ratio: {cr * 100:.2f} %")

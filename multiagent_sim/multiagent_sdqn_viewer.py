@@ -63,20 +63,6 @@ class MultiAgentSDQNViewer:
 
         self.reset()
 
-    @property
-    def time(self) -> float:
-        return time.time() - self.t0
-
-    @property
-    def time_since_render(self) -> float:
-        return self.time - self.last_render_time
-
-    @property
-    def current_fps(self) -> float:
-        if self.time_since_render > 0.0:
-            return 1.0 / self.time_since_render
-        return 0.0
-
     def reset(self) -> None:
         """
         Resets the viewer to its initial state.
@@ -134,19 +120,19 @@ class MultiAgentSDQNViewer:
         if verbose:
             print(self.viewer_status_str())
 
-        # self.fps = 0.9 * self.fps + 0.1 * self.current_fps
-        self.last_render_time = self.time
+        self._update_timers()
 
     def viewer_status_str(self) -> str:
         return (
             f"Real time: {self.time:.2f} s, "
             f"Sim time: {self.sim.sim_time:.2f} s, "
-            f"FPS: {self.current_fps:.2f}"
+            f"FPS: {self.fps:.2f}"
         )
 
     def _initiate_plots(self) -> None:
-        (self.drone_points,) = self.ax1.plot([], [], "bo", label="drones")
-        (self.user_points,) = self.ax1.plot([], [], "rx", label="users")
+        (self.drone0_point,) = self.ax1.plot([], [], "rx", label="drone0")
+        (self.drone_points,) = self.ax1.plot([], [], "bx", label="drones")
+        (self.user_points,) = self.ax1.plot([], [], "mo", label="users")
         self._plot_avoid_regions()
 
     def _plot_avoid_regions(self) -> None:
@@ -164,9 +150,13 @@ class MultiAgentSDQNViewer:
 
     def _update_agent_points(self) -> None:
         self.drone_states = self.sim.drones.get_states_array()
+        self.drone0_point.set_data(
+            self.drone_states[0:1, 0],
+            self.drone_states[0:1, 1],
+        )
         self.drone_points.set_data(
-            self.drone_states[:, 0],
-            self.drone_states[:, 1],
+            self.drone_states[1:, 0],
+            self.drone_states[1:, 1],
         )
         self.user_states = self.sim.users.get_states_array()
         self.user_points.set_data(
@@ -226,7 +216,7 @@ class MultiAgentSDQNViewer:
         rssi = signal_strength_map(
             self.drone_states[:, 0:3], xs, ys, f=2412, n=2.4, mode="max"
         )
-        heatmap = rssi_to_signal_quality(rssi, vmin=-80.0)
+        heatmap = rssi_to_signal_quality(rssi, vmin=-80.0) * 100.0
 
         # Plot the heatmap
         if self.im1 is None:
@@ -240,33 +230,37 @@ class MultiAgentSDQNViewer:
                 norm=norm,
                 alpha=0.7,
             )
+            plt.colorbar(self.im1, ax=self.ax1, label="Signal Quality (%)")
         else:
             self.im1.set_data(heatmap)
 
     def _plot_frame_ch1(self, drone_id: int = 0) -> None:
-        frame = self.sim.sdqn_agent.last_frames[drone_id, ..., 0]
+        frame = self.sim.sdqn_agent.last_frames[drone_id, ..., 0] / 255.0
         if self.im2 is None:
             self.im2 = self.ax2.imshow(
-                frame, origin="lower", cmap="gray", vmin=0, vmax=255
+                frame, origin="lower", cmap="gray", vmin=0.0, vmax=1.0
             )
+            plt.colorbar(self.im2, ax=self.ax2, label="Collision Risk")
         else:
             self.im2.set_data(frame)
 
     def _plot_frame_ch2(self, drone_id: int = 0) -> None:
-        frame = self.sim.sdqn_agent.last_frames[drone_id, ..., 1]
+        frame = self.sim.sdqn_agent.last_frames[drone_id, ..., 1] / 255.0
         if self.im3 is None:
             self.im3 = self.ax3.imshow(
-                frame, origin="lower", cmap="turbo", vmin=0, vmax=255
+                frame, origin="lower", cmap="turbo", vmin=0.0, vmax=1.0
             )
+            plt.colorbar(self.im3, ax=self.ax3, label="Signal Quality")
         else:
             self.im3.set_data(frame)
 
     def _plot_frame_ch3(self, drone_id: int = 0) -> None:
-        frame = self.sim.sdqn_agent.last_frames[drone_id, ..., 2]
+        frame = self.sim.sdqn_agent.last_frames[drone_id, ..., 2] / 255.0
         if self.im4 is None:
             self.im4 = self.ax4.imshow(
-                frame, origin="lower", cmap="turbo", vmin=0, vmax=255
+                frame, origin="lower", cmap="turbo", vmin=0.0, vmax=1.0
             )
+            plt.colorbar(self.im4, ax=self.ax4, label="Signal Quality")
         else:
             self.im4.set_data(frame)
 
@@ -277,4 +271,23 @@ class MultiAgentSDQNViewer:
 
     def _reset_timers(self) -> None:
         self.t0 = time.time()
+        self.fps = 0.0
         self.last_render_time = 0.0
+
+    def _update_timers(self) -> None:
+        self.fps = 0.1 * self.fps + 0.9 * self.current_fps
+        self.last_render_time = self.time
+
+    @property
+    def time(self) -> float:
+        return time.time() - self.t0
+
+    @property
+    def time_since_render(self) -> float:
+        return self.time - self.last_render_time
+
+    @property
+    def current_fps(self) -> float:
+        if self.time_since_render > 0.0:
+            return 1.0 / self.time_since_render
+        return 0.0

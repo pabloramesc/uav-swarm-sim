@@ -193,27 +193,9 @@ class MultiAgentSimulator:
             except TimeoutError:
                 self.network_simulator.fetch_packets()
 
-    def area_coverage_ratio(
-        self,
-        num_points: int = 1000,
-        tx_power: float = 20.0,
-        rx_sens: float = -80.0,
-        freq: float = 2.4,
-    ) -> float:
+    def area_coverage_ratio(self, num_points: int = 1000) -> float:
         """
         Calculates the ratio of the area covered by sufficient signal strength.
-
-        Parameters
-        ----------
-        num_points : int, optional
-            Number of random points to sample within the environment (default is 1000).
-        rx_sens : float, optional
-            Receiver sensitivity threshold in dBm (default is -80.0).
-
-        Returns
-        -------
-        float
-            The ratio of the area covered by sufficient signal strength.
         """
         eval_points = np.zeros((num_points, 3), dtype=np.float32)
         eval_points[:, 0] = np.random.uniform(
@@ -227,14 +209,15 @@ class MultiAgentSimulator:
             eval_points
         ) & ~self.environment.is_collision(eval_points)
         tx_power_map = signal_strength(
-            self.drone_positions,
-            eval_points[in_area],
-            f=freq,
-            tx_power=tx_power,
+            tx_positions=self.drones.get_states_array()[:, 0:3],
+            rx_positions=eval_points[in_area],
+            f=2412,
+            n=2.4,
+            tx_power=20.0,
             mode="max",
         )
-        in_range = tx_power_map > rx_sens
-        return np.sum(in_range) / np.sum(in_area)
+        in_range = tx_power_map > -80.0
+        return np.sum(in_range) / np.sum(in_area) if in_area.size > 0.0 else 0.0
 
     def _update_links_matrix(self) -> None:
         """

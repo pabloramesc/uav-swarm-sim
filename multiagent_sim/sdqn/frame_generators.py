@@ -140,7 +140,7 @@ class SimpleFrameGenerator(FrameGenerator):
         flat_cell_positions = self.cell_positions.reshape(-1, 2)
         obstacles_distances = distances_to_obstacles(self.env, flat_cell_positions)
         heatmap = obstacles_distances.reshape(self.channel_shape)
-        return gaussian_decay(heatmap, sigma=10.0)
+        return gaussian_decay(heatmap, sigma=self.collision_distance)
 
     def drones_repulsion_heatmap(self) -> np.ndarray:
         if self.drones.shape[0] == 0:
@@ -149,7 +149,7 @@ class SimpleFrameGenerator(FrameGenerator):
         neighbor_distances = pairwise_cross_distances(self.drones, flat_cell_positions)
         nearest_distances = np.min(neighbor_distances, axis=0)
         heatmap = nearest_distances.reshape(self.channel_shape)
-        return gaussian_decay(heatmap, sigma=50.0)
+        return gaussian_decay(heatmap, sigma=self.collision_distance)
 
     def collision_risk_heatmap(self) -> np.ndarray:
         obstacles_heatmap = self.obstacles_repulsion_heatmap()

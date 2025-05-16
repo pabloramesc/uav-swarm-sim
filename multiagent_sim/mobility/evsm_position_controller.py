@@ -11,36 +11,17 @@ from .swarm_position_controller import SwarmPositionController, SwarmPositionCon
 class EVSMPositionConfig(SwarmPositionConfig):
     """
     Configuration for EVSMPositionController.
-
-    Attributes
-    ----------
-    separation_distance : float
-        Desired separation between agents (m).
-    obstacle_distance : float
-        Minimum obstacle avoidance distance (m).
-    agent_mass : float
-        Agent mass (kg).
-    max_acceleration : float
-        Maximum acceleration (m/s^2).
-    target_speed : float
-        Desired horizontal speed (m/s).
-    target_altitude : float
-        Desired altitude above ground (m).
-    max_altitude_error : float
-        Maximum altitude error for controller.
-    natural_length_rate : float
-        Rate of change for EVSM natural length (m/s).
     """
 
-    separation_distance: float = 50.0
+    separation_distance: float = 100.0
     obstacle_distance: float = 10.0
-    agent_mass: float = 1.0
-    max_acceleration: float = 10.0
     target_speed: float = 15.0
     target_altitude: float = 100.0
-    max_altitude_error: float = 100.0
-    initial_natural_length: float = 50.0
+    initial_natural_length: float = 10.0
     natural_length_rate: float = 1.0
+    agent_mass: float = 1.0
+    max_acceleration: float = 10.0
+    max_position_error: float = 100.0
 
 
 class EVSMPositionController(SwarmPositionController):
@@ -57,33 +38,29 @@ class EVSMPositionController(SwarmPositionController):
         self.control_update_period = 0.1
         self.springs_update_period = 1.0
 
-        # Natural length parameters
         self._initial_nat_length = config.initial_natural_length
         self._max_nat_length = config.separation_distance
         self._nat_length_rate = config.natural_length_rate
         self._current_nat_length = self._initial_nat_length
 
-        # Altitude setpoint
         self._target_altitude = config.target_altitude
 
-        # EVSM horizontal control
+        kp = config.max_acceleration / config.max_position_error
+        kd = 2 * np.sqrt(kp)
+
         self.evsm = EVSM(
             env=environment,
             ln=self._initial_nat_length,
-            ks=config.max_acceleration / config.separation_distance,
-            kd=config.max_acceleration / config.target_speed,
+            ks=kp,
+            kd=kd,
             d_obs=config.obstacle_distance,
         )
 
-        # Vertical PD control
-        self.vertical_controller = AltitudeController(
-            kp=config.max_acceleration / config.max_altitude_error,
-            kd=config.max_acceleration / config.target_speed,
-        )
+        self.vertical_controller = AltitudeController(kp, kd)
 
         self.control_force = np.zeros(3)
         self.drone_positions: dict[int, np.ndarray] = {}
-        
+
         self._last_control_update_time: float = None
         self._last_springs_update_time: float = None
 

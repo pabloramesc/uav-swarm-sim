@@ -18,10 +18,11 @@ from .position_controller import PositionController
 
 @dataclass
 class SDQNPositionConfig(SwarmPositionConfig):
-    displacement: float = 10.0  # in meters
+    displacement: float = 1.0  # in meters
     obstacle_distance: float = 10.0  # in meters
     agent_mass: float = 1.0  # simple equivalence between force and acceleration
     max_acceleration: float = 10.0  # 1 g aprox. 9.81 m/s^2
+    max_displacement: float = 100.0
     target_velocity: float = 15.0  # between 5-25 m/S
     target_height: float = 100.0  # in meters (AGL - Above Ground Level)
 
@@ -38,15 +39,11 @@ class SDQNPositionController(SwarmPositionController):
 
         self.local_agent = local_agent
 
-        self.altitude_hold = AltitudeController(
-            kp=config.max_acceleration / config.displacement,
-            kd=config.max_acceleration / config.target_velocity,
-        )
-        self.position_controller = PositionController(
-            kp=config.max_acceleration / config.displacement,
-            kd=config.max_acceleration / config.target_velocity,
-        )
-        
+        kp = config.max_acceleration / config.max_displacement
+        kd = 2 * np.sqrt(kp)  # critical damping
+        self.altitude_hold = AltitudeController(kp, kd)
+        self.position_controller = PositionController(kp, kd)
+
         self._displacement = config.displacement
 
         self.last_update_time: float = None
@@ -93,8 +90,7 @@ class SDQNPositionController(SwarmPositionController):
 
         if self._needs_update(time):
             self._update_local_agent()
-
-        self.target_position = self._displacement * self.local_agent.direction
+            self.target_position += self._displacement * self.local_agent.direction
 
         control = np.zeros(3)
 
