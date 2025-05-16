@@ -7,13 +7,13 @@ https://opensource.org/licenses/MIT
 
 from multiagent_sim.multidrone_evsm_viewer import MultiDroneViewerEVSM
 from multiagent_sim.old.multidrone_evsm_simulator import MultiDroneEVSMSimulator
-from multiagent_sim.mobility.evsm_position_controller import EVSMPositionConfig
+from multiagent_sim.mobility.evsm_position_controller import EVSMConfig
 from multiagent_sim.mobility.utils import grid_positions
 
 dt = 0.01
 num_drones = 16
 
-evsm_config = EVSMPositionConfig(
+evsm_config = EVSMConfig(
     separation_distance=100.0,
     obstacle_distance=10.0,
     max_acceleration=10.0,

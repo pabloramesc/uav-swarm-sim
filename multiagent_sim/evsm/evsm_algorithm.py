@@ -22,7 +22,7 @@ from ..utils.logger import create_logger
 logger = create_logger("EVSM Algorithm", level="NOTSET")
 
 
-class EVSM:
+class EVSMAlgorithm:
     """
     EVSM (Exploration and Virtual Spring Model) class for swarm behavior.
 

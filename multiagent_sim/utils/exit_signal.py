@@ -7,4 +7,4 @@ def exit_handler(sig, frame):
     sys.exit(0)
 
 def register_exit_signal(sig=signal.SIGINT):
-    signal.signal(signal.SIGINT, exit_handler)
+    signal.signal(sig, exit_handler)

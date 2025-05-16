@@ -135,10 +135,10 @@ class AgentsRegistry(ABC):
             agent.update(dt)
 
     def __iter__(self):
-        return iter(self._agent_list)
+        return iter(self._agents_list)
 
     def __len__(self):
-        return len(self._agent_list)
+        return len(self._agents_list)
 
     def __getitem__(self, index: int) -> Agent:
         return self._agents_list[index]

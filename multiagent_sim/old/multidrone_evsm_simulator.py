@@ -12,7 +12,7 @@ import numpy as np
 from ..agents import Drone, AgentsManager, AgentsConfig, NeighborProvider
 from ..environment import Environment
 from ..mobility.evsm_position_controller import (
-    EVSMPositionConfig,
+    EVSMConfig,
     EVSMPositionController,
 )
 from ..math.path_loss_model import signal_strength
@@ -36,7 +36,7 @@ class MultiDroneEVSMSimulator:
         num_drones: int,
         dt: float = 0.01,
         dem_path: str = None,
-        evsm_config: EVSMPositionConfig = None,
+        evsm_config: EVSMConfig = None,
         neihgbor_provider: NeighborProvider = "registry",
         # visible_distance: float = 100.0,
     ) -> None:

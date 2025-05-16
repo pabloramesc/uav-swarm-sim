@@ -92,12 +92,14 @@ class NetworkSimulator:
                 return node
         raise ValueError(f"No node found with IP address {ip_address}")
 
-    def update(self, positions: np.ndarray = None, check: bool = False) -> None:
+    def update(
+        self, positions: dict[int, np.ndarray] = {}, check: bool = False
+    ) -> None:
         self.fetch_packets()
-        
+
         if positions is not None:
             self.set_node_positions(positions)
-            
+
         if check:
             try:
                 self.verify_node_positions(timeout=0.1)
@@ -145,16 +147,12 @@ class NetworkSimulator:
         self.real_init_time = None
         self.bridge
 
-    def set_node_positions(self, positions: np.ndarray) -> None:
-        if positions.shape != (self.num_nodes, 3):
-            raise ValueError(
-                f"Positions must be a numpy array with shape ({self.num_nodes}, 3)"
-            )
-        node_id_pos: dict[int, np.ndarray] = {}
-        for node_id, node_pos in enumerate(positions):
-            self.nodes[node_id].position = node_pos
-            node_id_pos[node_id] = node_pos
-        self.bridge.set_node_positions(node_id_pos)
+    def set_node_positions(self, positions: dict[int, np.ndarray]) -> None:
+        for node_id, pos in positions.items():
+            if pos.shape != (3,):
+                raise ValueError("Positions must be numpy array of shape (3,)")
+            self.nodes[node_id].position = pos
+        self.bridge.set_node_positions(positions)
 
     def verify_node_positions(self, timeout: float = 0.1) -> None:
         positions = self.bridge.request_node_positions(timeout)

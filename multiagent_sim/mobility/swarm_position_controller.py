@@ -10,7 +10,7 @@ SwarmingType = Literal["evsm", "sdqn"]
 
 
 @dataclass
-class SwarmPositionConfig:
+class SwarmControllerConfig:
     pass
 
 
@@ -19,7 +19,7 @@ class SwarmPositionController(ABC):
     Base class for position control.
     """
 
-    def __init__(self, config: SwarmPositionConfig, env: Environment) -> None:
+    def __init__(self, config: SwarmControllerConfig, env: Environment) -> None:
         self.config = config
         self.env = env
         self.time = 0.0

@@ -10,14 +10,14 @@ from dataclasses import dataclass
 import numpy as np
 
 from ..environment import Environment
-from ..sdqn.local_agent import LocalAgent
+from ..sdqn.sdqn_interface import SDQNInterface
 from .altitude_controller import AltitudeController
-from .swarm_position_controller import SwarmPositionController, SwarmPositionConfig
+from .swarm_position_controller import SwarmPositionController, SwarmControllerConfig
 from .position_controller import PositionController
 
 
 @dataclass
-class SDQNPositionConfig(SwarmPositionConfig):
+class SDQNConfig(SwarmControllerConfig):
     displacement: float = 1.0  # in meters
     obstacle_distance: float = 10.0  # in meters
     agent_mass: float = 1.0  # simple equivalence between force and acceleration
@@ -30,14 +30,14 @@ class SDQNPositionConfig(SwarmPositionConfig):
 class SDQNPositionController(SwarmPositionController):
     def __init__(
         self,
-        config: SDQNPositionConfig,
+        config: SDQNConfig,
         environment: Environment,
-        local_agent: LocalAgent,
+        sdqn_iface: SDQNInterface,
     ) -> None:
         super().__init__(config, environment)
         self.update_period = 0.1
 
-        self.local_agent = local_agent
+        self.sdqn_iface = sdqn_iface
 
         kp = config.max_acceleration / config.max_displacement
         kd = 2 * np.sqrt(kp)  # critical damping
@@ -65,7 +65,7 @@ class SDQNPositionController(SwarmPositionController):
         self._drone_positions = drone_positions
         self._user_positions = user_positions
 
-        self._update_local_agent()
+        self._update_sdqn_interface()
 
         self.last_update_time: float = None
         self.target_position = state[0:2]  # px, py
@@ -89,8 +89,8 @@ class SDQNPositionController(SwarmPositionController):
             self._user_positions = user_positions
 
         if self._needs_update(time):
-            self._update_local_agent()
-            self.target_position += self._displacement * self.local_agent.direction
+            self._update_sdqn_interface()
+            self.target_position += self._displacement * self.sdqn_iface.direction
 
         control = np.zeros(3)
 
@@ -118,10 +118,10 @@ class SDQNPositionController(SwarmPositionController):
         elapsed_time = time - self.last_update_time
         return elapsed_time > self.update_period
 
-    def _update_local_agent(self) -> None:
+    def _update_sdqn_interface(self) -> None:
         drones_array = self._positions_dict_to_array(self._drone_positions)
         users_array = self._positions_dict_to_array(self._user_positions)
-        self.local_agent.update(
+        self.sdqn_iface.update(
             position=self.state[0:2], drones=drones_array, users=users_array
         )
 

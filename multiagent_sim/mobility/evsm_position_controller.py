@@ -2,13 +2,13 @@ from dataclasses import dataclass
 import numpy as np
 
 from ..environment.environment import Environment
-from ..evsm.evsm_algorithm import EVSM
+from ..evsm.evsm_algorithm import EVSMAlgorithm
 from .altitude_controller import AltitudeController
-from .swarm_position_controller import SwarmPositionController, SwarmPositionConfig
+from .swarm_position_controller import SwarmPositionController, SwarmControllerConfig
 
 
 @dataclass
-class EVSMPositionConfig(SwarmPositionConfig):
+class EVSMConfig(SwarmControllerConfig):
     """
     Configuration for EVSMPositionController.
     """
@@ -31,7 +31,7 @@ class EVSMPositionController(SwarmPositionController):
 
     def __init__(
         self,
-        config: EVSMPositionConfig,
+        config: EVSMConfig,
         environment: Environment,
     ):
         super().__init__(config, environment)
@@ -48,7 +48,7 @@ class EVSMPositionController(SwarmPositionController):
         kp = config.max_acceleration / config.max_position_error
         kd = 2 * np.sqrt(kp)
 
-        self.evsm = EVSM(
+        self.evsm = EVSMAlgorithm(
             env=environment,
             ln=self._initial_nat_length,
             ks=kp,
