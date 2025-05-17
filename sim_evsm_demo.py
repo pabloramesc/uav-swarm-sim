@@ -8,7 +8,7 @@ https://opensource.org/licenses/MIT
 import numpy as np
 
 from multiagent_sim.core.evsm_simulator import EVSMSimulator, EVSMConfig
-from multiagent_sim.gui import EVSMViewer
+from multiagent_sim.gui.evsm_viewer import EVSMViewer
 
 
 dt = 0.01
@@ -29,7 +29,7 @@ sim = EVSMSimulator(
     num_drones,
     num_users,
     dt,
-    use_network=True,
+    use_network=False,
     evsm_config=evsm_config,
 )
 
@@ -53,7 +53,9 @@ gui = EVSMViewer(sim)
 while True:
     sim.update()
     fps = gui.update(force=False)
-    print(
-        f"Real time: {sim.real_time:.2f} s, Sim time: {sim.sim_time:.2f} s, "
-        f"NS-3 time: {sim.network.ns3_time:.2f} s, FPS: {gui.fps:.2f}"
-    )
+    
+    print(f"Real time: {sim.real_time:.2f} s, Sim time: {sim.sim_time:.2f} s, ", end="")
+    if sim.network:
+        print(f"NS-3 time: {sim.network.ns3_time:.2f} s, FPS: {gui.fps:.2f}")
+    else:
+        print(f"FPS: {gui.fps:.2f}")

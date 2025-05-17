@@ -39,7 +39,7 @@ class SDQNTrainer(MultiAgentSimulator):
         )
 
         self.reward_manager = RewardManager(env=self.environment)
-        
+
         self.prev_frames: np.ndarray = None
         self.prev_actions: np.ndarray = None
 
@@ -60,23 +60,24 @@ class SDQNTrainer(MultiAgentSimulator):
     def _create_drone(self, sdqn_config: SDQNConfig = None, **kwargs) -> Drone:
         iface = self._create_sdqn_interface(iface_id=len(self.agents))
         sdqn = SDQNPositionController(
-            config=sdqn_config, env=self.environment, sdqn_iface=iface
+            config=sdqn_config, environment=self.environment, sdqn_iface=iface
         )
         drone = Drone(
             agent_id=len(self.agents),
             environment=self.environment,
             position_controller=sdqn,
-            network_sim=self.network_simulator,
+            network_sim=self.netsim,
             drones_registry=self.drones,
             users_registry=self.users,
             neighbor_provider="network" if self.network else "registry",
         )
-    
+        return drone
+
     def initialize(self) -> None:
         self.logger.info("Initializing simulation ...")
-        
+
         super().initialize()
-        
+
         self.gcs.initialize(state=np.zeros(6))
 
         drone_states = np.zeros((self.num_drones, 6))
@@ -90,14 +91,14 @@ class SDQNTrainer(MultiAgentSimulator):
             num_positions=self.num_users, env=self.environment
         )
         self.users.initialize(states=user_states)
-        
+
         self.sdqn_brain.step()
         self.prev_frames = self.sdqn_brain.last_frames
         self.prev_actions = self.sdqn_brain.last_actions
 
         self.logger.info("✅ Initialization completed.")
-        
-    def update(self, dt = None) -> None:
+
+    def update(self, dt=None) -> None:
         super().update(dt)
 
         self.drone_states = self.drones.get_states_array()
@@ -112,7 +113,7 @@ class SDQNTrainer(MultiAgentSimulator):
 
         self.sdqn_brain.step()
 
-        self.sdqn_brain.sdqn.add_experiences(
+        self.sdqn_brain.wrapper.add_experiences(
             frames=self.prev_frames,
             actions=self.prev_actions,
             next_frames=self.sdqn_brain.last_frames,
@@ -120,11 +121,11 @@ class SDQNTrainer(MultiAgentSimulator):
             dones=self.dones,
         )
 
-        self.sdqn_brain.sdqn.train()
+        self.sdqn_brain.wrapper.train()
 
         self.prev_frames = self.sdqn_brain.last_frames
         self.prev_actions = self.sdqn_brain.last_actions
-        
+
     def reset_collided_drones(self, dones: np.ndarray) -> None:
         done_indices = np.arange(self.num_drones)[dones]
         for i in done_indices:
@@ -138,19 +139,13 @@ class SDQNTrainer(MultiAgentSimulator):
             self.logger.warning(f"⚠️  Reset drone {i} to initial states")
 
     def simulation_status_str(self) -> str:
+        coverage = self.metrics.area_coverage(self.drone_states[:, 0:3])
         return (
             f"Real time: {self.real_time:.2f} s, "
             f"Sim time: {self.sim_time:.2f} s, "
-            f"Sim steps: {self.sim_steps}, "
-            f"Area coverage: {self.area_coverage()*100:.2f} %"
+            f"Sim steps: {self.sim_step}, "
+            f"Area coverage: {coverage*100.0:.2f} %"
         )
 
     def training_status_str(self) -> str:
-        return (
-            f"Train steps: {self.sdqn_agent.sdqn.train_steps}, "
-            f"Train speed: {self.sdqn_agent.sdqn.train_speed:.2f} sps, "
-            f"Memory size: {self.sdqn_agent.sdqn.memory_size}, "
-            f"Epsilon: {self.sdqn_agent.sdqn.epsilon:.4f}, "
-            f"Loss: {self.sdqn_agent.sdqn.loss:.4e}, "
-            f"Accuracy: {self.sdqn_agent.sdqn.accuracy*100:.2f} %"
-        )
+        return self.sdqn_brain.wrapper.training_status_str()

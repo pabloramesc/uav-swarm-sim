@@ -152,7 +152,7 @@ class MultiAgentSDQNGym:
 
         self.sdqn_agent.step()
 
-        self.sdqn_agent.sdqn.add_experiences(
+        self.sdqn_agent.wrapper.add_experiences(
             frames=self.prev_frames,
             actions=self.prev_actions,
             next_frames=self.sdqn_agent.last_frames,
@@ -160,7 +160,7 @@ class MultiAgentSDQNGym:
             dones=dones,
         )
 
-        self.sdqn_agent.sdqn.train()
+        self.sdqn_agent.wrapper.train()
 
         self.prev_frames = self.sdqn_agent.last_frames
         self.prev_actions = self.sdqn_agent.last_actions
@@ -212,12 +212,12 @@ class MultiAgentSDQNGym:
 
     def training_status_str(self) -> str:
         return (
-            f"Train steps: {self.sdqn_agent.sdqn.train_steps}, "
-            f"Train speed: {self.sdqn_agent.sdqn.train_speed:.2f} sps, "
-            f"Memory size: {self.sdqn_agent.sdqn.memory_size}, "
-            f"Epsilon: {self.sdqn_agent.sdqn.epsilon:.4f}, "
-            f"Loss: {self.sdqn_agent.sdqn.loss:.4e}, "
-            f"Accuracy: {self.sdqn_agent.sdqn.accuracy*100:.2f} %"
+            f"Train steps: {self.sdqn_agent.wrapper.train_steps}, "
+            f"Train speed: {self.sdqn_agent.wrapper.train_speed:.2f} sps, "
+            f"Memory size: {self.sdqn_agent.wrapper.memory_size}, "
+            f"Epsilon: {self.sdqn_agent.wrapper.epsilon:.4f}, "
+            f"Loss: {self.sdqn_agent.wrapper.loss:.4e}, "
+            f"Accuracy: {self.sdqn_agent.wrapper.accuracy*100:.2f} %"
         )
 
     def _needs_update(self) -> bool:

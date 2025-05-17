@@ -6,14 +6,9 @@ https://opensource.org/licenses/MIT
 """
 
 import numpy as np
-import matplotlib
 
-matplotlib.use("Agg")
-
-from multiagent_sim.mobility.sdqn_position_controller import SDQNConfig
-from multiagent_sim.old.multiagent_sdqn_gym import MultiAgentSDQNGym
-from multiagent_sim.gui.sdqn_viewer import MultiAgentSDQNViewer
-
+from multiagent_sim.core.sdqn_trainer import SDQNTrainer, SDQNConfig
+from multiagent_sim.gui.sdqn_viewer import SDQNViewer
 
 dt = 0.1
 num_drones = 16
@@ -21,7 +16,7 @@ num_users = 10
 size = 500.0
 
 config = SDQNConfig(displacement=10.0, target_height=10.0)
-sim = MultiAgentSDQNGym(
+sim = SDQNTrainer(
     num_drones,
     num_users,
     dt,
@@ -44,15 +39,14 @@ for _ in range(5):
 
 sim.initialize()
 
-# gui = MultiAgentSDQNViewer(sim)
+gui = SDQNViewer(sim)
 
 while True:
     sim.update()
-    # gui.update(force_render=False, verbose=False)
+    fps = gui.update(force=False)
 
-    # print(gui.viewer_status_str())
+    print(f"FPS: {gui.fps:.2f}")
     print(sim.simulation_status_str())
     print(sim.training_status_str())
-    if hasattr(sim, "rewards"):
-        print("Rewards:", " ".join(f"{r:.2f}" for r in sim.rewards))
+    print("Rewards:", " ".join(f"{r:.2f}" for r in sim.rewards))
     print()

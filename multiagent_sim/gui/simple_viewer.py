@@ -132,7 +132,7 @@ class SimpleViewer(MultiAgentViewer):
 
     def _configure_axes(self) -> None:
         self._calculate_axis_limits()
-        self.ax.set_title("Multi-agent EVSM simulation")
+        self.ax.set_title("Multi-agent simulation")
         self.ax.set_xlabel("X (m)")
         self.ax.set_ylabel("Y (m)")
         self.ax.set_aspect("equal")

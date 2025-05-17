@@ -33,7 +33,7 @@ class SDQNWrapper:
 
         if self.model_path is None:
             timestamp = datetime.now().strftime("%y%m%d-%H%M%S")
-            self.model_path = f"dqns-model-{timestamp}.keras"
+            self.model_path = f"sdqn-model-{timestamp}.keras"
 
         if not os.path.exists(self.model_path):
             self.model = self.build_keras_model()
@@ -204,3 +204,13 @@ class SDQNWrapper:
         if self.train_metrics is not None and "loss" in self.train_metrics:
             return self.train_metrics["loss"]
         return np.nan
+
+    def training_status_str(self) -> str:
+        return (
+            f"Train steps: {self.train_steps}, "
+            f"Train speed: {self.train_speed:.2f} sps, "
+            f"Memory size: {self.memory_size}, "
+            f"Epsilon: {self.epsilon:.4f}, "
+            f"Loss: {self.loss:.4e}, "
+            f"Accuracy: {self.accuracy*100:.2f} %"
+        )

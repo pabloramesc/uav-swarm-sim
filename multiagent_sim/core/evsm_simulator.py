@@ -78,7 +78,7 @@ class EVSMSimulator(MultiAgentSimulator):
             agent_id=len(self.agents),
             environment=self.environment,
             position_controller=evsm,
-            network_sim=self.network.netsim,
+            network_sim=self.netsim,
             drones_registry=self.drones,
             users_registry=self.users,
             neighbor_provider="network" if self.network else "registry",

@@ -34,6 +34,7 @@ class EVSMViewer(SimpleViewer):
         (self.spring_lines,) = self.ax.plot([], [], "g-", lw=0.5, label="springs")
         (self.edge_drone_points,) = self.ax.plot([], [], "rx", label="edge drones")
         super()._init_plots()
+        self.ax.set_title("Multi-agent EVSM simulation")
 
     def _update_plots(self) -> None:
         super()._update_plots()

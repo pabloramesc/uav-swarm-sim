@@ -38,8 +38,10 @@ class MultiAgentSimulator(ABC):
 
         if use_network:
             self.network = NetworkManager(1, num_drones, num_users)
+            self.netsim = self.network.netsim
         else:
             self.network = None
+            self.netsim = None
 
         self.gcs: ControlStation = None
         self.drones = AgentsRegistry()
@@ -48,7 +50,7 @@ class MultiAgentSimulator(ABC):
         self.agents = AgentsRegistry()
         self._create_agents(**kwargs)
 
-        self.metrics = MetricsGenerator(env=self.environment, netsim=self.network.netsim)
+        self.metrics = MetricsGenerator(env=self.environment, netsim=self.netsim)
 
         self.logger = create_logger(name="MultiAgentSimulator", level="INFO")
 
@@ -77,7 +79,7 @@ class MultiAgentSimulator(ABC):
         self.gcs = ControlStation(
             agent_id=len(self.agents),
             environment=self.environment,
-            network_sim=self.network.netsim,
+            network_sim=self.netsim,
         )
         self.agents.register(self.gcs)
         
@@ -86,7 +88,7 @@ class MultiAgentSimulator(ABC):
             user = User(
                 agent_id=len(self.agents),
                 environment=self.environment,
-                network_sim=self.network.netsim,
+                network_sim=self.netsim,
             )
             self.users.register(user)
             self.agents.register(user)

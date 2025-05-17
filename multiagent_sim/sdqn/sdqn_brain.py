@@ -6,7 +6,7 @@ from .actions import Action
 
 class SDQNBrain:
     def __init__(self, wrapper: SDQNWrapper) -> None:
-        self.sdqn = wrapper
+        self.wrapper = wrapper
         self.ifaces: list[SDQNInterface] = []
         
         self.last_frames: np.ndarray = None
@@ -31,7 +31,7 @@ class SDQNBrain:
         frames = self.generate_frames()
         self.last_frames = frames
 
-        actions = self.sdqn.act(frames)
+        actions = self.wrapper.act(frames)
         for i, agent in enumerate(self.ifaces):
             action = Action(actions[i])
             agent.update_action(action)
@@ -40,9 +40,9 @@ class SDQNBrain:
         return
     
     def generate_frames(self) -> np.ndarray:
-        frames = np.zeros((self.num_ifaces, *self.sdqn.frame_shape), dtype=np.uint8)
+        frames = np.zeros((self.num_ifaces, *self.wrapper.frame_shape), dtype=np.uint8)
         for i, iface in enumerate(self.ifaces):
             frame = iface.generate_frame()
-            self.sdqn.check_frame(frame)
+            self.wrapper.check_frame(frame)
             frames[i] = frame
         return frames
