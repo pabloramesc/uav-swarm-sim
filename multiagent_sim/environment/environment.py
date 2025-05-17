@@ -9,7 +9,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from .elevation_map import ElevationMap
-from .geo import enu2geo, geo2enu
+from ..math.geo import enu2geo, geo2enu
 from .obstacles.boundaries import Boundary, PolygonalBoundary, RectangularBoundary
 from .obstacles.obstacles import CircularObstacle, Obstacle, RectangularObstacle
 
