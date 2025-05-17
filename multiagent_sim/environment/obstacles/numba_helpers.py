@@ -71,6 +71,7 @@ def rectangle_closest_point_numba(
 
     return closest
 
+
 @njit(cache=True)
 def rectangle_distances_numba(
     pos: np.ndarray, left: float, right: float, bottom: float, top: float
@@ -79,6 +80,7 @@ def rectangle_distances_numba(
     deltas = closest - pos
     distances = np.sqrt(np.sum(deltas**2, axis=1))
     return distances
+
 
 @njit(cache=True)
 def rectangle_distances_and_directions_numba(
@@ -91,3 +93,13 @@ def rectangle_distances_and_directions_numba(
     non_zero = distances > 0.0
     directions[non_zero] = deltas[non_zero] / distances[non_zero, None]
     return distances, directions
+
+
+@njit(cache=True)
+def rectangle_external_distances_numba(
+    pos: np.ndarray, left: float, right: float, bottom: float, top: float
+) -> np.ndarray:
+    clipped = np.clip(pos, a_min=(left, bottom), a_max=(right, top))
+    deltas = clipped - pos
+    distances = np.sqrt(np.sum(deltas**2, axis=1))
+    return distances

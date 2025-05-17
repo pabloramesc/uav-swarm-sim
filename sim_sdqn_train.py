@@ -39,13 +39,13 @@ for _ in range(5):
 
 sim.initialize()
 
-gui = SDQNViewer(sim)
+# gui = SDQNViewer(sim)
 
 while True:
     sim.update()
-    fps = gui.update(force=False)
+    # fps = gui.update(force=False)
 
-    print(f"FPS: {gui.fps:.2f}")
+    # print(f"FPS: {gui.fps:.2f}")
     print(sim.simulation_status_str())
     print(sim.training_status_str())
     print("Rewards:", " ".join(f"{r:.2f}" for r in sim.rewards))

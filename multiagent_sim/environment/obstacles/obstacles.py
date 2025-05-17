@@ -18,6 +18,7 @@ from .numba_helpers import (
     is_inside_rectangle_numba,
     rectangle_closest_point_numba,
     rectangle_distances_and_directions_numba,
+    rectangle_external_distances_numba,
 )
 
 
@@ -124,38 +125,31 @@ class RectangularObstacle(Obstacle):
     def right(self) -> float:
         return self.top_right[0]
 
+    @property
+    def bounds(self) -> np.ndarray:
+        """Returns [left, right, bottom, top] as a NumPy array."""
+        return np.array([self.left, self.right, self.bottom, self.top], dtype=float)
+
     def is_inside(self, pos: ArrayLike) -> bool | np.ndarray:
         pos = np.atleast_2d(pos)
-        is_inside = is_inside_rectangle_numba(
-            pos, self.left, self.right, self.bottom, self.top
-        )
+        is_inside = is_inside_rectangle_numba(pos, *self.bounds)
         return is_inside if is_inside.shape[0] > 1 else is_inside.item()
 
     def distance(self, pos: ArrayLike) -> float | np.ndarray:
         pos = np.atleast_2d(pos)
-        clipped = np.clip(
-            pos, a_min=(self.left, self.bottom), a_max=(self.right, self.top)
-        )
-        distances: np.ndarray = np.linalg.norm(pos - clipped, axis=1)
-        distances = np.maximum(distances, 0.0)
+        distances = rectangle_external_distances_numba(pos, *self.bounds)
         return distances if distances.shape[0] > 1 else distances.item()
 
     def direction(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
-        _, directions = rectangle_distances_and_directions_numba(
-            pos, self.left, self.right, self.bottom, self.top
-        )
-        is_inside = is_inside_rectangle_numba(
-            pos, self.left, self.right, self.bottom, self.top
-        )
+        _, directions = rectangle_distances_and_directions_numba(pos, *self.bounds)
+        is_inside = is_inside_rectangle_numba(pos, *self.bounds)
         directions[is_inside] *= -1
         return np.squeeze(directions)
 
     def closest_point(self, pos: ArrayLike) -> np.ndarray:
         pos = np.asarray(pos)
-        closest = rectangle_closest_point_numba(
-            pos, self.left, self.right, self.bottom, self.top
-        )
+        closest = rectangle_closest_point_numba(pos, *self.bounds)
         return np.squeeze(closest)
 
 
