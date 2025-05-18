@@ -17,6 +17,7 @@ from PIL import Image
 from rasterio.coords import BoundingBox
 import geopandas as gpd
 from shapely.geometry import box  # Add this import
+from pyproj import Transformer
 
 
 class ElevationMap:
@@ -87,40 +88,41 @@ class ElevationMap:
         """
         Fetch the satellite image for the elevation map bounds and crop it to match the elevation data.
         """
-        # Convert bounds from EPSG:4326 (degrees) to EPSG:3857 (meters)
-        bounds_box = box(
-            self.bounds.left, self.bounds.bottom, self.bounds.right, self.bounds.top
-        )
-        gdf = gpd.GeoDataFrame(geometry=[bounds_box], crs="EPSG:4326").to_crs(epsg=3857)
-        bounds_3857 = gdf.total_bounds  # [x_min, x_max, y_min, y_max] in EPSG:3857
+        transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+        left, bottom = transformer.transform(self.bounds.left, self.bounds.bottom)
+        right, top = transformer.transform(self.bounds.right, self.bounds.top)
+        bounds_3857 = (left, bottom, right, top)
 
-        # Fetch the satellite image using the converted bounds
-        img, ext = ctx.bounds2img(
-            *bounds_3857, zoom=14, source=ctx.providers.Esri.WorldImagery
-        )
+        print("Bounds in WGS84:", self.bounds)
+        print("Bounds in EPSG:3857:", bounds_3857)
 
-        # Crop the satellite image to match the elevation bounds
-        x_min, x_max, y_min, y_max = ext  # ext is in EPSG:3857
-        lon_extent = np.linspace(
-            x_min, x_max, img.shape[1]
-        )  # X-axis (longitude in meters)
-        lat_extent = np.linspace(
-            y_max, y_min, img.shape[0]
-        )  # Y-axis (latitude in meters, inverted)
+        try:
+            img, ext = ctx.bounds2img(
+                *bounds_3857, zoom=14, source=ctx.providers.Esri.WorldImagery
+            )
+            print("Satellite image downloaded successfully")
+        except Exception as e:
+            print("Error downloading tiles:", e)
 
-        # Find indices for cropping
-        lon_idx = np.where(
-            (lon_extent >= bounds_3857[0]) & (lon_extent <= bounds_3857[1])
-        )[0]
-        lat_idx = np.where(
-            (lat_extent >= bounds_3857[2]) & (lat_extent <= bounds_3857[3])
-        )[0]
+        print("Returned extent (EPSG:3857):", ext)
 
-        # Crop the image
-        cropped_img = img[
-            np.min(lat_idx) : np.max(lat_idx) + 1, np.min(lon_idx) : np.max(lon_idx) + 1
-        ]
+        x_min, x_max, y_min, y_max = ext
+        height, width, _ = img.shape
 
+        pixel_size_x = (x_max - x_min) / width
+        pixel_size_y = (y_max - y_min) / height
+
+        left_px = int((bounds_3857[0] - x_min) / pixel_size_x)
+        right_px = int((bounds_3857[2] - x_min) / pixel_size_x)
+        top_px = int((y_max - bounds_3857[3]) / pixel_size_y)
+        bottom_px = int((y_max - bounds_3857[1]) / pixel_size_y)
+
+        if left_px < 0 or right_px > width or top_px < 0 or bottom_px > height:
+            raise ValueError(
+                "Calculated crop bounds fall outside the image dimensions."
+            )
+
+        cropped_img = img[top_px:bottom_px, left_px:right_px]
         return cropped_img
 
     def save_satellite_image(self, image_path: str = None) -> None:
@@ -151,6 +153,58 @@ class ElevationMap:
         plt.savefig(image_path, bbox_inches="tight", pad_inches=0)
         plt.close()
         print("Elevation image saved to", image_path)
+
+    def save_fused_image(
+        self,
+        image_path: str = None,
+        output_resolution: tuple[int, int] = (1000, 1000),
+        alpha: float = 0.5,
+    ) -> None:
+        """
+        Save a fused image that blends satellite imagery and elevation data.
+
+        Parameters
+        ----------
+        image_path : str, optional
+            Path to save the fused image. If None, saves next to the DEM file.
+        output_resolution : tuple[int, int]
+            Output resolution in pixels (width, height).
+        alpha : float
+            Blending factor for elevation data. Must be between 0 and 1.
+        """
+        if not (0.0 <= alpha <= 1.0):
+            raise ValueError("Alpha must be between 0 and 1.")
+
+        if image_path is None:
+            directory, _ = os.path.split(self.dem_path)
+            image_path = os.path.join(directory, "fused_image.png")
+
+        # Get the satellite image and resize it
+        sat_img = self._fetch_satellite_image()
+        sat_img_resized = np.array(
+            Image.fromarray(sat_img).resize(output_resolution[::-1])
+        )
+
+        # Get the elevation image and normalize it
+        lon_grid, lat_grid = self._generate_grid(output_resolution)
+        elevations = self.get_elevation(lat_grid.ravel(), lon_grid.ravel())
+        elevation_grid = elevations.reshape(output_resolution[1], output_resolution[0])
+        normalized_elev = self._normalize_elevation(elevation_grid)
+        elevation_img = plt.cm.terrain(normalized_elev)[:, :, :3]  # RGB only
+
+        # Ensure satellite and elevation are in uint8 format
+        elevation_img_uint8 = (elevation_img * 255).astype(np.uint8)
+        sat_img_uint8 = sat_img_resized[:, :, :3]  # Drop alpha if present
+
+        # Blend both images
+        fused_img = ((1 - alpha) * sat_img_uint8 + alpha * elevation_img_uint8).astype(
+            np.uint8
+        )
+
+        # Save the result
+        fused_pil = Image.fromarray(fused_img)
+        fused_pil.save(image_path)
+        print("Fused image saved to", image_path)
 
     def plot(self, ax: Axes = None, show: bool = False):
         """
@@ -258,9 +312,8 @@ class ElevationMap:
 # Ejemplo de uso
 if __name__ == "__main__":
     # Ruta al archivo DEM
-    dir_path = "data"
     file_name = "barcelona_dem.tif"
-    file_path = os.path.join(dir_path, file_name)
+    file_path = os.path.join("data", "elevation", file_name)
 
     # Crear el objeto ElevationMap
     elevation_map = ElevationMap(file_path)
@@ -277,3 +330,7 @@ if __name__ == "__main__":
 
     # Visualizar el mapa de elevación en 3D
     elevation_map.plot_3d()
+
+    elevation_map.save_elevation_image()
+    elevation_map.save_satellite_image()
+    elevation_map.save_fused_image()
