@@ -7,7 +7,7 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from multiagent_sim.core.sdqn_trainer import SDQNTrainer, SDQNConfig
+from multiagent_sim.core.sdqn_simulator import SDQNSimulator, SDQNConfig
 from multiagent_sim.gui.sdqn_viewer import SDQNViewer
 
 dt = 0.1
@@ -16,13 +16,14 @@ num_users = 10
 size = 1e3
 
 config = SDQNConfig(displacement=10.0, target_height=10.0)
-sim = SDQNTrainer(
+sim = SDQNSimulator(
     num_drones,
     num_users,
     dt,
     sdqn_config=config,
     model_path="data/models/sdqn-m02.keras",
     actions_mode="extended",
+    train_mode=True,
 )
 
 sim.environment.set_rectangular_boundary([-size, -size], [+size, +size])

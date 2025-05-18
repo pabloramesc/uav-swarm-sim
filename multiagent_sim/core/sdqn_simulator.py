@@ -17,7 +17,7 @@ from ..mobility.utils import environment_random_positions
 ActionsMode = Literal["basic", "extended"]
 
 
-class SDQNTrainer(MultiAgentSimulator):
+class SDQNSimulator(MultiAgentSimulator):
 
     def __init__(
         self,
@@ -28,10 +28,12 @@ class SDQNTrainer(MultiAgentSimulator):
         use_network: bool = False,
         sdqn_config: SDQNConfig = None,
         model_path: str = None,
+        train_mode: bool = True,
         actions_mode: ActionsMode = "basic",
     ) -> None:
         self.sdqn_config = sdqn_config or SDQNConfig()
         self.model_path = model_path
+        self.train_mode = train_mode
 
         if actions_mode == "basic":
             self.num_actions = 5
@@ -61,7 +63,7 @@ class SDQNTrainer(MultiAgentSimulator):
             frame_shape=SimpleFrameGenerator.calculate_frame_shape(),
             num_actions=self.num_actions,
             model_path=self.model_path,
-            train_mode=True,
+            train_mode=self.train_mode,
         )
         return SDQNBrain(wrapper)
 
@@ -123,19 +125,21 @@ class SDQNTrainer(MultiAgentSimulator):
             users=self.user_states[:, 0:2],
             time=self.sim_time,
         )
+
         self.reset_collided_drones(self.dones)
 
         self.sdqn_brain.step()
 
-        self.sdqn_brain.wrapper.add_experiences(
-            frames=self.prev_frames,
-            actions=self.prev_actions.astype(np.uint32),
-            next_frames=self.sdqn_brain.last_frames,
-            rewards=self.rewards.astype(np.float32),
-            dones=self.dones,
-        )
+        if self.train_mode:
+            self.sdqn_brain.wrapper.add_experiences(
+                frames=self.prev_frames,
+                actions=self.prev_actions.astype(np.uint32),
+                next_frames=self.sdqn_brain.last_frames,
+                rewards=self.rewards.astype(np.float32),
+                dones=self.dones,
+            )
 
-        self.sdqn_brain.wrapper.train()
+            self.sdqn_brain.wrapper.train()
 
         self.prev_frames = self.sdqn_brain.last_frames
         self.prev_actions = self.sdqn_brain.last_actions

@@ -11,7 +11,7 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.image import AxesImage
 
-from ..core.sdqn_trainer import SDQNTrainer
+from ..core.sdqn_simulator import SDQNSimulator
 from .simple_viewer import BackgroundType, SimpleViewer
 
 
@@ -19,7 +19,7 @@ class SDQNViewer(SimpleViewer):
 
     def __init__(
         self,
-        sim: SDQNTrainer,
+        sim: SDQNSimulator,
         xlim: tuple[float, float] = None,
         ylim: tuple[float, float] = None,
         fig_size: tuple[float, float] = None,
@@ -29,7 +29,7 @@ class SDQNViewer(SimpleViewer):
     ):
         self.frame_images: list[AxesImage] = None
         super().__init__(sim, xlim, ylim, fig_size, min_fps, max_fps, background_type)
-        self.sim: SDQNTrainer = sim
+        self.sim: SDQNSimulator = sim
 
     def _create_axes(self) -> list[Axes]:
         self.ax = self.fig.add_subplot(221)
