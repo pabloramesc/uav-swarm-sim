@@ -17,7 +17,7 @@ from ..core.multiagent_simulator import MultiAgentSimulator
 from ..math.path_loss_model import rssi_to_signal_quality, signal_strength_map
 from .multiagent_viewer import MultiAgentViewer
 
-BackgroundType = Literal["elevation", "rssi", "none"]
+BackgroundType = Literal["elevation", "satellite", "fused", "rssi", "none"]
 
 
 class SimpleViewer(MultiAgentViewer):
@@ -48,13 +48,27 @@ class SimpleViewer(MultiAgentViewer):
         (self.drone_points,) = self.ax.plot([], [], "bx", label="drones")
         (self.user_points,) = self.ax.plot([], [], "mo", label="users")
         (self.gcs_points,) = self.ax.plot([], [], "k*", label="GCS")
+
         self._plot_avoid_regions()
-        if self.background_type == "elevation":
-            self._plot_elevation_map()
         self._configure_axes()
+
+        if self.background_type == "none":
+            pass
+        elif self.background_type == "rssi":
+            self._plot_rssi_heatmap()
+        elif self.background_type == "elevation":
+            self._plot_elevation_img()
+        elif self.background_type == "satellite":
+            self._plot_satellite_img()
+        elif self.background_type == "fused":
+            self._plot_fused_map()
+        else:
+            raise ValueError("Invalid background type option:", self.background_type)
+
 
     def _update_plots(self) -> None:
         self._update_agent_points()
+        
         if self.background_type == "rssi":
             self._plot_rssi_heatmap()
 
@@ -76,22 +90,33 @@ class SimpleViewer(MultiAgentViewer):
                 label="obstacles" if i == 0 else None,
             )
 
-    def _plot_elevation_map(self) -> None:
-        if self.sim.environment.elevation_map is None:
-            return
+    def _plot_elevation_img(self) -> None:
         self.background_image = self.ax.imshow(
-            self.sim.environment.elevation_map.elevation_data,
-            extent=(
-                self.xlim[0],
-                self.xlim[1],
-                self.ylim[1],
-                self.ylim[0],
-            ),  # Flip Y-axis
+            self.sim.environment.elevation_map.elevation_img,
+            extent=(*self.xlim, *self.ylim[::-1]),  # Flip Y-axis
             origin="lower",
             cmap="terrain",
             alpha=0.7,
         )
         plt.colorbar(self.background_image, ax=self.ax, label="Elevation (m)")
+
+    def _plot_satellite_img(self) -> None:
+        self.background_image = self.ax.imshow(
+            self.sim.environment.elevation_map.satellite_img,
+            extent=(*self.xlim, *self.ylim[::-1]),  # Flip Y-axis
+            origin="lower",
+            alpha=0.7,
+        )
+        # no colorbar for sat
+
+    def _plot_fused_map(self) -> None:
+        self.background_image = self.ax.imshow(
+            self.sim.environment.elevation_map.fused_img,
+            extent=(*self.xlim, *self.ylim[::-1]),  # Flip Y-axis
+            origin="lower",
+            alpha=0.7,
+        )
+        # no colorbar for sat
 
     def _plot_rssi_heatmap(self) -> None:
         # Generate the grid for the heatmap

@@ -48,7 +48,7 @@ class SDQNWrapper:
                 epsilon=0.0, epsilon_min=0.0, decay_type="fixed"
             )
 
-        self.memory = PriorityReplayBuffer(max_size=500_000, beta_annealing=0.0)
+        self.memory = PriorityReplayBuffer(max_size=100_000, beta_annealing=0.0)
 
         self.dqn_agent = DQNAgent(
             model=None,

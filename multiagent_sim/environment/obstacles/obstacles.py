@@ -58,6 +58,7 @@ class Obstacle(ABC):
         return np.squeeze(closest)
 
     def _get_distances(self, pos: np.ndarray) -> np.ndarray:
+        pos = np.atleast_2d(pos)
         points = [Point(p) for p in pos]
         distances = np.array([self.shape.boundary.distance(p) for p in points])
         return distances
@@ -65,11 +66,33 @@ class Obstacle(ABC):
     def _get_closest_and_distances(
         self, pos: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray]:
+        pos = np.atleast_2d(pos)
         points = [Point(p) for p in pos]
         lines = [shortest_line(self.shape.boundary, p) for p in points]
         closest = np.array([line.coords[0] for line in lines])
         distances = np.array([line.length for line in lines])
         return closest, distances
+
+    @property
+    def bounds(self) -> np.ndarray:
+        """Returns [bottom, left, top, right] as a NumPy array."""
+        return np.array(self.shape.bounds, dtype=float)
+
+    @property
+    def bottom(self) -> float:
+        return self.bounds[0]
+
+    @property
+    def left(self) -> float:
+        return self.bounds[1]
+
+    @property
+    def top(self) -> float:
+        return self.bounds[2]
+
+    @property
+    def right(self) -> float:
+        return self.bounds[3]
 
 
 class CircularObstacle(Obstacle):
@@ -109,47 +132,36 @@ class RectangularObstacle(Obstacle):
         self.top_right = np.array(top_right)
         super().__init__(box(*self.bottom_left, *self.top_right))
 
-    @property
-    def bottom(self) -> float:
-        return self.bottom_left[1]
-
-    @property
-    def left(self) -> float:
-        return self.bottom_left[0]
-
-    @property
-    def top(self) -> float:
-        return self.top_right[1]
-
-    @property
-    def right(self) -> float:
-        return self.top_right[0]
-
-    @property
-    def bounds(self) -> np.ndarray:
-        """Returns [left, right, bottom, top] as a NumPy array."""
-        return np.array([self.left, self.right, self.bottom, self.top], dtype=float)
-
     def is_inside(self, pos: ArrayLike) -> bool | np.ndarray:
         pos = np.atleast_2d(pos)
-        is_inside = is_inside_rectangle_numba(pos, *self.bounds)
+        is_inside = is_inside_rectangle_numba(
+            pos, left=self.left, right=self.right, bottom=self.bottom, top=self.top
+        )
         return is_inside if is_inside.shape[0] > 1 else is_inside.item()
 
     def distance(self, pos: ArrayLike) -> float | np.ndarray:
         pos = np.atleast_2d(pos)
-        distances = rectangle_external_distances_numba(pos, *self.bounds)
+        distances = rectangle_external_distances_numba(
+            pos, left=self.left, right=self.right, bottom=self.bottom, top=self.top
+        )
         return distances if distances.shape[0] > 1 else distances.item()
 
     def direction(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
-        _, directions = rectangle_distances_and_directions_numba(pos, *self.bounds)
-        is_inside = is_inside_rectangle_numba(pos, *self.bounds)
+        _, directions = rectangle_distances_and_directions_numba(
+            pos, left=self.left, right=self.right, bottom=self.bottom, top=self.top
+        )
+        is_inside = is_inside_rectangle_numba(
+            pos, left=self.left, right=self.right, bottom=self.bottom, top=self.top
+        )
         directions[is_inside] *= -1
         return np.squeeze(directions)
 
     def closest_point(self, pos: ArrayLike) -> np.ndarray:
         pos = np.asarray(pos)
-        closest = rectangle_closest_point_numba(pos, *self.bounds)
+        closest = rectangle_closest_point_numba(
+            pos, left=self.left, right=self.right, bottom=self.bottom, top=self.top
+        )
         return np.squeeze(closest)
 
 

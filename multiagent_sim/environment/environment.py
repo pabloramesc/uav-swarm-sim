@@ -242,6 +242,7 @@ class Environment:
         enu = np.zeros((pos.shape[0], 3))
         enu[:, 0:2] = pos[:, 0:2]
         geo = enu2geo(enu, self.home)
+        geo = np.atleast_2d(geo)
         lat, lon = geo[:, 0], geo[:, 1]
         return self.elevation_map.get_elevation(lat, lon)
 

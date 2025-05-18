@@ -31,8 +31,10 @@ class Boundary(Obstacle):
         super().__init__(shape)
 
     def distance(self, pos: ArrayLike) -> float:
+        pos = np.atleast_2d(pos)
         is_inside = self.is_inside(pos)
         distances = super()._get_distances(pos)
+        is_inside = np.atleast_1d(is_inside)
         distances[~is_inside] = 0.0
         return distances if distances.shape[0] > 1 else distances.item()
 

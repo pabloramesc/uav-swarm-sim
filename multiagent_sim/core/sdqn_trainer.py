@@ -115,9 +115,9 @@ class SDQNTrainer(MultiAgentSimulator):
 
         self.sdqn_brain.wrapper.add_experiences(
             frames=self.prev_frames,
-            actions=self.prev_actions,
+            actions=self.prev_actions.astype(np.uint32),
             next_frames=self.sdqn_brain.last_frames,
-            rewards=self.rewards,
+            rewards=self.rewards.astype(np.float32),
             dones=self.dones,
         )
 

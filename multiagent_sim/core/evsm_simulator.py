@@ -89,7 +89,8 @@ class EVSMSimulator(MultiAgentSimulator):
         self.logger.info("Initializing simulation ...")
 
         gcs_state = np.zeros(6)
-        gcs_state[0:3] = np.asarray(home)
+        gcs_state[0:2] = np.asarray(home[0:2])
+        gcs_state[2] = self.environment.get_elevation(home[0:2])
         self.gcs.initialize(state=gcs_state)
 
         drone_states = np.zeros((self.num_drones, 6))

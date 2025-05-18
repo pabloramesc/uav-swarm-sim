@@ -91,7 +91,8 @@ def environment_random_positions(num_positions: int, env: Environment) -> np.nda
         format [x, y, z].
     """
     positions = []
-    while len(positions) < num_positions:
+    max_iter = num_positions * 100
+    for _ in range(max_iter):
         x = np.random.uniform(env.boundary.left, env.boundary.right)
         y = np.random.uniform(env.boundary.bottom, env.boundary.top)
         z = env.get_elevation([x, y])
@@ -100,4 +101,10 @@ def environment_random_positions(num_positions: int, env: Environment) -> np.nda
         ):
             continue
         positions.append([x, y, z])
+        if len(positions) == num_positions:
+            break
+        
+    if len(positions) != num_positions:
+        raise RuntimeError("Cannot generate random positions inside environment")
+    
     return np.array(positions)
