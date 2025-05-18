@@ -37,14 +37,14 @@ class SDQNInterface:
         
     def update_action(self, action: Action) -> None:
         if action == Action.ZOOM_IN:
-            new_radius = self.frame_generator.frame_radius / 2
+            new_radius = self.frame_generator.frame_radius / 1.1
         elif action == Action.ZOOM_OUT:
-            new_radius = self.frame_generator.frame_radius * 2
+            new_radius = self.frame_generator.frame_radius * 1.1
         else:
             new_radius = None
             
         if new_radius is not None:
-            new_radius = np.clip(new_radius, 0.1, 10e3)
+            new_radius = np.clip(new_radius, 10.0, 10e3)
             self.frame_generator.set_frame_radius(new_radius)
             
         self.direction = action_to_displacement(action)

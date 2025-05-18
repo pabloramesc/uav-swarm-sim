@@ -31,8 +31,8 @@ class FrameGenerator(ABC):
         self.channel_names = [f"ch{i}" for i in range(num_channels)]
 
         self.position = np.zeros(2)
-        self.drones = np.zeros((0, 2))
-        self.users = np.zeros((0, 2))
+        self.abs_drones = np.zeros((0, 2))
+        self.abs_users = np.zeros((0, 2))
 
     @staticmethod
     def calculate_frame_shape(
@@ -44,8 +44,10 @@ class FrameGenerator(ABC):
         self, position: np.ndarray, drones: np.ndarray, users: np.ndarray
     ) -> None:
         self.position = position
-        self.drones = drones
-        self.users = users
+        self.abs_drones = drones
+        self.abs_users = users
+        self.rel_drones = drones - position
+        self.rel_users = users - position
 
     @abstractmethod
     def generate_frame(self) -> np.ndarray:
@@ -68,7 +70,9 @@ class SimpleFrameGenerator(FrameGenerator):
         self.cell_size = self.calculate_cell_size(num_cells, frame_radius)
         self.channel_names = ["Collision risk", "Drones signal", "Users coverage"]
 
-        self.cell_positions = np.zeros((*self.channel_shape, 2))
+        self.rel_cell_positions = np.zeros((*self.channel_shape, 2))
+        self.abs_cell_positions = np.zeros((*self.channel_shape, 2))
+        self._update_rel_cells_positions()
 
     @staticmethod
     def calculate_frame_shape(num_cells: int = 64) -> tuple[int, int, int]:
@@ -82,13 +86,15 @@ class SimpleFrameGenerator(FrameGenerator):
         self, position: np.ndarray, drones: np.ndarray, users: np.ndarray
     ) -> None:
         super().update(position, drones, users)
-        self._update_cells_positions()
+        self._update_abs_cells_positions()
 
     def set_frame_radius(self, frame_radius: float) -> None:
         if frame_radius < 0.0:
             raise ValueError("Frame radius must be positive")
         self.frame_radius = frame_radius
-        self._update_cells_positions()
+        self.cell_size = self.calculate_cell_size(self.num_cells, self.frame_radius)
+        self._update_rel_cells_positions()
+        self._update_abs_cells_positions()
 
     def generate_frame(self) -> np.ndarray:
         collision_risk = self.collision_risk_heatmap()
@@ -109,16 +115,17 @@ class SimpleFrameGenerator(FrameGenerator):
             matrix[center - 1 : center + 2, center - 1 : center + 2] = value
         return matrix
 
-    def _update_cells_positions(self) -> None:
+    def _update_rel_cells_positions(self) -> None:
         dx = np.linspace(-self.frame_radius, +self.frame_radius, self.num_cells)
         dy = np.linspace(-self.frame_radius, +self.frame_radius, self.num_cells)
-        xs = dx + self.position[0]
-        ys = dy + self.position[1]
-        x_grid, y_grid = np.meshgrid(xs, ys)
-        self.cell_positions = np.stack((x_grid, y_grid), axis=-1)
+        x_grid, y_grid = np.meshgrid(dx, dy)
+        self.rel_cell_positions = np.stack((x_grid, y_grid), axis=-1)
+    
+    def _update_abs_cells_positions(self) -> None:
+        self.abs_cell_positions = self.rel_cell_positions + self.position
 
     def poisitions_to_cell_indices(self, positions: np.ndarray) -> np.ndarray:
-        indices = ((positions - self.cell_positions[0, 0]) // self.cell_size).astype(
+        indices = ((positions - self.rel_cell_positions[0, 0]) // self.cell_size).astype(
             np.int32
         )
         # Filter out indices that are outside the frame
@@ -137,16 +144,16 @@ class SimpleFrameGenerator(FrameGenerator):
         return matrix
 
     def obstacles_repulsion_heatmap(self) -> np.ndarray:
-        flat_cell_positions = self.cell_positions.reshape(-1, 2)
+        flat_cell_positions = self.abs_cell_positions.reshape(-1, 2)
         obstacles_distances = distances_to_obstacles(self.env, flat_cell_positions)
         heatmap = obstacles_distances.reshape(self.channel_shape)
         return gaussian_decay(heatmap, sigma=self.collision_distance)
 
     def drones_repulsion_heatmap(self) -> np.ndarray:
-        if self.drones.shape[0] == 0:
+        if self.abs_drones.shape[0] == 0:
             return np.zeros((self.num_cells, self.num_cells))
-        flat_cell_positions = self.cell_positions.reshape(-1, 2)
-        neighbor_distances = pairwise_cross_distances(self.drones, flat_cell_positions)
+        flat_cell_positions = self.rel_cell_positions.reshape(-1, 2)
+        neighbor_distances = pairwise_cross_distances(self.rel_drones, flat_cell_positions)
         nearest_distances = np.min(neighbor_distances, axis=0)
         heatmap = nearest_distances.reshape(self.channel_shape)
         return gaussian_decay(heatmap, sigma=self.collision_distance)
@@ -158,24 +165,24 @@ class SimpleFrameGenerator(FrameGenerator):
         return np.clip(collision_heatmap, 0.0, 1.0)
 
     def drones_signal_heatmap(self) -> np.ndarray:
-        if self.drones.shape[0] == 0:
+        if self.abs_drones.shape[0] == 0:
             return np.zeros(self.channel_shape)
 
-        flat_cell_positions = self.cell_positions.reshape(-1, 2)
+        flat_cell_positions = self.rel_cell_positions.reshape(-1, 2)
         rssi = signal_strength(
-            self.drones, flat_cell_positions, f=2412, n=2.4, tx_power=20, mode="max"
+            self.rel_drones, flat_cell_positions, f=2412, n=2.4, tx_power=20, mode="max"
         ).reshape(self.channel_shape)
         quality = rssi_to_signal_quality(rssi)
-        drones = self.positions_binary_map(self.drones)
+        drones = self.positions_binary_map(self.rel_drones)
         return np.clip(quality + drones, 0.0, 1.0)
 
     def users_coverage_heatmap(self) -> np.ndarray:
-        flat_cell_positions = self.cell_positions.reshape(-1, 2)
+        flat_cell_positions = self.rel_cell_positions.reshape(-1, 2)
         rssi = signal_strength(
-            self.position, flat_cell_positions, f=2412, n=2.4, tx_power=20, mode="max"
+            np.zeros(2), flat_cell_positions, f=2412, n=2.4, tx_power=20, mode="max"
         ).reshape(self.channel_shape)
         quality = rssi_to_signal_quality(rssi)
-        users = self.positions_binary_map(self.users)
+        users = self.positions_binary_map(self.rel_users)
         return np.clip(quality + users, 0.0, 1.0)
 
 

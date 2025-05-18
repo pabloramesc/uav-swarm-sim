@@ -1,3 +1,5 @@
+from typing import Literal
+
 import numpy as np
 
 from ..agents import Drone
@@ -12,6 +14,8 @@ from ..sdqn import (
 from .multiagent_simulator import MultiAgentSimulator
 from ..mobility.utils import environment_random_positions
 
+ActionsMode = Literal["basic", "extended"]
+
 
 class SDQNTrainer(MultiAgentSimulator):
 
@@ -24,9 +28,18 @@ class SDQNTrainer(MultiAgentSimulator):
         use_network: bool = False,
         sdqn_config: SDQNConfig = None,
         model_path: str = None,
+        actions_mode: ActionsMode = "basic",
     ) -> None:
         self.sdqn_config = sdqn_config or SDQNConfig()
         self.model_path = model_path
+
+        if actions_mode == "basic":
+            self.num_actions = 5
+        elif actions_mode == "extended":
+            self.num_actions = 7
+        else:
+            raise ValueError("Invalid actions mode:", actions_mode)
+
         self.sdqn_brain = self._create_sdqn_brain()
 
         super().__init__(
@@ -44,15 +57,16 @@ class SDQNTrainer(MultiAgentSimulator):
         self.prev_actions: np.ndarray = None
 
     def _create_sdqn_brain(self) -> SDQNBrain:
-        frame_shape = SimpleFrameGenerator.calculate_frame_shape()
-        num_actions = 5  # len(Action)
         wrapper = SDQNWrapper(
-            frame_shape, num_actions, model_path=self.model_path, train_mode=True
+            frame_shape=SimpleFrameGenerator.calculate_frame_shape(),
+            num_actions=self.num_actions,
+            model_path=self.model_path,
+            train_mode=True,
         )
         return SDQNBrain(wrapper)
 
     def _create_sdqn_interface(self, iface_id: int) -> SDQNInterface:
-        frame_gen = SimpleFrameGenerator(env=self.environment, frame_radius=250.0)
+        frame_gen = SimpleFrameGenerator(env=self.environment, frame_radius=500.0)
         interface = SDQNInterface(iface_id, frame_gen)
         self.sdqn_brain.register_interface(interface)
         return interface

@@ -13,7 +13,7 @@ from multiagent_sim.gui.sdqn_viewer import SDQNViewer
 dt = 0.1
 num_drones = 16
 num_users = 10
-size = 500.0
+size = 1e3
 
 config = SDQNConfig(displacement=10.0, target_height=10.0)
 sim = SDQNTrainer(
@@ -21,19 +21,20 @@ sim = SDQNTrainer(
     num_users,
     dt,
     sdqn_config=config,
-    model_path="data/models/sdqn-m01.keras",
+    model_path="data/models/sdqn-m02.keras",
+    actions_mode="extended",
 )
 
 sim.environment.set_rectangular_boundary([-size, -size], [+size, +size])
 
 for _ in range(5):
     center = np.random.uniform(-size, +size, size=(2,))
-    radius = np.random.uniform(5.0, 50.0)
+    radius = np.random.uniform(0.01 * size, 0.1 * size)
     sim.environment.add_circular_obstacle(center, radius)
 
 for _ in range(5):
     bottom_left = np.random.uniform(-size, +size, size=(2,))
-    width_height = np.random.uniform(10.0, 100.0, size=(2,))
+    width_height = np.random.uniform(0.05 * size, 0.5 * size, size=(2,))
     top_right = bottom_left + width_height
     sim.environment.add_rectangular_obstacle(bottom_left, top_right)
 

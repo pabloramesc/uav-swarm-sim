@@ -22,8 +22,8 @@ class RewardManager:
         self.max_links = 6
 
         self.w_coll = 1.0
-        self.w_conn = 0.5
-        self.w_covr = 0.1
+        self.w_conn = 1.0
+        self.w_covr = 1.0
         self.w_expl = 0.0
 
         self.visited_cells = VisitedCells(cell_size=50.0)
@@ -47,7 +47,7 @@ class RewardManager:
             + self.w_covr * r_covr
             + self.w_expl * r_expl
         )
-        rewards = np.clip(rewards, -1.0, +1.0)
+        # rewards = np.clip(rewards, -1.0, +1.0)
 
         # dones = self.is_collision(drone_positions)
         dones = r_coll <= -0.9  # almost -1

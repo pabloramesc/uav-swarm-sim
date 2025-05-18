@@ -96,15 +96,15 @@ def environment_random_positions(num_positions: int, env: Environment) -> np.nda
         x = np.random.uniform(env.boundary.left, env.boundary.right)
         y = np.random.uniform(env.boundary.bottom, env.boundary.top)
         z = env.get_elevation([x, y])
-        if not env.is_inside([x, y]) or env.is_collision(
+        if (not env.is_inside([x, y])) or env.is_collision(
             [x, y, z], check_altitude=False
         ):
             continue
         positions.append([x, y, z])
         if len(positions) == num_positions:
             break
-        
+
     if len(positions) != num_positions:
         raise RuntimeError("Cannot generate random positions inside environment")
-    
+
     return np.array(positions)

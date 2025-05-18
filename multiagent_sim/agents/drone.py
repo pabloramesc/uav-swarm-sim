@@ -72,8 +72,7 @@ class Drone(Agent):
     ):
         super().initialize(state, time)
 
-        self.drone_positions = {}
-        self.user_positions = {}
+        self._update_neighbors()
         self.position_controller.initialize(
             time,
             state,
