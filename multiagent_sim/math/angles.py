@@ -139,6 +139,10 @@ def is_angle_between(
 class SweepAngle:
     start: float
     stop: float
+    
+    def __post_init__(self):
+        self.start = normalize_angle_2pi(self.start)
+        self.stop = normalize_angle_2pi(self.stop)
 
     @property
     def sweep(self) -> float:

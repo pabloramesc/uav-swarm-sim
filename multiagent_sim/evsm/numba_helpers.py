@@ -111,7 +111,7 @@ def sweep_angle(
     """
     Calculates the sweep angle for exploration based on neighbors' positions.
 
-    The sweep angle is the angular range in which no neighbor is visible by the agent.
+    The sweep angle is the largest angular range in which no neighbor is visible by the agent.
 
     Parameters
     ----------
@@ -128,17 +128,20 @@ def sweep_angle(
     neighbors = neighbors.reshape(-1, 2)
     num_neighbors = neighbors.shape[0]
     if num_neighbors == 0:
-        return (0.0, 0.0)
+        return (0.0, 2* np.pi)
     vectors = neighbors - position
     angles = np.arctan2(vectors[:, 1], vectors[:, 0])
     angles.sort()
-    for i in range(num_neighbors):
-        angle1 = angles[i - 1]
-        angle2 = angles[i]
-        sweep_angle = (angle2 - angle1) % (2 * np.pi)
-        if sweep_angle >= np.pi / 2:
-            return (angle1, angle2)
-    return (np.nan, np.nan)
+    sweeps = (angles - np.roll(angles, shift=+1)) % (2 * np.pi)
+    i = np.argmax(sweeps)
+    return (angles[i-1], angles[i])
+    # for i in range(num_neighbors):
+    #     angle1 = angles[i - 1]
+    #     angle2 = angles[i]
+    #     sweep_angle = (angle2 - angle1) % (2 * np.pi)
+    #     if sweep_angle >= np.pi / 2:
+    #         return (angle1, angle2)
+    # return (np.nan, np.nan)
 
 
 @njit(cache=True)

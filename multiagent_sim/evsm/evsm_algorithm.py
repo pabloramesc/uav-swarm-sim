@@ -171,8 +171,6 @@ class EVSMAlgorithm:
 
     def _calculate_sweep_angle(self) -> SweepAngle:
         start, stop = sweep_angle(self.position, self.neighbors)
-        if np.isnan((start, stop)).any():
-            return None
         return SweepAngle(start, stop)
 
     def _get_avoidance_distances_and_directions(self) -> tuple[np.ndarray, np.ndarray]:
@@ -197,7 +195,7 @@ class EVSMAlgorithm:
         bool
             True if the robot is at the edge, False otherwise.
         """
-        return self.sweep_angle is not None
+        return self.sweep_angle.sweep > np.pi / 2
 
     def is_near_obstacle(self) -> bool:
         """
