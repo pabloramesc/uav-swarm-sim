@@ -75,23 +75,23 @@ class Obstacle(ABC):
 
     @property
     def bounds(self) -> np.ndarray:
-        """Returns [bottom, left, top, right] as a NumPy array."""
+        """Returns [left, bottom, right, top] as a NumPy array."""
         return np.array(self.shape.bounds, dtype=float)
 
     @property
-    def bottom(self) -> float:
+    def left(self) -> float:
         return self.bounds[0]
 
     @property
-    def left(self) -> float:
+    def bottom(self) -> float:
         return self.bounds[1]
 
     @property
-    def top(self) -> float:
+    def right(self) -> float:
         return self.bounds[2]
 
     @property
-    def right(self) -> float:
+    def top(self) -> float:
         return self.bounds[3]
 
 

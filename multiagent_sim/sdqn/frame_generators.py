@@ -98,8 +98,8 @@ class SimpleFrameGenerator(FrameGenerator):
 
     def generate_frame(self) -> np.ndarray:
         collision_risk = self.collision_risk_heatmap()
-        drones_signal = self.drones_signal_heatmap()
-        users_coverage = self.users_coverage_heatmap()
+        drones_signal = self.signal_heatmap(self.rel_drones)
+        users_coverage = self.signal_heatmap(self.rel_users)
 
         frame = np.zeros(self.frame_shape)
         frame[..., 0] = self.set_center_cells(collision_risk, value=1.0)
@@ -163,28 +163,17 @@ class SimpleFrameGenerator(FrameGenerator):
         drones_heatmap = self.drones_repulsion_heatmap()
         collision_heatmap = np.maximum(obstacles_heatmap, drones_heatmap)
         return np.clip(collision_heatmap, 0.0, 1.0)
-
-    def drones_signal_heatmap(self) -> np.ndarray:
-        if self.abs_drones.shape[0] == 0:
+    
+    def signal_heatmap(self, rel_positions: np.ndarray) -> np.ndarray:
+        if rel_positions.shape[0] == 0:
             return np.zeros(self.channel_shape)
-
         flat_cell_positions = self.rel_cell_positions.reshape(-1, 2)
         rssi = signal_strength(
-            self.rel_drones, flat_cell_positions, f=2412, n=2.4, tx_power=20, mode="max"
+            rel_positions, flat_cell_positions, f=2412, n=2.4, tx_power=20, mode="max"
         ).reshape(self.channel_shape)
         quality = rssi_to_signal_quality(rssi)
-        drones = self.positions_binary_map(self.rel_drones)
-        return np.clip(quality + drones, 0.0, 1.0)
-
-    def users_coverage_heatmap(self) -> np.ndarray:
-        flat_cell_positions = self.rel_cell_positions.reshape(-1, 2)
-        rssi = signal_strength(
-            np.zeros(2), flat_cell_positions, f=2412, n=2.4, tx_power=20, mode="max"
-        ).reshape(self.channel_shape)
-        quality = rssi_to_signal_quality(rssi)
-        users = self.positions_binary_map(self.rel_users)
-        return np.clip(quality + users, 0.0, 1.0)
-
+        points = self.positions_binary_map(rel_positions)
+        return np.clip(quality + points, 0.0, 1.0)
 
 class _FrameGenerator:
     """

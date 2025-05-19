@@ -61,13 +61,13 @@ class SDQNViewer(SimpleViewer):
         frames = self._get_drone_frames()
         labels = self._get_frame_labels()
         im1 = self._init_frame(
-            frames[..., 0], ax=self.ax1, cmap="viridis", label=labels[0]
+            frames[..., 0], ax=self.ax1, cmap="gray", label=labels[0]
         )
         im2 = self._init_frame(
             frames[..., 1], ax=self.ax2, cmap="viridis", label=labels[1]
         )
         im3 = self._init_frame(
-            frames[..., 2], ax=self.ax3, cmap="viridis", label=labels[2]
+            frames[..., 2], ax=self.ax3, cmap="plasma", label=labels[2]
         )
         self.frame_images = [im1, im2, im3]
 

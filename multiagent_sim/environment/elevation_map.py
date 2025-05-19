@@ -186,4 +186,5 @@ if __name__ == "__main__":
     axes[1].set_title("Satellite")
     axes[2].imshow(fused_img)
     axes[2].set_title("Fused")
+    plt.tight_layout()
     plt.show()
