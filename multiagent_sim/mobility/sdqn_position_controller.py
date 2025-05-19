@@ -44,7 +44,7 @@ class SDQNPositionController(SwarmPositionController):
         self.altitude_hold = AltitudeController(kp, kd)
         self.position_controller = PositionController(kp, kd)
 
-        self._displacement = config.displacement
+        self.displacement = config.displacement
 
         self.last_update_time: float = None
         self.target_position = np.zeros(2)  # px, py
@@ -90,7 +90,9 @@ class SDQNPositionController(SwarmPositionController):
 
         if self._needs_update(time):
             self._update_sdqn_interface()
-            self.target_position += self._displacement * self.sdqn_iface.direction
+            self.target_position = (
+                self.state[0:2] + self.displacement * self.sdqn_iface.direction
+            )
 
         control = np.zeros(3)
 

@@ -25,6 +25,20 @@ class SwarmPositionController(ABC):
         self.time = 0.0
         self.state = np.zeros((6,))  # px, py, pz, vx, vy, vz
 
+    @property
+    def position(self) -> np.ndarray:
+        """
+        Current position [px, py, pz] in meters.
+        """
+        return self.state[0:3]
+
+    @property
+    def velocity(self) -> np.ndarray:
+        """
+        Current velocity [vx, vy, vz] in m/s.
+        """
+        return self.state[3:6]
+
     @abstractmethod
     def initialize(
         self,

@@ -18,8 +18,8 @@ class SDQNInterface:
         self.drones = np.zeros((0, 2))
         self.users = np.zeros((0, 2))
         
-        self.last_frame: np.ndarray = None
-        self.last_action: int = None
+        self.frame: np.ndarray = None
+        self.action: int = None
         self.direction = np.zeros(2)
 
     def update(
@@ -32,7 +32,7 @@ class SDQNInterface:
 
     def generate_frame(self) -> np.ndarray:
         frame = self.frame_generator.generate_frame()
-        self.last_frame = frame
+        self.frame = frame
         return frame
         
     def update_action(self, action: Action) -> None:
@@ -47,5 +47,5 @@ class SDQNInterface:
             new_radius = np.clip(new_radius, 10.0, 10e3)
             self.frame_generator.set_frame_radius(new_radius)
             
+        self.action = action
         self.direction = action_to_displacement(action)
-        self.last_action = action
