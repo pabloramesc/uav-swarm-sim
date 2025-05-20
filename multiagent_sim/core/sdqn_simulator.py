@@ -8,7 +8,8 @@ from ..sdqn import (
     RewardManager,
     SDQNBrain,
     SDQNWrapper,
-    SimpleFrameGenerator,
+    GridFrameGenerator,
+    LogPolarFrameGenerator,
     SDQNInterface,
 )
 from .multiagent_simulator import MultiAgentSimulator
@@ -29,11 +30,13 @@ class SDQNSimulator(MultiAgentSimulator):
         sdqn_config: SDQNConfig = None,
         model_path: str = None,
         train_mode: bool = True,
+        logpolar: bool = False,
         actions_mode: ActionsMode = "basic",
     ) -> None:
         self.sdqn_config = sdqn_config or SDQNConfig()
         self.model_path = model_path
         self.train_mode = train_mode
+        self.logpolar = logpolar
 
         if actions_mode == "basic":
             self.num_actions = 5
@@ -57,10 +60,17 @@ class SDQNSimulator(MultiAgentSimulator):
 
         self.prev_frames: np.ndarray = None
         self.prev_actions: np.ndarray = None
+        
+        self.sdqn_update_period: float = 0.1
+        self.last_sdqn_update_time: float = None
 
     def _create_sdqn_brain(self) -> SDQNBrain:
+        if self.logpolar:
+            frame_shape = LogPolarFrameGenerator.calculate_frame_shape()
+        else:
+            frame_shape = GridFrameGenerator.calculate_frame_shape()
         wrapper = SDQNWrapper(
-            frame_shape=SimpleFrameGenerator.calculate_frame_shape(),
+            frame_shape=frame_shape,
             num_actions=self.num_actions,
             model_path=self.model_path,
             train_mode=self.train_mode,
@@ -68,7 +78,10 @@ class SDQNSimulator(MultiAgentSimulator):
         return SDQNBrain(wrapper)
 
     def _create_sdqn_interface(self, iface_id: int) -> SDQNInterface:
-        frame_gen = SimpleFrameGenerator(env=self.environment, frame_radius=500.0)
+        if self.logpolar:
+            frame_gen = LogPolarFrameGenerator(env=self.environment)
+        else:
+            frame_gen = GridFrameGenerator(env=self.environment, frame_radius=500.0)
         interface = SDQNInterface(iface_id, frame_gen)
         self.sdqn_brain.register_interface(interface)
         return interface
@@ -93,6 +106,7 @@ class SDQNSimulator(MultiAgentSimulator):
         self.logger.info("Initializing simulation ...")
 
         super().initialize()
+        self.last_sdqn_update_time = None
 
         self.gcs.initialize(state=np.zeros(6))
 
@@ -116,6 +130,10 @@ class SDQNSimulator(MultiAgentSimulator):
 
     def update(self, dt=None) -> None:
         super().update(dt)
+        
+        if not (self.train_mode or self._need_update_sdqn(self.sim_time)):
+            return
+        self.last_sdqn_update_time = self.sim_time
 
         self.drone_states = self.drones.get_states_array()
         self.user_states = self.users.get_states_array()
@@ -167,3 +185,8 @@ class SDQNSimulator(MultiAgentSimulator):
 
     def training_status_str(self) -> str:
         return self.sdqn_brain.wrapper.training_status_str()
+    
+    def _need_update_sdqn(self, time: float) -> bool:
+        if self.last_sdqn_update_time is None:
+            return True
+        return (time - self.last_sdqn_update_time) >= self.sdqn_update_period

@@ -11,7 +11,7 @@ from ..mobility.sdqn_position_controller import (
 )
 from ..sdqn.sdqn_wrapper import SDQNWrapper
 from ..sdqn.reward_manager import RewardManager
-from ..sdqn.frame_generators import SimpleFrameGenerator
+from ..sdqn.frame_generators import GridFrameGenerator
 from ..sdqn.actions import Action
 from ..sdqn.sdqn_brain import SDQNBrain
 from ..sdqn.sdqn_interface import SDQNInterface
@@ -55,7 +55,7 @@ class MultiAgentSDQNGym:
         return time.time() - self.init_time
 
     def _create_sdqn_central_agent(self) -> SDQNBrain:
-        frame_shape = SimpleFrameGenerator.calculate_frame_shape()
+        frame_shape = GridFrameGenerator.calculate_frame_shape()
         num_actions = 5  # len(Action)
         wrapper = SDQNWrapper(
             frame_shape, num_actions, model_path=self.model_path, train_mode=True
@@ -76,7 +76,7 @@ class MultiAgentSDQNGym:
         self.users = AgentsRegistry()
 
         for i in range(self.num_drones):
-            frame_gen = SimpleFrameGenerator(env=self.environment, frame_radius=250.0)
+            frame_gen = GridFrameGenerator(env=self.environment, frame_radius=250.0)
             local = SDQNInterface(iface_id=i, frame_generator=frame_gen)
             self.sdqn_agent.register_interface(local)
             sdqn = SDQNPositionController(

@@ -1,4 +1,4 @@
-from .frame_generators import SimpleFrameGenerator
+from .frame_generators import GridFrameGenerator, LogPolarFrameGenerator
 from .reward_manager import RewardManager
 from .sdqn_brain import SDQNBrain
 from .sdqn_interface import SDQNInterface

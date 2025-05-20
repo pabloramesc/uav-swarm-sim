@@ -1,5 +1,4 @@
 import numpy as np
-from typing import Literal
 from enum import IntEnum
 
 

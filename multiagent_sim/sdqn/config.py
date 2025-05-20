@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Type
 
-from .frame_generators import FrameGenerator, SimpleFrameGenerator
+from .frame_generators import FrameGenerator, GridFrameGenerator
 
 @dataclass
 class FrameGeneratorConfig:

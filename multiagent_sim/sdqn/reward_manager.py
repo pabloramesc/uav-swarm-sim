@@ -23,7 +23,7 @@ class RewardManager:
 
         self.w_coll = 1.0
         self.w_conn = 0.0
-        self.w_covr = 0.0
+        self.w_covr = 0.1
         self.w_expl = 0.0
 
         self.visited_cells = VisitedCells(cell_size=50.0)
@@ -84,7 +84,7 @@ class RewardManager:
                 mode="max",
             )
             quality = rssi_to_signal_quality(rssi, vmin=-80.0)
-            rewards[i] = 0.0 if quality > self.min_quality else -1.0
+            rewards[i] = 1.0 - quality if quality > self.min_quality else -1.0
         return rewards
 
     def coverage_reward(self, drones: np.ndarray, users: np.ndarray) -> float:

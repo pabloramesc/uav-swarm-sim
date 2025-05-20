@@ -12,7 +12,7 @@ from multiagent_sim.gui.sdqn_viewer import SDQNViewer
 
 dt = 0.1
 num_drones = 16
-num_users = 10
+num_users = 20
 size = 1e3
 
 config = SDQNConfig(displacement=10.0, target_height=10.0)
@@ -23,7 +23,7 @@ sim = SDQNSimulator(
     sdqn_config=config,
     model_path="data/models/sdqn-m01.keras",
     actions_mode="basic",
-    train_mode=True,
+    train_mode=False,
 )
 
 sim.environment.set_rectangular_boundary([-size, -size], [+size, +size])

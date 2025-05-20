@@ -35,23 +35,28 @@ class SDQNPositionController(SwarmPositionController):
         sdqn_iface: SDQNInterface,
     ) -> None:
         super().__init__(config, environment)
-        self.update_period = 0.1
+        self.control_update_period = 0.0
+        self.sdqn_update_period = 0.0
 
         self.sdqn_iface = sdqn_iface
 
         kp = config.max_acceleration / config.max_displacement
-        kd = 2 * np.sqrt(kp)  # critical damping
+        # kd = 2 * np.sqrt(kp)  # critical damping
+        kd = config.max_acceleration / config.target_velocity
         self.altitude_hold = AltitudeController(kp, kd)
         self.position_controller = PositionController(kp, kd)
 
         self.displacement = config.displacement
 
-        self.last_update_time: float = None
         self.target_position = np.zeros(2)  # px, py
 
         # Neighbor positions cache
-        self._drone_positions: dict[int, np.ndarray] = {}
-        self._user_positions: dict[int, np.ndarray] = {}
+        self.control_force = np.zeros(3)
+        self.drone_positions: dict[int, np.ndarray] = {}
+        self.user_positions: dict[int, np.ndarray] = {}
+
+        self._last_control_update_time: float = None
+        self._last_sdqn_update_time: float = None
 
     def initialize(
         self,
@@ -62,13 +67,15 @@ class SDQNPositionController(SwarmPositionController):
     ) -> None:
         super().initialize(time, state)
 
-        self._drone_positions = drone_positions
-        self._user_positions = user_positions
+        self.drone_positions = drone_positions
+        self.user_positions = user_positions
 
         self._update_sdqn_interface()
 
-        self.last_update_time: float = None
+        self.control_force = np.zeros(3)
         self.target_position = state[0:2]  # px, py
+        self._last_control_update_time: float = None
+        self._last_sdqn_update_time: float = None
 
     def update(
         self,
@@ -83,21 +90,24 @@ class SDQNPositionController(SwarmPositionController):
         super().update(time, state)
 
         if drone_positions is not None:
-            self._drone_positions = drone_positions
+            self.drone_positions = drone_positions
 
         if user_positions is not None:
-            self._user_positions = user_positions
+            self.user_positions = user_positions
 
-        if self._needs_update(time):
+        if not self._need_update_control(time):
+            return self.control_force
+        self._last_control_update_time = time
+
+        if self._need_update_sdqn(time):
             self._update_sdqn_interface()
             self.target_position = (
                 self.state[0:2] + self.displacement * self.sdqn_iface.direction
             )
-
-        control = np.zeros(3)
+            self._last_sdqn_update_time = time
 
         # Horizontal control using PD (Proportional Derivative)
-        control[0:2] = self.position_controller.control(
+        self.control_force[0:2] = self.position_controller.control(
             target_position=self.target_position,
             position=state[0:2],
             velocity=state[3:5],
@@ -105,24 +115,28 @@ class SDQNPositionController(SwarmPositionController):
 
         # Vertical control by altitude hold
         target_altitude = self.env.get_elevation(state[0:2]) + self.config.target_height
-        control[2] = self.altitude_hold.control(
+        self.control_force[2] = self.altitude_hold.control(
             target_altitude=target_altitude, altitude=state[2], vspeed=state[5]
         )
 
-        return control
+        return self.control_force
 
     def get_frame(self) -> np.ndarray:
         return self.dqns.compute_state_frame()
 
-    def _needs_update(self, time: float) -> bool:
-        if time is None or self.last_update_time is None:
+    def _need_update_control(self, time: float) -> bool:
+        if self._last_control_update_time is None:
             return True
-        elapsed_time = time - self.last_update_time
-        return elapsed_time > self.update_period
+        return (time - self._last_control_update_time) >= self.control_update_period
+
+    def _need_update_sdqn(self, time: float) -> bool:
+        if self._last_sdqn_update_time is None:
+            return True
+        return (time - self._last_sdqn_update_time) >= self.sdqn_update_period
 
     def _update_sdqn_interface(self) -> None:
-        drones_array = self._positions_dict_to_array(self._drone_positions)
-        users_array = self._positions_dict_to_array(self._user_positions)
+        drones_array = self._positions_dict_to_array(self.drone_positions)
+        users_array = self._positions_dict_to_array(self.user_positions)
         self.sdqn_iface.update(
             position=self.state[0:2], drones=drones_array, users=users_array
         )
