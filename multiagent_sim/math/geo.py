@@ -47,7 +47,7 @@ def geo2enu(geo: ArrayLike, home: ArrayLike) -> np.ndarray:
     enu[:, 1] = dlat * LATDEG2METERS  # North
     enu[:, 2] = geo[:, 2] - home[2]  # Up
 
-    return np.squeeze(enu)  # Return (3,) if input was (3,)
+    return enu.reshape(geo.shape)  # Return same shape as input
 
 
 def enu2geo(enu: ArrayLike, home: ArrayLike) -> np.ndarray:
@@ -82,7 +82,7 @@ def enu2geo(enu: ArrayLike, home: ArrayLike) -> np.ndarray:
     )  # Longitude
     geo[:, 2] = home[2] + enu2d[:, 2]  # Altitude
 
-    return np.squeeze(geo)
+    return geo.reshape(enu.shape)  # Return same shape as input
 
 if __name__ == "__main__":
     home = np.array([37.7749, -122.4194, 30.0])  # Reference point (latitude, longitude, altitude)

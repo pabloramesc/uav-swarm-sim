@@ -9,12 +9,11 @@ import numpy as np
 
 from multiagent_sim.core.sdqn_simulator import SDQNSimulator, SDQNConfig
 from multiagent_sim.gui.sdqn_viewer import SDQNViewer
-from multiagent_sim.gui.sdqn_logpolar_viewer import SDQNGridViewer, SDQNLogPolarViewer
 
 dt = 0.1
 num_drones = 16
 num_users = 20
-size = 500
+size = 500.0
 change_interval = 1000
 
 config = SDQNConfig(
@@ -34,12 +33,12 @@ sim = SDQNSimulator(
 sim.environment.set_rectangular_boundary([-size, -size], [+size, +size])
 
 
-def generate_obstacles():
+def change_environment():
     sim.environment.clear_obstacles()
 
     for _ in range(5):
         center = np.random.uniform(-size, +size, size=(2,))
-        radius = np.random.uniform(0.01 * size, 0.1 * size)
+        radius = np.random.uniform(0.02 * size, 0.2 * size)
         sim.environment.add_circular_obstacle(center, radius)
 
     for _ in range(5):
@@ -48,20 +47,18 @@ def generate_obstacles():
         top_right = bottom_left + width_height
         sim.environment.add_rectangular_obstacle(bottom_left, top_right)
 
+    sim.initialize()
 
-generate_obstacles()
-sim.initialize()
+change_environment()
 
 gui = SDQNViewer(sim)
-# gui = SDQNGridViewer(sim)
-# gui = SDQNLogPolarViewer(sim)
 
 while True:
     sim.update()
 
     if sim.sim_step % change_interval == 0:
-        print("Changing obstacles...")
-        sim.initialize()
+        print("Changing environment...")
+        change_environment()
 
     fps = gui.update(force=False)
 

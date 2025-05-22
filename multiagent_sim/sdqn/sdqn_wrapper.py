@@ -53,7 +53,7 @@ class SDQNWrapper:
         self.dqn_agent = DQNAgent(
             model=None,
             batch_size=64,
-            gamma=0.99,
+            gamma=0.95,
             policy=self.policy,
             # memory_size=500_000,
             memory=self.memory,
@@ -207,6 +207,7 @@ class SDQNWrapper:
 
     def training_status_str(self) -> str:
         return (
+            f"Train time: {self.train_elapsed:.2f} s, "
             f"Train steps: {self.train_steps}, "
             f"Train speed: {self.train_speed:.2f} sps, "
             f"Memory size: {self.memory_size}, "

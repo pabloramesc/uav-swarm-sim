@@ -13,9 +13,9 @@ from multiagent_sim.gui.sdqn_viewer import SDQNViewer
 dt = 0.1
 num_drones = 16
 num_users = 20
-size = 1e3
+size = 500
 
-config = SDQNConfig(displacement=10.0, target_height=10.0)
+config = SDQNConfig(displacement=20.0, target_height=10.0)
 sim = SDQNSimulator(
     num_drones,
     num_users,

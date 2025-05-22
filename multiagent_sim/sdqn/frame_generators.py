@@ -91,7 +91,8 @@ class FrameGenerator(ABC):
         flat_abs_cells = self.abs_cell_positions.reshape(-1, 2)
         obstacles_distances = distances_to_obstacles(self.env, flat_abs_cells)
         heatmap = obstacles_distances.reshape(self.channel_shape)
-        return gaussian_decay(heatmap, sigma=self.collision_distance)
+        # return gaussian_decay(heatmap, sigma=self.collision_distance)
+        return heatmap <= 0.0
 
     def drones_repulsion_heatmap(self) -> np.ndarray:
         if self.abs_drones.shape[0] == 0:
@@ -100,11 +101,13 @@ class FrameGenerator(ABC):
         neighbor_distances = pairwise_cross_distances(self.rel_drones, flat_rel_cells)
         nearest_distances: np.ndarray = np.min(neighbor_distances, axis=0)
         heatmap = nearest_distances.reshape(self.channel_shape)
-        return gaussian_decay(heatmap, sigma=self.collision_distance)
+        # return gaussian_decay(heatmap, sigma=self.collision_distance)
+        return heatmap <= 0.0
 
     def collision_risk_heatmap(self) -> np.ndarray:
         obstacles_heatmap = self.obstacles_repulsion_heatmap()
-        drones_heatmap = self.drones_repulsion_heatmap()
+        # drones_heatmap = self.drones_repulsion_heatmap()
+        drones_heatmap = self.positions_binary_map(self.rel_drones)
         collision_heatmap = np.maximum(obstacles_heatmap, drones_heatmap)
         return np.clip(collision_heatmap, 0.0, 1.0)
 

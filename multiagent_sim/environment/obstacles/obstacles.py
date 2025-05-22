@@ -28,18 +28,18 @@ class Obstacle(ABC):
         self.shape = shape
         self.centroid = np.array(self.shape.centroid.coords[0])
 
-    def is_inside(self, pos: ArrayLike) -> bool | np.ndarray:
-        pos = np.atleast_2d(pos)
+    def is_inside(self, pos: ArrayLike) -> np.ndarray:
+        pos = np.asarray(pos)
         points = [Point(p) for p in pos]
         is_inside = np.array([self.shape.contains(p) for p in points])
-        return is_inside if pos.shape[0] > 1 else is_inside.item()
+        return is_inside
 
-    def distance(self, pos: ArrayLike) -> float | np.ndarray:
+    def distance(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
         distances = self._get_distances(pos)
         is_inside = self.is_inside(pos)
         distances[is_inside] = 0.0
-        return distances if pos.shape[0] > 1 else distances.item()
+        return distances
 
     def direction(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
@@ -50,12 +50,12 @@ class Obstacle(ABC):
         directions[non_zero] = deltas[non_zero] / distances[non_zero, None]
         is_inside = self.is_inside(pos)
         directions[is_inside] *= -1
-        return np.squeeze(directions)
+        return directions
 
     def closest_point(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
         closest, _ = self._get_closest_and_distances(pos)
-        return np.squeeze(closest)
+        return closest
 
     def _get_distances(self, pos: np.ndarray) -> np.ndarray:
         pos = np.atleast_2d(pos)
@@ -102,27 +102,27 @@ class CircularObstacle(Obstacle):
         self.radius = float(radius)
         super().__init__(Point(self.center).buffer(self.radius, quad_segs))
 
-    def is_inside(self, pos: ArrayLike) -> bool | np.ndarray:
+    def is_inside(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
         distances = center_distances_numba(pos, self.center)
         is_inside = distances <= self.radius
-        return is_inside if is_inside.shape[0] > 1 else is_inside.item()
+        return is_inside
 
-    def distance(self, pos: ArrayLike) -> float | np.ndarray:
+    def distance(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
         distances = center_distances_numba(pos, self.center)
         distances = np.maximum(distances - self.radius, 0.0)
-        return distances if distances.shape[0] > 1 else distances.item()
+        return distances
 
     def direction(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
         _, directions = center_distances_and_directions_numba(pos, self.center)
-        return np.squeeze(directions)
+        return directions
 
     def closest_point(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
         closest = circle_closest_point_numba(pos, self.center, self.radius)
-        return np.squeeze(closest)
+        return closest
 
 
 class RectangularObstacle(Obstacle):
@@ -132,19 +132,19 @@ class RectangularObstacle(Obstacle):
         self.top_right = np.array(top_right)
         super().__init__(box(*self.bottom_left, *self.top_right))
 
-    def is_inside(self, pos: ArrayLike) -> bool | np.ndarray:
+    def is_inside(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
         is_inside = is_inside_rectangle_numba(
             pos, left=self.left, right=self.right, bottom=self.bottom, top=self.top
         )
-        return is_inside if is_inside.shape[0] > 1 else is_inside.item()
+        return is_inside
 
-    def distance(self, pos: ArrayLike) -> float | np.ndarray:
+    def distance(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
         distances = rectangle_external_distances_numba(
             pos, left=self.left, right=self.right, bottom=self.bottom, top=self.top
         )
-        return distances if distances.shape[0] > 1 else distances.item()
+        return distances
 
     def direction(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
@@ -155,14 +155,14 @@ class RectangularObstacle(Obstacle):
             pos, left=self.left, right=self.right, bottom=self.bottom, top=self.top
         )
         directions[is_inside] *= -1
-        return np.squeeze(directions)
+        return directions
 
     def closest_point(self, pos: ArrayLike) -> np.ndarray:
         pos = np.asarray(pos)
         closest = rectangle_closest_point_numba(
             pos, left=self.left, right=self.right, bottom=self.bottom, top=self.top
         )
-        return np.squeeze(closest)
+        return closest
 
 
 class PolygonalObstacle(Obstacle):

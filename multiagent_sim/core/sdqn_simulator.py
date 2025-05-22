@@ -105,7 +105,6 @@ class SDQNSimulator(MultiAgentSimulator):
     def initialize(self) -> None:
         self.logger.info("Initializing simulation ...")
 
-        super().initialize()
         self.last_sdqn_update_time = None
 
         self.gcs.initialize(state=np.zeros(6))
@@ -125,6 +124,8 @@ class SDQNSimulator(MultiAgentSimulator):
         self.sdqn_brain.step()
         self.prev_frames = self.sdqn_brain.last_frames
         self.prev_actions = self.sdqn_brain.last_actions
+        
+        super().initialize()
 
         self.logger.info("✅ Initialization completed.")
 
@@ -135,8 +136,8 @@ class SDQNSimulator(MultiAgentSimulator):
             return
         self.last_sdqn_update_time = self.sim_time
 
-        self.drone_states = self.drones.get_states_array()
-        self.user_states = self.users.get_states_array()
+        # self.drone_states = self.drones.get_states_array()
+        # self.user_states = self.users.get_states_array()
 
         self.rewards, self.dones = self.reward_manager.update(
             drones=self.drone_states[:, 0:2],

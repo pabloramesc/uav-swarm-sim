@@ -41,9 +41,11 @@ class SDQNPositionController(SwarmPositionController):
         self.sdqn_iface = sdqn_iface
 
         kp = config.max_acceleration / config.max_displacement
-        # kd = 2 * np.sqrt(kp)  # critical damping
-        kd = config.max_acceleration / config.target_velocity
+        
+        kd = 2 * np.sqrt(kp)  # critical damping
         self.altitude_hold = AltitudeController(kp, kd)
+        
+        kd = config.max_acceleration / config.target_velocity
         self.position_controller = PositionController(kp, kd)
 
         self.displacement = config.displacement
@@ -105,6 +107,9 @@ class SDQNPositionController(SwarmPositionController):
                 self.state[0:2] + self.displacement * self.sdqn_iface.direction
             )
             self._last_sdqn_update_time = time
+            
+        if self.env.is_collision(pos=self.target_position, check_boundary=True):
+            self.target_position = self.state[0:2]
 
         # Horizontal control using PD (Proportional Derivative)
         self.control_force[0:2] = self.position_controller.control(

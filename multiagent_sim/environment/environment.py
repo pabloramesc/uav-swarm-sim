@@ -183,7 +183,9 @@ class Environment:
             raise ValueError("Boundary is not defined.")
         return self.boundary.is_inside(pos[:, 0:2])
 
-    def is_collision(self, pos: ArrayLike, check_altitude: bool = True) -> np.ndarray:
+    def is_collision(
+        self, pos: ArrayLike, check_altitude: bool = False, check_boundary: bool = False
+    ) -> np.ndarray:
         """
         Checks if one or more positions collide with any obstacle or the ground.
 
@@ -202,23 +204,25 @@ class Environment:
         """
         pos = np.atleast_2d(pos)  # Ensure pos is (N, 3)
 
-        # Check collision with obstacles
+        boundary_collisions = np.zeros(pos.shape[0], dtype=bool)
+        if check_boundary:
+            boundary_collisions = ~self.boundary.is_inside(pos[:, 0:2])
+
         obstacle_collisions = np.array(
             [obstacle.is_inside(pos[:, 0:2]) for obstacle in self.obstacles]
         )
         obstacle_collisions = np.any(obstacle_collisions, axis=0)
 
-        # Check collision with the ground
+        collisions = boundary_collisions | obstacle_collisions
+
         if check_altitude:
             ground_elevations = self.get_elevation(
                 pos[:, 0:2]
             )  # Get ground elevation for all positions
             below_ground = pos[:, 2] < ground_elevations
-            collisions = obstacle_collisions | below_ground
-        else:
-            collisions = obstacle_collisions
-        
-        return collisions if collisions.size > 1 else collisions.item()
+            collisions = collisions | below_ground
+
+        return collisions
 
     def get_elevation(self, pos: ArrayLike) -> np.ndarray:
         """
