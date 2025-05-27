@@ -132,7 +132,8 @@ class SimpleViewer(MultiAgentViewer):
         # Plot the heatmap
         if self.background_image is None:
             cmap = plt.cm.get_cmap("turbo", 11)  # 11 discrete colors
-            norm = mcolors.BoundaryNorm(boundaries=np.linspace(0, 100, 11), ncolors=10)
+            cmap.set_under("black")  # Color for values below the first boundary
+            norm = mcolors.BoundaryNorm(boundaries=np.linspace(1e-6, 100, 11), ncolors=10)
             self.background_image = self.ax.imshow(
                 heatmap,
                 extent=[self.xlim[0], self.xlim[1], self.ylim[0], self.ylim[1]],

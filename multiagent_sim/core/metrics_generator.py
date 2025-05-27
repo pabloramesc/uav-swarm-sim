@@ -35,3 +35,36 @@ class MetricsGenerator:
         rx = pts[inside]
         rssi = signal_strength(tx, rx, f=2412, n=2.4, tx_power=20.0, mode="max")
         return np.mean(rssi > min_rssi)
+    
+    def users_coverage(
+        self,
+        drone_positions: np.ndarray,
+        user_positions: np.ndarray,
+        min_rssi: float = -80.0,
+    ):
+        if len(user_positions) == 0:
+            return 0.0
+
+        tx = drone_positions
+        rx = user_positions
+        rssi = signal_strength(tx, rx, f=2412, n=2.4, tx_power=20.0, mode="max")
+        return np.mean(rssi > min_rssi)
+    
+    def connected_drones(
+        self,
+        drone_positions: np.ndarray,
+        min_rssi: float = -80.0,
+    ):
+        num_drones = drone_positions.shape[0]
+        if num_drones == 0:
+            return 0.0
+           
+        count = 0
+        for i in range(num_drones):
+            tx = np.delete(drone_positions, i, axis=0)
+            rx = drone_positions[i, :]
+            rssi = signal_strength(tx, rx, f=2412, n=2.4, tx_power=20.0, mode="max")
+            if rssi > min_rssi:
+                count += 1
+                
+        return count / num_drones if num_drones > 0 else 0.0

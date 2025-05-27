@@ -1,9 +1,12 @@
 import numpy as np
 from numba import njit
+from typing import Literal
+
+SignalCalculationMode = Literal["sum", "max"]  # Updated to "sum" or "max"
 
 
 def rssi_to_signal_quality(
-    rssi: np.ndarray, vmin: float = -90.0, vmax: float = -30.0
+    rssi: np.ndarray, vmin: float = -80.0, vmax: float = -30.0
 ) -> np.ndarray:
     quality = (rssi - vmin) / (vmax - vmin)
     return np.clip(quality, 0.0, 1.0)
@@ -15,7 +18,7 @@ def signal_strength(
     f: float = 10.0,
     n: float = 3.0,
     tx_power: float = 20.0,
-    mode: str = "total",
+    mode: SignalCalculationMode = "sum",  # Updated default and type
 ) -> np.ndarray:
     """
     Calculate the transmitted power at receiver positions from transmitter positions.
@@ -32,16 +35,16 @@ def signal_strength(
         Path loss exponent (default is 3.0).
     tx_power : float, optional
         Transmit power in dBm (default is 20.0).
-    mode : str, optional
-        Mode of calculation. Can be "total" to sum contributions from all transmitters
-        or "max" to return the maximum received power from a single transmitter (default is "total").
+    mode : SignalCalculationMode, optional
+        Mode of calculation. Can be "sum" to sum contributions from all transmitters
+        or "max" to return the maximum received power from a single transmitter (default is "sum").
 
     Returns
     -------
     np.ndarray
         Array of shape (num_rx,) with the received power at each receiver position.
         The result depends on the selected mode:
-        - "total": Total received power from all transmitters.
+        - "sum": Total received power from all transmitters.
         - "max": Maximum received power from a single transmitter.
     """
     if tx_positions.shape[0] == 0:
@@ -52,7 +55,7 @@ def signal_strength(
 
     rx_power = _signal_strength_numba(tx_positions, rx_positions, f, n, tx_power)
 
-    if mode == "total":
+    if mode == "sum":
         # Compute received power in linear scale (mW)
         rx_power_linear = 10 ** (rx_power / 10)  # Convert dBm to mW
 
@@ -69,7 +72,7 @@ def signal_strength(
         return max_rx_power
 
     else:
-        raise ValueError("Invalid mode. Choose 'total' or 'max'.")
+        raise ValueError("Invalid mode. Choose 'sum' or 'max'.")
 
 
 def signal_strength_map(
@@ -79,7 +82,7 @@ def signal_strength_map(
     f: float = 10.0,
     n: float = 3.0,
     tx_power: float = 20.0,
-    mode: str = "total",
+    mode: SignalCalculationMode = "sum",  # Updated default and type
 ) -> np.ndarray:
     """
     Generate a heatmap of received power over a grid of points.
@@ -98,9 +101,9 @@ def signal_strength_map(
         Path loss exponent (default is 3.0).
     tx_power : float, optional
         Transmit power in dBm (default is 20.0).
-    mode : str, optional
-        Mode of calculation. Can be "total" to sum contributions from all transmitters
-        or "max" to return the maximum received power from a single transmitter (default is "total").
+    mode : SignalCalculationMode, optional
+        Mode of calculation. Can be "sum" to sum contributions from all transmitters
+        or "max" to return the maximum received power from a single transmitter (default is "sum").
 
     Returns
     -------

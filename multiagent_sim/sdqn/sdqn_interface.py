@@ -22,13 +22,13 @@ class SDQNInterface:
         self.action: int = None
         self.direction = np.zeros(2)
 
-    def update(
+    def update_positions(
         self, position: np.ndarray, drones: np.ndarray, users: np.ndarray
     ) -> None:
         self.position = position
         self.drones = drones
         self.users = users
-        self.frame_generator.update(position, drones, users)
+        self.frame_generator.update_positions(position, drones, users)
 
     def generate_frame(self) -> np.ndarray:
         frame = self.frame_generator.generate_frame()
@@ -45,13 +45,13 @@ class SDQNInterface:
             return
         
         if action == Action.ZOOM_IN:
-            new_radius = self.frame_generator.frame_radius / 1.1
+            new_radius = self.frame_generator.frame_radius / 1.2
         elif action == Action.ZOOM_OUT:
-            new_radius = self.frame_generator.frame_radius * 1.1
+            new_radius = self.frame_generator.frame_radius * 1.2
         else:
             new_radius = None
 
         if new_radius is not None:
-            new_radius = np.clip(new_radius, 10.0, 10e3)
+            new_radius = np.clip(new_radius, 100.0, 10e3)
             self.frame_generator.set_frame_radius(new_radius)
         

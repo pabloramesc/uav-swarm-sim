@@ -60,3 +60,31 @@ class SwarmPositionController(ABC):
     ) -> np.ndarray:
         self.time = time
         self.state = state.copy()
+
+
+class DummyPositionController(SwarmPositionController):
+    """
+    Dummy position controller that does nothing.
+    """
+
+    def __init__(self, config: SwarmControllerConfig, env: Environment) -> None:
+        super().__init__(config, env)
+
+    def initialize(
+        self,
+        time: float,
+        state: np.ndarray,
+        drone_positions: dict[int, np.ndarray] = None,
+        user_positions: dict[int, np.ndarray] = None,
+    ) -> None:
+        super().initialize(time, state)
+
+    def update(
+        self,
+        time: float,
+        state: np.ndarray,
+        drone_positions: dict[int, np.ndarray] = None,
+        user_positions: dict[int, np.ndarray] = None,
+    ) -> np.ndarray:
+        super().update(time, state)
+        return np.zeros((3,))

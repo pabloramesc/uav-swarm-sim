@@ -35,6 +35,8 @@ class SDQNPositionController(SwarmPositionController):
         sdqn_iface: SDQNInterface,
     ) -> None:
         super().__init__(config, environment)
+        self.config: SDQNConfig = config
+        
         self.control_update_period = 0.0
         self.sdqn_update_period = 0.0
 
@@ -97,19 +99,25 @@ class SDQNPositionController(SwarmPositionController):
         if user_positions is not None:
             self.user_positions = user_positions
 
-        if not self._need_update_control(time):
-            return self.control_force
-        self._last_control_update_time = time
+        # if not self._need_update_control(time):
+        #     return self.control_force
+        # self._last_control_update_time = time
 
-        if self._need_update_sdqn(time):
-            self._update_sdqn_interface()
-            self.target_position = (
-                self.state[0:2] + self.displacement * self.sdqn_iface.direction
-            )
-            self._last_sdqn_update_time = time
-            
-        if self.env.is_collision(pos=self.target_position, check_boundary=True):
-            self.target_position = self.state[0:2]
+        # if self._need_update_sdqn(time):
+        #     self._update_sdqn_interface()
+        #     self.target_position = (
+        #         self.state[0:2] + self.displacement * self.sdqn_iface.direction
+        #     )
+        #     self._last_sdqn_update_time = time
+        
+        self._update_sdqn_interface()
+        
+        vel = self.config.target_velocity * self.sdqn_iface.direction
+        self.target_position = self.state[0:2] + vel * 0.1
+        
+
+        # if self.env.is_collision(pos=self.target_position, check_boundary=True):
+        #     self.target_position = self.state[0:2]
 
         # Horizontal control using PD (Proportional Derivative)
         self.control_force[0:2] = self.position_controller.control(
@@ -142,7 +150,7 @@ class SDQNPositionController(SwarmPositionController):
     def _update_sdqn_interface(self) -> None:
         drones_array = self._positions_dict_to_array(self.drone_positions)
         users_array = self._positions_dict_to_array(self.user_positions)
-        self.sdqn_iface.update(
+        self.sdqn_iface.update_positions(
             position=self.state[0:2], drones=drones_array, users=users_array
         )
 

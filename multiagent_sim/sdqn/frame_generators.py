@@ -48,7 +48,7 @@ class FrameGenerator(ABC):
     def calculate_frame_shape(channel_shape: tuple[int, int]) -> tuple[int, int, int]:
         return (*channel_shape, 3)
 
-    def update(
+    def update_positions(
         self, position: np.ndarray, drones: np.ndarray, users: np.ndarray
     ) -> None:
         self.position = position
@@ -198,7 +198,7 @@ class LogPolarFrameGenerator(FrameGenerator):
         num_radial: int = 64,
         num_angular: int = 64,
         min_radius: float = 1e0,
-        max_radius: float = 1e3,
+        max_radius: float = 10e3,
         collision_distance: float = 10.0,
     ):
         self.num_radial = num_radial
@@ -218,21 +218,22 @@ class LogPolarFrameGenerator(FrameGenerator):
         return (num_radial, num_angular, 3)
 
     def get_logpolar_mesh_edges(self) -> tuple[np.ndarray, np.ndarray]:
-        r_edges = np.geomspace(self.min_radius, self.max_radius, self.num_radial + 1)
+        log_r_min = np.log(self.min_radius)
+        log_r_max = np.log(self.max_radius)
+        r_edges = np.exp(np.linspace(log_r_min, log_r_max, self.num_radial + 1))
         theta_edges = np.linspace(-np.pi, +np.pi, self.num_angular + 1, endpoint=True)
-        # theta_grid, r_grid = np.meshgrid(theta_edges, r_edges, indexing="ij")
-        # xs = r_grid * np.cos(theta_grid)
-        # ys = r_grid * np.sin(theta_grid)
         return r_edges, theta_edges
 
     def update_rel_cells_positions(self) -> None:
-        radial = np.geomspace(self.min_radius, self.max_radius, self.num_radial)
+        log_r_min = np.log(self.min_radius)
+        log_r_max = np.log(self.max_radius)
+        radial = np.exp(np.linspace(log_r_min, log_r_max, self.num_radial))
         angular = np.linspace(-np.pi, +np.pi, self.num_angular, endpoint=True)
+        
         theta_grid, r_grid = np.meshgrid(angular, radial, indexing="ij")
-
         px = r_grid * np.cos(theta_grid)
         py = r_grid * np.sin(theta_grid)
-
+        
         self.rel_cell_positions = np.stack([px, py], axis=-1)
 
     def positions_to_cell_indices(self, positions: np.ndarray) -> np.ndarray:
@@ -240,9 +241,9 @@ class LogPolarFrameGenerator(FrameGenerator):
         r = np.linalg.norm(rel, axis=1)
         theta = np.arctan2(rel[:, 1], rel[:, 0])
 
-        log_r = np.log10(np.clip(r, self.min_radius, self.max_radius))
-        log_r_min = np.log10(self.min_radius)
-        log_r_max = np.log10(self.max_radius)
+        log_r = np.log(np.clip(r, self.min_radius, self.max_radius))
+        log_r_min = np.log(self.min_radius)
+        log_r_max = np.log(self.max_radius)
 
         radial_indices = (
             (log_r - log_r_min) / (log_r_max - log_r_min) * self.num_radial

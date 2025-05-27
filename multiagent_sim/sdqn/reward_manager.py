@@ -28,7 +28,7 @@ class RewardManager:
 
         self.visited_cells = VisitedCells(cell_size=50.0)
         self.expire_time = 60.0
-        self.min_quality = 0.1
+        self.min_quality = 0.0
 
     def update(
         self, drones: np.ndarray, users: np.ndarray, time: float
@@ -52,23 +52,52 @@ class RewardManager:
         # # dones = self.is_collision(drone_positions)
         # dones = r_coll <= -0.9  # almost -1
         # rewards[dones] = -10.0
-        
+
         num_drones = drones.shape[0]
         rewards = np.zeros(num_drones)
         dones = np.zeros(num_drones, dtype=bool)
+
+        # ratio = self.users_coverage_ratio(drones, users)
+        # rewards[:] = ratio**2
+
+        # quality = self.signal_quality(drones)
+        # rewards[quality < self.min_quality] = -1
+        # rewards = (1.0 - quality)**2
         
-        rewards[:] = self.users_coverage_ratio(drones, users)
-        
+        rewards = self.coverage_reward(drones, users)
+
         dist = self.min_separation(drones)
         rewards[dist < self.d_obs] = -1
-        
-        quality = self.signal_quality(drones)
-        rewards[quality < self.min_quality] = -1
-        
+
         rewards[dist <= 0.0] = -10
-        dones[dist <= 0.0] = True       
+        dones[dist <= 0.0] = True
 
         return rewards, dones
+    
+    def coverage_reward(self, drones: np.ndarray, users: np.ndarray) -> np.ndarray:
+        num_drones = drones.shape[0]
+        rewards = np.zeros(num_drones)
+        for i in range(num_drones):
+            drones_rssi = signal_strength(
+                tx_positions=np.delete(drones, i, axis=0),
+                rx_positions=drones[i],
+                f=2412,
+                n=2.4,
+                tx_power=20.0,
+                mode="max",
+            )
+            drones_quality = rssi_to_signal_quality(drones_rssi, vmin=-80.0, vmax=-30.0)
+            users_rssi = signal_strength(
+                tx_positions=users,
+                rx_positions=drones[i],
+                f=2412,
+                n=2.4,
+                tx_power=20.0,
+                mode="max",
+            )
+            users_quality = rssi_to_signal_quality(users_rssi, vmin=-80.0, vmax=-30.0)
+            rewards[i] = users_quality - drones_quality
+        return rewards
 
     def min_separation(self, drones: np.ndarray) -> np.ndarray:
         pairwise = pairwise_self_distances(drones)

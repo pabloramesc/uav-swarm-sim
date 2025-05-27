@@ -25,6 +25,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.image import AxesImage
+from matplotlib.scale import LogScale
 
 from ..core.sdqn_simulator import SDQNSimulator
 from .simple_viewer import BackgroundType, SimpleViewer
@@ -227,13 +228,14 @@ class SDQNLogPolarViewer(SimpleViewer):
         pm = ax.pcolormesh(theta_edges, r_edges, frame.T / 255.0, cmap=cmap, vmin=0.0, vmax=1.0)
         plt.colorbar(pm, ax=ax)
         
-        ax.set_rscale("log")
-        # r_tick_values = [0.1, 1, 10, 100, 1e3, 10e3]
-        r_tick_values = [1, 10, 100, 1e3]
+        ax.set_rscale(LogScale(ax, base=np.e))
+        log_r_min = np.log(generator.min_radius)
+        log_r_max = np.log(generator.max_radius)
+        r_tick_values = np.exp(np.linspace(log_r_min, log_r_max, 6))
         ax.set_rticks(r_tick_values)
-        ax.set_rlabel_position(45)
+        ax.set_rlabel_position(-45)  # Position the radial labels
         
-        r_tick_labels = [f"{r:.1f} m" if r<1000 else f"{r/1000:.1f} km"
-                 for r in r_tick_values]
+        r_tick_labels = [f"{r:.1f} m" if r < 1000 else f"{r/1000:.1f} km" for r in r_tick_values]
         ax.set_yticklabels(r_tick_labels)
+        
         return pm

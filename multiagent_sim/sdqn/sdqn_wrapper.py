@@ -41,19 +41,19 @@ class SDQNWrapper:
 
         if train_mode:
             self.policy = EpsilonGreedyPolicy(
-                epsilon=1.0, epsilon_min=0.1, epsilon_decay=1e-5, decay_type="linear"
+                epsilon=1.0, epsilon_min=0.1, epsilon_decay=5e-6, decay_type="linear"
             )
         else:
             self.policy = EpsilonGreedyPolicy(
                 epsilon=0.0, epsilon_min=0.0, decay_type="fixed"
             )
 
-        self.memory = PriorityReplayBuffer(max_size=100_000, beta_annealing=0.0)
+        self.memory = PriorityReplayBuffer(max_size=200_000, beta_annealing=1e-6)
 
         self.dqn_agent = DQNAgent(
             model=None,
             batch_size=64,
-            gamma=0.95,
+            gamma=0.99,
             policy=self.policy,
             # memory_size=500_000,
             memory=self.memory,
@@ -179,11 +179,11 @@ class SDQNWrapper:
 
     @property
     def train_elapsed(self) -> float:
-        return self.dqn_agent.train_elapsed
+        return self.dqn_agent.train_elapsed or 0.0
 
     @property
     def train_speed(self) -> float:
-        return self.dqn_agent.train_speed or np.nan
+        return self.dqn_agent.train_speed or 0.0
 
     @property
     def memory_size(self) -> int:
