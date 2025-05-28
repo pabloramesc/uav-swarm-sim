@@ -24,7 +24,7 @@ sim = SDQNTrainer(
     num_users,
     dt,
     sdqn_config=config,
-    model_path="data/models/sdqn-m03b.keras",
+    model_path="data/models/sdqn-m03a.keras",
     actions_mode="extended",
     train_mode=True,
     logpolar=True,

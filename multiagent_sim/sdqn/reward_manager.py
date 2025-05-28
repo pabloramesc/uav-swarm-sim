@@ -58,13 +58,15 @@ class RewardManager:
         dones = np.zeros(num_drones, dtype=bool)
 
         # ratio = self.users_coverage_ratio(drones, users)
-        # rewards[:] = ratio**2
+        # rewards[:] = ratio
 
         # quality = self.signal_quality(drones)
         # rewards[quality < self.min_quality] = -1
         # rewards = (1.0 - quality)**2
         
-        rewards = self.coverage_reward(drones, users)
+        # rewards = self.coverage_reward(drones, users)
+        
+        rewards = self.difference_coverage_rewards(drones, users)
 
         dist = self.min_separation(drones)
         rewards[dist < self.d_obs] = -1
@@ -156,6 +158,18 @@ class RewardManager:
     #         quality = rssi_to_signal_quality(rssi, vmin=-80.0)
     #         rewards[i] = 1.0 - quality if quality > self.min_quality else -1.0
     #     return rewards
+    
+    def difference_coverage_rewards(self, drones: np.ndarray, users: np.ndarray) -> np.ndarray:
+        num_drones = drones.shape[0]
+        rewards = np.zeros(num_drones)
+        global_reward = self.users_coverage_ratio(drones, users)
+        for i in range(num_drones):
+            no_drone_reward = self.users_coverage_ratio(
+                np.delete(drones, i, axis=0), users
+            )
+            rewards[i] = global_reward - no_drone_reward
+        return rewards
+            
 
     def users_coverage_ratio(self, drones: np.ndarray, users: np.ndarray) -> float:
         rssi = signal_strength(
