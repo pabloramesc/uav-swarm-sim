@@ -127,9 +127,14 @@ class MultiAgentSimulator(ABC):
             self.network.update(self.sim_time, positions)
 
         for agent in self.agents:
-            agent.update(dt)        
+            agent.update(dt)
         
         self._update_states_cache()
+        
+        self.metrics.update(
+            drone_states=self.drone_states,
+            user_states=self.user_states,
+        )
 
     def _sync_to_real_time(self) -> None:
         """

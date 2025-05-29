@@ -180,20 +180,18 @@ class SDQNTrainer(MultiAgentSimulator):
             drone.state[2] = self.sdqn_config.target_height
 
     def simulation_status_str(self) -> str:
-        area_cov = self.metrics.area_coverage(self.drone_states[:, 0:3])
-        users_cov = self.metrics.users_coverage(
-            self.drone_states[:, 0:3], self.user_states[:, 0:3]
-        )
-        connected_drones = self.metrics.connected_drones(
-            self.drone_states[:, 0:3]
-        )
+        area_cov = self.metrics.area_coverage
+        users_cov = self.metrics.users_coverage
+        direct_conn = self.metrics.direct_conn
+        global_conn = self.metrics.global_conn
         return (
             f"Real time: {self.real_time:.2f} s, "
             f"Sim time: {self.sim_time:.2f} s, "
             f"Sim steps: {self.sim_step}, "
             f"Area coverage: {area_cov*100.0:.2f} %, "
             f"Users coverage: {users_cov*100.0:.2f} %, "
-            f"Connected drones: {connected_drones*100.0:.2f} %"
+            f"Directly connected drones: {direct_conn*100.0:.2f} %, "
+            f"Globally connected drones: {global_conn*100.0:.2f} %"
         )
 
     def training_status_str(self) -> str:

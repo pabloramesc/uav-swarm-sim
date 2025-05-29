@@ -28,7 +28,7 @@ class RewardManager:
 
         self.visited_cells = VisitedCells(cell_size=50.0)
         self.expire_time = 60.0
-        self.min_quality = 0.0
+        self.min_quality = 0.01
 
     def update(
         self, drones: np.ndarray, users: np.ndarray, time: float
@@ -63,19 +63,24 @@ class RewardManager:
         # quality = self.signal_quality(drones)
         # rewards[quality < self.min_quality] = -1
         # rewards = (1.0 - quality)**2
-        
+
         # rewards = self.coverage_reward(drones, users)
-        
-        rewards = self.difference_coverage_rewards(drones, users)
+
+        rewards += self.difference_coverage_rewards(drones, users)
+
+        rewards += self.difference_connectivity_rewards(drones)
+
+        # quality = self.drones_signal_quality(drones)
+        # rewards[quality < self.min_quality] = -1.0
 
         dist = self.min_separation(drones)
-        rewards[dist < self.d_obs] = -1
+        rewards[dist < self.d_obs] = -1.0
 
-        rewards[dist <= 0.0] = -10
+        rewards[dist <= 0.0] = -10.0
         dones[dist <= 0.0] = True
 
         return rewards, dones
-    
+
     def coverage_reward(self, drones: np.ndarray, users: np.ndarray) -> np.ndarray:
         num_drones = drones.shape[0]
         rewards = np.zeros(num_drones)
@@ -143,23 +148,24 @@ class RewardManager:
     #     rewards = neighbor_repulsion_rewards + osbtacle_repulsion_rewards
     #     return np.clip(rewards, -1.0, 0.0)
 
-    # def connectivity_rewards(self, drones: np.ndarray) -> np.ndarray:
-    #     num_drones = drones.shape[0]
-    #     rewards = np.zeros(num_drones)
-    #     for i in range(num_drones):
-    #         rssi = signal_strength(
-    #             tx_positions=np.delete(drones, i, axis=0),
-    #             rx_positions=drones[i],
-    #             f=2412,
-    #             n=2.4,
-    #             tx_power=20.0,
-    #             mode="max",
-    #         )
-    #         quality = rssi_to_signal_quality(rssi, vmin=-80.0)
-    #         rewards[i] = 1.0 - quality if quality > self.min_quality else -1.0
-    #     return rewards
-    
-    def difference_coverage_rewards(self, drones: np.ndarray, users: np.ndarray) -> np.ndarray:
+    def drones_signal_quality(self, drones: np.ndarray) -> np.ndarray:
+        num_drones = drones.shape[0]
+        quality = np.zeros(num_drones)
+        for i in range(num_drones):
+            rssi = signal_strength(
+                tx_positions=np.delete(drones, i, axis=0),
+                rx_positions=drones[i],
+                f=2412,
+                n=2.4,
+                tx_power=20.0,
+                mode="max",
+            )
+            quality[i] = rssi_to_signal_quality(rssi, vmin=-80.0)
+        return quality
+
+    def difference_coverage_rewards(
+        self, drones: np.ndarray, users: np.ndarray
+    ) -> np.ndarray:
         num_drones = drones.shape[0]
         rewards = np.zeros(num_drones)
         global_reward = self.users_coverage_ratio(drones, users)
@@ -169,7 +175,6 @@ class RewardManager:
             )
             rewards[i] = global_reward - no_drone_reward
         return rewards
-            
 
     def users_coverage_ratio(self, drones: np.ndarray, users: np.ndarray) -> float:
         rssi = signal_strength(
@@ -182,7 +187,51 @@ class RewardManager:
         )
         quality = rssi_to_signal_quality(rssi, vmin=-80.0)
         covered = quality > self.min_quality
-        return np.sum(covered) / users.shape[0]
+        return np.mean(covered)
+
+    def connection_matrix(self, drones: np.ndarray) -> np.ndarray:
+        num_drones = drones.shape[0]
+        matrix = np.zeros((num_drones, num_drones), dtype=bool)
+        for i in range(num_drones):
+            rssi = signal_strength(
+                tx_positions=drones[i],
+                rx_positions=drones,
+                f=2412,
+                n=2.4,
+                tx_power=20.0,
+                mode="max",
+            )
+            quality = rssi_to_signal_quality(rssi, vmin=-80.0)
+            matrix[i, np.where(quality > self.min_quality)[0]] = True
+        return matrix
+
+    def connected_clusters(self, drones: np.ndarray) -> list[np.ndarray]:
+        from scipy.sparse.csgraph import connected_components
+
+        matrix = self.connection_matrix(drones)
+        n_components, labels = connected_components(
+            matrix, directed=False, return_labels=True
+        )
+        clusters = [np.where(labels == i)[0] for i in range(n_components)]
+        return clusters
+
+    def connected_drones_ratio(self, drones: np.ndarray) -> float:
+        clusters = self.connected_clusters(drones)
+        if not clusters:
+            return 0.0
+        largest_cluster_size = max(len(cluster) for cluster in clusters)
+        return largest_cluster_size / drones.shape[0]
+
+    def difference_connectivity_rewards(self, drones: np.ndarray) -> np.ndarray:
+        num_drones = drones.shape[0]
+        rewards = np.zeros(num_drones)
+        global_reward = self.connected_drones_ratio(drones)
+        for i in range(num_drones):
+            no_drone_reward = self.connected_drones_ratio(
+                np.delete(drones, i, axis=0)
+            ) * (1 - 1 / num_drones)
+            rewards[i] = global_reward - no_drone_reward
+        return rewards
 
     # def exploration_rewards(self, positions: np.ndarray, time: float) -> np.ndarray:
     #     last_visited_times = self.visited_cells.get_cells_time(positions)

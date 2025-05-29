@@ -9,8 +9,57 @@ class MetricsGenerator:
     def __init__(self, env: Environment, netsim: NetworkSimulator = None):
         self.env = env
         self.netsim = netsim
+        self._drone_states = None
+        self._user_states = None
 
-    def area_coverage(
+    def update(self, drone_states: np.ndarray, user_states: np.ndarray):
+        self._drone_states = drone_states
+        self._user_states = user_states
+
+    @property
+    def drone_states(self):
+        return self._drone_states
+
+    @property
+    def user_states(self):
+        return self._user_states
+
+    @property
+    def area_coverage(self):
+        if self._drone_states is None:
+            return 0.0
+        return self.calcaulte_area_coverage(self._drone_states[:, :3])
+
+    @property
+    def users_coverage(self):
+        if self._drone_states is None or self._user_states is None:
+            return 0.0
+        return self.calculate_users_coverage(self._drone_states[:, :3], self._user_states[:, :3])
+
+    @property
+    def direct_conn(self):
+        if self._drone_states is None:
+            return 0.0
+        return self.calculate_direct_conn_drones(self._drone_states[:, :3])
+
+    @property
+    def drones_conn_matrix(self):
+        if self._drone_states is None:
+            return None
+        return self.calculate_drones_conn_matrix(self._drone_states[:, :3])
+
+    @property
+    def global_conn(self):
+        matrix = self.drones_conn_matrix
+        if matrix is None:
+            return 0.0
+        clusters = self.connected_clusters(matrix)
+        if not clusters:
+            return 0.0
+        largest_cluster_size = max(len(cluster) for cluster in clusters)
+        return largest_cluster_size / matrix.shape[0]
+
+    def calcaulte_area_coverage(
         self,
         drone_positions: np.ndarray,
         num_points: int = 1000,
@@ -35,8 +84,8 @@ class MetricsGenerator:
         rx = pts[inside]
         rssi = signal_strength(tx, rx, f=2412, n=2.4, tx_power=20.0, mode="max")
         return np.mean(rssi > min_rssi)
-    
-    def users_coverage(
+
+    def calculate_users_coverage(
         self,
         drone_positions: np.ndarray,
         user_positions: np.ndarray,
@@ -49,8 +98,8 @@ class MetricsGenerator:
         rx = user_positions
         rssi = signal_strength(tx, rx, f=2412, n=2.4, tx_power=20.0, mode="max")
         return np.mean(rssi > min_rssi)
-    
-    def connected_drones(
+
+    def calculate_direct_conn_drones(
         self,
         drone_positions: np.ndarray,
         min_rssi: float = -80.0,
@@ -58,7 +107,7 @@ class MetricsGenerator:
         num_drones = drone_positions.shape[0]
         if num_drones == 0:
             return 0.0
-           
+
         count = 0
         for i in range(num_drones):
             tx = np.delete(drone_positions, i, axis=0)
@@ -66,5 +115,32 @@ class MetricsGenerator:
             rssi = signal_strength(tx, rx, f=2412, n=2.4, tx_power=20.0, mode="max")
             if rssi > min_rssi:
                 count += 1
-                
+
         return count / num_drones if num_drones > 0 else 0.0
+
+    def calculate_drones_conn_matrix(
+        self,
+        drone_positions: np.ndarray,
+        min_rssi: float = -80.0,
+    ):
+        num_drones = drone_positions.shape[0]
+        matrix = np.zeros((num_drones, num_drones), dtype=bool)
+
+        for i in range(num_drones):
+            tx = drone_positions[i, :]
+            rx = drone_positions[:, :]
+            rssi = signal_strength(tx, rx, f=2412, n=2.4, tx_power=20.0, mode="max")
+            matrix[i, np.where(rssi > min_rssi)[0]] = True
+
+        np.fill_diagonal(matrix, False)  # No self-connections
+
+        return matrix
+
+    def connected_clusters(self, matrix: np.ndarray):
+        from scipy.sparse.csgraph import connected_components
+
+        n_components, labels = connected_components(
+            matrix, directed=False, return_labels=True
+        )
+        clusters = [np.where(labels == i)[0] for i in range(n_components)]
+        return clusters

@@ -24,10 +24,10 @@ sim = SDQNTrainer(
     num_users,
     dt,
     sdqn_config=config,
-    model_path="data/models/sdqn-m03a.keras",
+    model_path="data/models/sdqn-m2e.keras",
     actions_mode="extended",
     train_mode=True,
-    logpolar=True,
+    logpolar=False,
 )
 
 sim.environment.set_rectangular_boundary([-size, -size], [+size, +size])

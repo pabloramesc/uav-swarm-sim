@@ -41,7 +41,7 @@ class SDQNWrapper:
 
         if train_mode:
             self.policy = EpsilonGreedyPolicy(
-                epsilon=1.0, epsilon_min=0.1, epsilon_decay=5e-6, decay_type="linear"
+                epsilon=1.0, epsilon_min=0.1, epsilon_decay=1e-5, decay_type="linear"
             )
         else:
             self.policy = EpsilonGreedyPolicy(
