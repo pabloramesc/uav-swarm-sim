@@ -68,7 +68,7 @@ class RewardManager:
 
         rewards += self.difference_coverage_rewards(drones, users)
 
-        rewards += self.difference_connectivity_rewards(drones)
+        # rewards += self.difference_connectivity_rewards(drones)
 
         # quality = self.drones_signal_quality(drones)
         # rewards[quality < self.min_quality] = -1.0

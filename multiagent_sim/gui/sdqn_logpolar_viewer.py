@@ -163,10 +163,15 @@ class SDQNLogPolarViewer(SimpleViewer):
         self.sim: SDQNSimulator = sim
 
     def _create_axes(self) -> list[Axes]:
-        self.ax = self.fig.add_subplot(221)
-        self.ax1 = self.fig.add_subplot(222, projection="polar")
-        self.ax2 = self.fig.add_subplot(223, projection="polar")
-        self.ax3 = self.fig.add_subplot(224, projection="polar")
+        # self.ax = self.fig.add_subplot(221)
+        # self.ax1 = self.fig.add_subplot(222, projection="polar")
+        # self.ax2 = self.fig.add_subplot(223, projection="polar")
+        # self.ax3 = self.fig.add_subplot(224, projection="polar")
+        self.fig.set_size_inches(16, 4)
+        self.ax = self.fig.add_subplot(141)
+        self.ax1 = self.fig.add_subplot(142, projection="polar")
+        self.ax2 = self.fig.add_subplot(143, projection="polar")
+        self.ax3 = self.fig.add_subplot(144, projection="polar")
         return [self.ax, self.ax1, self.ax2, self.ax3]
 
     def _init_plots(self) -> None:

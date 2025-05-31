@@ -72,6 +72,7 @@ class SDQNWrapper:
 
         self.train_metrics: dict = None
         self.min_train_samples = 10_000
+        self.cumulative_reward = 0.0
 
     def add_experiences(
         self,
@@ -115,6 +116,7 @@ class SDQNWrapper:
             dones=dones,
         )
         self.dqn_agent.add_experiences_batch(batch)
+        self.cumulative_reward += np.sum(rewards)
 
     def train(self) -> dict:
         """
@@ -213,5 +215,6 @@ class SDQNWrapper:
             f"Memory size: {self.memory_size}, "
             f"Epsilon: {self.epsilon:.4f}, "
             f"Loss: {self.loss:.4e}, "
-            f"Accuracy: {self.accuracy*100:.2f} %"
+            # f"Accuracy: {self.accuracy*100:.2f} %"
+            f"Cumulative reward: {self.cumulative_reward:.4f}"
         )

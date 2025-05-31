@@ -83,18 +83,14 @@ int main(int argc, char *argv[]) {
     // Config::SetDefault("ns3::aodv::RoutingProtocol::EnableHello", BooleanValue(true));
 
     Ipv4ListRoutingHelper list;
-    // AodvHelper aodv;
-    // list.Add(aodv, 100);
-    OlsrHelper olsr;
-    list.Add(olsr, 100);
+    AodvHelper aodv;
+    list.Add(aodv, 100);
+    // OlsrHelper olsr;
+    // list.Add(olsr, 100);
     
-    InternetStackHelper uavStack;
-    uavStack.SetRoutingHelper(list);
-    uavStack.Install(uavNodes);
-
-    InternetStackHelper defaultStack;
-    defaultStack.Install(gcsNodes);
-    defaultStack.Install(userNodes);
+    InternetStackHelper stack;
+    stack.SetRoutingHelper(list);
+    stack.Install(allNodes);
 
     // --- IP address assignment ---
     Ipv4AddressHelper ipv4;

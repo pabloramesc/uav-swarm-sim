@@ -100,6 +100,9 @@ class SimBridge:
 
     def set_node_positions(self, node_positions: dict[int, np.ndarray]) -> None:
         """Send new positions for multiple nodes."""
+        if node_positions is None or len(node_positions) == 0:
+            raise ValueError("Node positions cannot be empty.")
+        
         self.logger.debug("Setting node positions...")
 
         msg = SimMessage(command=SimCommandCode.SET_POSITIONS)

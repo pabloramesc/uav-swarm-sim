@@ -54,7 +54,7 @@ class ConnectionGraphPlotter:
             node_size=800,
             font_color='white'
         )
-        self.ax.set_title("Diagrama de Conexión de Drones")
+        self.ax.set_title("Ad-hoc network topology")
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 

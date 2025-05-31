@@ -22,6 +22,9 @@ def create_logger(name: str, level: LogLevel = "INFO") -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(_LEVEL_MAP[level])
     logger.propagate = False
+    
+    if logger.handlers:
+        return logger
 
     # Create console handler
     ch = logging.StreamHandler()

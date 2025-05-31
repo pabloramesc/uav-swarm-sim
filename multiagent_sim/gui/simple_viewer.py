@@ -142,7 +142,8 @@ class SimpleViewer(MultiAgentViewer):
                 norm=norm,
                 alpha=0.7,
             )
-            plt.colorbar(self.background_image, ax=self.ax, label="Signal Quality (%)")
+            self.fig.colorbar(self.background_image, ax=self.ax, label="Signal Quality (%)")
+            # self.fig.colorbar(self.background_image, ax=self.ax)
         else:
             self.background_image.set_data(heatmap)
 

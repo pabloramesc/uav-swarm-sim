@@ -21,7 +21,7 @@ evsm_config = EVSMConfig(
     obstacle_distance=10.0,
     max_acceleration=10.0,
     target_speed=10.0,
-    target_altitude=10.0,
+    target_altitude=50.0,
     initial_natural_length=5.0,
     natural_length_rate=2.0,
 )
@@ -46,7 +46,7 @@ for _ in range(5):
     top_right = bottom_left + width_height
     sim.environment.add_rectangular_obstacle(bottom_left, top_right)
 
-sim.initialize(home=[0.0, 0.0, 0.0])
+sim.initialize(home=[0.0, 0.0, 0.0], spacing=5.0)
 
 gui = EVSMViewer(sim)
 

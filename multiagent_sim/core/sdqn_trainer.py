@@ -1,6 +1,7 @@
 from typing import Literal
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from ..agents import Drone
 from ..mobility.sdqn_position_controller import SDQNConfig
@@ -14,7 +15,7 @@ from ..sdqn import (
     SDQNInterface,
 )
 from .multiagent_simulator import MultiAgentSimulator
-from ..mobility.utils import environment_random_positions
+from ..mobility.utils import environment_random_positions, grid_positions
 
 ActionsMode = Literal["basic", "extended"]
 
@@ -102,14 +103,20 @@ class SDQNTrainer(MultiAgentSimulator):
         )
         return drone
 
-    def initialize(self) -> None:
+    def initialize(self, home: ArrayLike = [0.0, 0.0], spacing: float = 5.0) -> None:
         self.logger.info("Initializing simulation ...")
 
-        self.last_sdqn_update_time = None
-
-        self.gcs.initialize(state=np.zeros(6))
+        gcs_state = np.zeros(6)
+        gcs_state[0:2] = np.asarray(home[0:2])
+        gcs_state[2] = self.environment.get_elevation(home[0:2])
+        self.gcs.initialize(state=gcs_state)
 
         drone_states = np.zeros((self.num_drones, 6))
+        # drone_states[:, 0:3] = grid_positions(
+        #     num_points=self.num_drones,
+        #     origin=home,
+        #     space=spacing,
+        # )
         drone_states[:, 0:3] = environment_random_positions(
             num_positions=self.num_drones, env=self.environment
         )

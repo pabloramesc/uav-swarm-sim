@@ -188,6 +188,9 @@ class NetworkSimulator:
             self.node_packets[node_id] = []
 
         return packets
+    
+    def update_sim_time(self) -> None:
+        self.bridge.request_sim_time()
 
     def _create_nodes(self) -> None:
         node_id = 0

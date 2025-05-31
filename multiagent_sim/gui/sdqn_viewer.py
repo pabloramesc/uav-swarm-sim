@@ -31,10 +31,15 @@ class SDQNViewer(SimpleViewer):
         self.sim: SDQNSimulator = sim
 
     def _create_axes(self) -> list[Axes]:
-        self.ax = self.fig.add_subplot(221)
-        self.ax1 = self.fig.add_subplot(222)
-        self.ax2 = self.fig.add_subplot(223)
-        self.ax3 = self.fig.add_subplot(224)
+        # self.ax = self.fig.add_subplot(221)
+        # self.ax1 = self.fig.add_subplot(222)
+        # self.ax2 = self.fig.add_subplot(223)
+        # self.ax3 = self.fig.add_subplot(224)
+        self.fig.set_size_inches(16, 4)
+        self.ax = self.fig.add_subplot(141)
+        self.ax1 = self.fig.add_subplot(142)
+        self.ax2 = self.fig.add_subplot(143)
+        self.ax3 = self.fig.add_subplot(144)
         return [self.ax, self.ax1, self.ax2, self.ax3]
 
     def _init_plots(self) -> None:
@@ -42,6 +47,7 @@ class SDQNViewer(SimpleViewer):
         (self.drone0_point,) = self.ax.plot([], [], "rx", label="drone0")
         super()._init_plots()
         self.ax.get_legend().remove()
+        self.fig.tight_layout()
 
     def _update_plots(self):
         self._update_frame_images()
@@ -94,7 +100,7 @@ class SDQNViewer(SimpleViewer):
         self, frame: np.ndarray, ax: Axes, cmap: str, label: str
     ) -> AxesImage:
         im = ax.imshow(frame / 255.0, origin="lower", cmap=cmap, vmin=0.0, vmax=1.0)
-        plt.colorbar(im, ax=ax)
+        self.fig.colorbar(im, ax=ax)
         ax.set_title(label)
         ax.set_xlabel("X (m)")
         ax.set_ylabel("Y (m)")

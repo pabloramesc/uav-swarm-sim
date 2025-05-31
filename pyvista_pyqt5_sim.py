@@ -8,12 +8,12 @@ from pyvista_terrain_sim import TerrainVisualizer
 
 
 class Simulation:
-    def __init__(self, visualizer):
+    def __init__(self, visualizer: TerrainVisualizer):
         self.viz = visualizer
         self.disp = 10.0
 
-        self.users_geo = self.viz.get_random_points(num_points=10)
-        self.drones_geo = self.viz.get_random_points(num_points=10)
+        self.users_geo = self.viz.get_random_points(num_points=20)
+        self.drones_geo = self.viz.get_random_points(num_points=16)
 
         self.viz.initiate(self.users_geo, self.drones_geo)
 
@@ -23,14 +23,14 @@ class Simulation:
         self.timer.start(100)  # every 100 ms
 
     def step(self):
-        users_dm = np.random.normal(0.0, (self.disp, self.disp, 0.0), size=(10, 3))
-        drones_dm = np.random.normal(0.0, (self.disp, self.disp, 0.0), size=(10, 3))
+        # users_dm = np.random.normal(0.0, (self.disp, self.disp, 0.0), size=(20, 3))
+        # drones_dm = np.random.normal(0.0, (self.disp, self.disp, 0.0), size=(16, 3))
 
-        users_enu = geo2enu(self.users_geo, self.viz.home) + users_dm
-        drones_enu = geo2enu(self.drones_geo, self.viz.home) + drones_dm
+        # users_enu = geo2enu(self.users_geo, self.viz.home) + users_dm
+        # drones_enu = geo2enu(self.drones_geo, self.viz.home) + drones_dm
 
-        self.users_geo = enu2geo(users_enu, self.viz.home)
-        self.drones_geo = enu2geo(drones_enu, self.viz.home)
+        # self.users_geo = enu2geo(users_enu, self.viz.home)
+        # self.drones_geo = enu2geo(drones_enu, self.viz.home)
 
         self.viz.update(self.users_geo, self.drones_geo)
 

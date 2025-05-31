@@ -99,8 +99,8 @@ class TerrainVisualizer:
         )
         self.drone_actor = self.plotter.add_points(
             self.drone_points,
-            color="red",
-            point_size=12,
+            color="magenta",
+            point_size=10,
             render_points_as_spheres=True,
             reset_camera=False,
         )

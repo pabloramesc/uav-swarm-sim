@@ -85,7 +85,7 @@ class EVSMSimulator(MultiAgentSimulator):
         )
         return drone
 
-    def initialize(self, home: ArrayLike):
+    def initialize(self, home: ArrayLike = [0.0, 0.0], spacing: float = 5.0) -> None:
         self.logger.info("Initializing simulation ...")
 
         gcs_state = np.zeros(6)
@@ -97,7 +97,7 @@ class EVSMSimulator(MultiAgentSimulator):
         drone_states[:, 0:3] = grid_positions(
             num_points=self.num_drones,
             origin=home,
-            space=5.0,
+            space=spacing,
             altitude=self.evsm_config.target_altitude,
         )
         self.drones.initialize(states=drone_states)
