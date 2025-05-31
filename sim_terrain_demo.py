@@ -12,18 +12,19 @@ from multiagent_sim.gui.simple_viewer import SimpleViewer
 
 
 dt = 0.01
+grid_spacing = 100.0
 num_drones = 25
-num_users = 10
-size = 500.0
+num_users = 50
 
 evsm_config = EVSMConfig(
-    separation_distance=500.0,
+    separation_distance=1e3,
     obstacle_distance=100.0,
-    max_acceleration=10.0,
     target_speed=20.0,
     target_altitude=50.0,
-    initial_natural_length=5.0,
-    natural_length_rate=5.0,
+    initial_natural_length=grid_spacing,
+    natural_length_rate=10.0,
+    max_acceleration=10.0,
+    max_position_error=100.0,
 )
 sim = EVSMSimulator(
     num_drones,
@@ -38,21 +39,12 @@ xy_min = [1e3, 1e3]
 xy_max = [9e3, 9e3]
 # sim.environment.set_rectangular_boundary(xy_min, xy_max)
 
-vertices = [[1e3, 1e3], [6e3, 1e3], [9e3, 6e3], [9e3, 9e3], [1e3, 9e3]]
+vertices = [[2e3, 2e3], [6e3, 2e3], [8e3, 4e3], [8e3, 8e3], [2e3, 8e3]]
 sim.environment.set_polygonal_boundary(vertices)
+sim.environment.add_circular_obstacle([6e3, 4e3], 0.5e3)
+sim.environment.add_rectangular_obstacle([4.0e3, 5.5e3], [6.0e3, 6.5e3])
 
-for _ in range(5):
-    center = np.random.uniform(xy_min, xy_max, size=(2,))
-    radius = np.random.uniform(50.0, 500.0)
-    sim.environment.add_circular_obstacle(center, radius)
-
-for _ in range(5):
-    bottom_left = np.random.uniform(xy_min, xy_max, size=(2,))
-    width_height = np.random.uniform(100.0, 1000.0, size=(2,))
-    top_right = bottom_left + width_height
-    sim.environment.add_rectangular_obstacle(bottom_left, top_right)
-
-sim.initialize(home=[4.6e3, 1.5e3])
+sim.initialize(home=[4e3, 4e3], spacing=grid_spacing, altitude=100.0)
 
 gui = SimpleViewer(sim, background_type="fused")
 

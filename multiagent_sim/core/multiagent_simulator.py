@@ -26,6 +26,7 @@ class MultiAgentSimulator(ABC):
         self,
         num_drones: int,
         num_users: int = 0,
+        num_gcs: int = 1,
         dt: float = 0.01,
         dem_path: str = None,
         use_network: bool = False,
@@ -33,6 +34,7 @@ class MultiAgentSimulator(ABC):
     ) -> None:
         self.num_drones = num_drones
         self.num_users = num_users
+        self.num_gcs = num_gcs
         self.dt = dt
         self.environment = Environment(dem_path)
 
@@ -43,7 +45,7 @@ class MultiAgentSimulator(ABC):
             self.network = None
             self.netsim = None
 
-        self.gcs: ControlStation = None
+        self.gcs = AgentsRegistry()
         self.drones = AgentsRegistry()
         self.users = AgentsRegistry()
         
@@ -60,6 +62,7 @@ class MultiAgentSimulator(ABC):
         
         self.drone_states: np.ndarray = None
         self.user_states: np.ndarray = None
+        self.gcs_states: np.ndarray = None
 
         register_exit_signal()
 
@@ -76,12 +79,14 @@ class MultiAgentSimulator(ABC):
         self._create_users()
     
     def _create_gcs(self) -> None:
-        self.gcs = ControlStation(
-            agent_id=len(self.agents),
-            environment=self.environment,
-            network_sim=self.netsim,
-        )
-        self.agents.register(self.gcs)
+        for _ in range(self.num_gcs):
+            gcs = ControlStation(
+                agent_id=len(self.agents),
+                environment=self.environment,
+                network_sim=self.netsim,
+            )
+            self.gcs.register(gcs)
+            self.agents.register(gcs)
         
     def _create_users(self) -> None:
         for _ in range(self.num_users):
@@ -98,7 +103,6 @@ class MultiAgentSimulator(ABC):
             drone = self._create_drone(**kwargs)
             self.drones.register(drone)
             self.agents.register(drone)
-        return self.drones
     
     @abstractmethod
     def _create_drone(self, **kwargs) -> Drone:
@@ -155,5 +159,6 @@ class MultiAgentSimulator(ABC):
             self.network.wait(timeout=ns3_delta)
 
     def _update_states_cache(self) -> None:
+        self.gcs_states = self.gcs.get_states_array()
         self.user_states = self.users.get_states_array()
         self.drone_states = self.drones.get_states_array()

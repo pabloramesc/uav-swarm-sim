@@ -31,9 +31,11 @@ class SimpleViewer(MultiAgentViewer):
         min_fps: float = 10.0,
         max_fps: float = 60.0,
         background_type: BackgroundType = "rssi",
+        show_legend: bool = False,
     ) -> None:
         self.background_type: BackgroundType = background_type
         self.background_image: AxesImage = None
+        self.show_legend = show_legend
         super().__init__(sim, xlim, ylim, fig_size, min_fps, max_fps)
 
     def _create_axes(self) -> list[Axes]:
@@ -45,8 +47,8 @@ class SimpleViewer(MultiAgentViewer):
         Initiate GCS, drones, and users. Plot avoid regions and elevetion map
         if needed.
         """
-        (self.drone_points,) = self.ax.plot([], [], "bx", label="drones")
         (self.user_points,) = self.ax.plot([], [], "mo", label="users")
+        (self.drone_points,) = self.ax.plot([], [], "bx", label="drones")
         (self.gcs_points,) = self.ax.plot([], [], "k*", label="GCS")
 
         self._plot_avoid_regions()
@@ -65,10 +67,9 @@ class SimpleViewer(MultiAgentViewer):
         else:
             raise ValueError("Invalid background type option:", self.background_type)
 
-
     def _update_plots(self) -> None:
         self._update_agent_points()
-        
+
         if self.background_type == "rssi":
             self._plot_rssi_heatmap()
 
@@ -116,7 +117,13 @@ class SimpleViewer(MultiAgentViewer):
             origin="lower",
             alpha=0.7,
         )
-        # no colorbar for sat
+        elev = self.sim.environment.elevation_map.elevation_data
+        vmin, vmax = np.nanmin(elev), np.nanmax(elev)
+        cmap = plt.get_cmap("terrain")
+        norm = plt.Normalize(vmin=vmin, vmax=vmax)
+        sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+        sm.set_array([])  # Required for colorbar
+        plt.colorbar(sm, ax=self.ax, label="Elevation (m)")
 
     def _plot_rssi_heatmap(self) -> None:
         # Generate the grid for the heatmap
@@ -133,7 +140,9 @@ class SimpleViewer(MultiAgentViewer):
         if self.background_image is None:
             cmap = plt.cm.get_cmap("turbo", 11)  # 11 discrete colors
             cmap.set_under("black")  # Color for values below the first boundary
-            norm = mcolors.BoundaryNorm(boundaries=np.linspace(1e-6, 100, 11), ncolors=10)
+            norm = mcolors.BoundaryNorm(
+                boundaries=np.linspace(1e-6, 100, 11), ncolors=10
+            )
             self.background_image = self.ax.imshow(
                 heatmap,
                 extent=[self.xlim[0], self.xlim[1], self.ylim[0], self.ylim[1]],
@@ -142,20 +151,26 @@ class SimpleViewer(MultiAgentViewer):
                 norm=norm,
                 alpha=0.7,
             )
-            self.fig.colorbar(self.background_image, ax=self.ax, label="Signal Quality (%)")
+            self.fig.colorbar(
+                self.background_image, ax=self.ax, label="Signal Quality (%)"
+            )
             # self.fig.colorbar(self.background_image, ax=self.ax)
         else:
             self.background_image.set_data(heatmap)
 
     def _update_agent_points(self) -> None:
-        gcs_states = np.atleast_2d(self.sim.gcs.state)
-        self.gcs_points.set_data(gcs_states[:, 0], gcs_states[:, 1])
-        self.user_points.set_data(
-            self.sim.user_states[:, 0], self.sim.user_states[:, 1]
-        )
-        self.drone_points.set_data(
-            self.sim.drone_states[:, 0], self.sim.drone_states[:, 1]
-        )
+        if self.sim.gcs_states.shape[0] > 0:
+            self.gcs_points.set_data(
+                self.sim.gcs_states[:, 0], self.sim.gcs_states[:, 1]
+            )
+        if self.sim.user_states.shape[0] > 0:
+            self.user_points.set_data(
+                self.sim.user_states[:, 0], self.sim.user_states[:, 1]
+            )
+        if self.sim.drone_states.shape[0] > 0:
+            self.drone_points.set_data(
+                self.sim.drone_states[:, 0], self.sim.drone_states[:, 1]
+            )
 
     def _configure_axes(self) -> None:
         self._calculate_axis_limits()
@@ -164,7 +179,9 @@ class SimpleViewer(MultiAgentViewer):
         self.ax.set_ylabel("Y (m)")
         self.ax.set_aspect("equal")
         self.ax.grid(True)
-        self.ax.legend(loc="upper right")
+
+        if self.show_legend:
+            self.ax.legend(loc="upper right")
 
         if self.xlim:
             self.ax.set_xlim(*self.xlim)

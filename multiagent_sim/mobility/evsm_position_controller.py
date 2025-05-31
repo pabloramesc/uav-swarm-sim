@@ -53,6 +53,7 @@ class EVSMPositionController(SwarmPositionController):
             ln=self._initial_nat_length,
             ks=kp,
             kd=kd,
+            k_expl=kp,
             d_obs=config.obstacle_distance,
         )
 

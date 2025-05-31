@@ -52,6 +52,7 @@ class EVSMSimulator(MultiAgentSimulator):
         self,
         num_drones: int,
         num_users: int = 0,
+        num_gcs: int = 1,
         dt: float = 0.01,
         dem_path: str = None,
         use_network: bool = False,
@@ -62,6 +63,7 @@ class EVSMSimulator(MultiAgentSimulator):
         super().__init__(
             num_drones,
             num_users,
+            num_gcs,
             dt,
             dem_path,
             use_network,
@@ -85,28 +87,30 @@ class EVSMSimulator(MultiAgentSimulator):
         )
         return drone
 
-    def initialize(self, home: ArrayLike = [0.0, 0.0], spacing: float = 5.0) -> None:
+    def initialize(self, home: ArrayLike = [0.0, 0.0], spacing: float = 5.0, altitude: float = 0.0) -> None:
         self.logger.info("Initializing simulation ...")
 
-        gcs_state = np.zeros(6)
-        gcs_state[0:2] = np.asarray(home[0:2])
-        gcs_state[2] = self.environment.get_elevation(home[0:2])
-        self.gcs.initialize(state=gcs_state)
+        if self.num_gcs == 1:
+            gcs_state = np.zeros(6)
+            gcs_state[0:2] = np.asarray(home[0:2])
+            gcs_state[2] = self.environment.get_elevation(home[0:2])
+            self.gcs[0].initialize(state=gcs_state)
 
         drone_states = np.zeros((self.num_drones, 6))
         drone_states[:, 0:3] = grid_positions(
             num_points=self.num_drones,
             origin=home,
             space=spacing,
-            altitude=self.evsm_config.target_altitude,
+            altitude=altitude,
         )
         self.drones.initialize(states=drone_states)
 
-        user_states = np.zeros((self.num_users, 6))
-        user_states[:, 0:3] = environment_random_positions(
-            num_positions=self.num_users, env=self.environment
-        )
-        self.users.initialize(states=user_states)
+        if self.num_users > 0:
+            user_states = np.zeros((self.num_users, 6))
+            user_states[:, 0:3] = environment_random_positions(
+                num_positions=self.num_users, env=self.environment
+            )
+            self.users.initialize(states=user_states)
 
         super().initialize()
 

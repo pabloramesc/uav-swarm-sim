@@ -23,8 +23,11 @@ class EVSMViewer(SimpleViewer):
         min_fps: float = 10.0,
         max_fps: float = 60.0,
         background_type: BackgroundType = "rssi",
+        show_legend: bool = False,
     ) -> None:
-        super().__init__(sim, xlim, ylim, fig_size, min_fps, max_fps, background_type)
+        super().__init__(
+            sim, xlim, ylim, fig_size, min_fps, max_fps, background_type, show_legend
+        )
         self.sim: EVSMSimulator = sim
 
     def _init_plots(self) -> None:

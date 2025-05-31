@@ -35,17 +35,19 @@ def geo2enu(geo: ArrayLike, home: ArrayLike) -> np.ndarray:
         Local ENU coordinates [E, N, U] in meters.
         Returns a (3,) array for a single point or an (N, 3) array for multiple points.
     """
-    geo = np.atleast_2d(geo).astype(float)  # Ensure geo is at least 2D (N, 3)
+    geo = np.asarray(geo, dtype=float)  # Ensure geo is a numpy array
     home = np.asarray(home, dtype=float)
     if home.shape != (3,):
         raise ValueError("Home must be a (3,) array.")
 
-    enu = np.zeros_like(geo)
-    dlat = geo[:, 0] - home[0]
-    dlon = geo[:, 1] - home[1]
+    geo_2d = np.atleast_2d(geo)            # Ensure geo is at least 2D (N, 3)
+    
+    enu = np.zeros_like(geo_2d)
+    dlat = geo_2d[:, 0] - home[0]
+    dlon = geo_2d[:, 1] - home[1]
     enu[:, 0] = dlon * LATDEG2METERS * np.cos(np.deg2rad(home[0]))  # East
     enu[:, 1] = dlat * LATDEG2METERS  # North
-    enu[:, 2] = geo[:, 2] - home[2]  # Up
+    enu[:, 2] = geo_2d[:, 2] - home[2]  # Up
 
     return enu.reshape(geo.shape)  # Return same shape as input
 
@@ -70,10 +72,11 @@ def enu2geo(enu: ArrayLike, home: ArrayLike) -> np.ndarray:
         Geographic coordinates [latitude, longitude, altitude] in (deg, deg, m).
         Returns a (3,) array for a single point or an (N, 3) array for multiple points.
     """
-    enu2d = np.atleast_2d(enu).astype(float)  # Ensure enu is at least 2D (N, 3)
+    enu = np.asarray(enu, dtype=float)  # Ensure enu is a numpy array
     home = np.asarray(home, dtype=float)
     if home.shape != (3,):
         raise ValueError("Home must be a (3,) array.")
+    enu2d = np.atleast_2d(enu) # Ensure enu is at least 2D (N, 3)
 
     geo = np.zeros_like(enu2d)
     geo[:, 0] = home[0] + (enu2d[:, 1] / LATDEG2METERS)  # Latitude
