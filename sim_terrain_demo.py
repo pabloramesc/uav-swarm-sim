@@ -27,9 +27,10 @@ evsm_config = EVSMConfig(
     max_position_error=100.0,
 )
 sim = EVSMSimulator(
-    num_drones,
-    num_users,
-    dt,
+    num_drones=num_drones,
+    num_users=num_users,
+    num_gcs=1,
+    dt=dt,
     use_network=False,
     evsm_config=evsm_config,
     dem_path="data/elevation/barcelona_dem.tif",

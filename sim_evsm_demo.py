@@ -9,11 +9,11 @@ import numpy as np
 
 from multiagent_sim.core.evsm_simulator import EVSMSimulator, EVSMConfig
 from multiagent_sim.gui.evsm_viewer import EVSMViewer
-
+from multiagent_sim.utils.data_logger import DataLogger
 
 dt = 0.01
 num_drones = 25
-num_users = 0
+num_users = 10
 size = 1e3
 grid_spacing = 10.0
 
@@ -44,9 +44,24 @@ sim.initialize(home=[200, 200], spacing=grid_spacing)
 
 gui = EVSMViewer(sim)
 
+log = DataLogger(
+    columns=["step", "area_coverage", "users_coverage", "direct_conn", "global_conn"],
+    log_folder="logs",
+)
+
 while True:
     sim.update()
     fps = gui.update(force=False)
+
+    log.append(
+        [
+            sim.sim_step,
+            sim.metrics.area_coverage,
+            sim.metrics.users_coverage,
+            sim.metrics.direct_conn,
+            sim.metrics.global_conn,
+        ]
+    )
 
     print(f"Real time: {sim.real_time:.2f} s, Sim time: {sim.sim_time:.2f} s, ", end="")
     if sim.network:
