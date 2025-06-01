@@ -76,8 +76,8 @@ class RewardManager:
         dist = self.min_separation(drones)
         rewards[dist < self.d_obs] = -1.0
 
-        rewards[dist <= 0.0] = -10.0
-        dones[dist <= 0.0] = True
+        rewards[dist <= 1.0] = -10.0
+        dones[dist <= 1.0] = True
 
         return rewards, dones
 

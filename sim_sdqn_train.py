@@ -88,8 +88,9 @@ for episode in range(num_episodes + 1):
         sim.update()
         fps = gui.update(force=False) if gui else np.nan
 
-        cumulative_reward += np.mean(sim.rewards)
-        episode_losses.append(sim.sdqn_brain.wrapper.loss)
+        if sim.sdqn_brain.wrapper.train_steps > 0:
+            cumulative_reward += np.mean(sim.rewards)
+            episode_losses.append(sim.sdqn_brain.wrapper.loss)
 
         print(
             (
@@ -135,6 +136,6 @@ for episode in range(num_episodes + 1):
         epsilon=sim.sdqn_brain.wrapper.epsilon,
         area_coverage=sim.metrics.area_coverage * 100.0,
         user_coverage=sim.metrics.user_coverage * 100.0,
-        direct_conn=sim.metrics.direct_connections * 100.0,
-        global_conn=sim.metrics.global_connections * 100.0,
+        direct_conn=sim.metrics.direct_conn * 100.0,
+        global_conn=sim.metrics.global_conn * 100.0,
     )
