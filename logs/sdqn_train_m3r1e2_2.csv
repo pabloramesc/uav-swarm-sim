@@ -1,0 +1,4 @@
+# Model: log-polar, Actions: basic, Environment: 2km x 2km, 
+# Num drones: 16, Num users: 20, Num obstacles: 0
+# Max steps: 5000, Time step: 0.10
+episode,steps,duration,reward,loss,epsilon,area_coverage,user_coverage,direct_conn,global_conn

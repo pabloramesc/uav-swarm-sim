@@ -27,8 +27,6 @@ class SDQNTrainer(MultiAgentSimulator):
         num_drones: int,
         num_users: int = 0,
         dt: float = 0.01,
-        dem_path: str = None,
-        use_network: bool = False,
         sdqn_config: SDQNConfig = None,
         model_path: str = None,
         train_mode: bool = True,
@@ -50,12 +48,12 @@ class SDQNTrainer(MultiAgentSimulator):
         self.sdqn_brain = self._create_sdqn_brain()
 
         super().__init__(
-            num_drones,
-            num_users,
-            dt,
-            dem_path,
-            use_network,
-            sdqn_config=self.sdqn_config,
+            num_drones=num_drones,
+            num_users=num_users,
+            num_gcs=1,
+            dt=dt,
+            dem_path=None,
+            use_network=False,
         )
 
         self.reward_manager = RewardManager(env=self.environment)
@@ -106,20 +104,20 @@ class SDQNTrainer(MultiAgentSimulator):
     def initialize(self, home: ArrayLike = [0.0, 0.0], spacing: float = 5.0) -> None:
         self.logger.info("Initializing simulation ...")
 
-        gcs_state = np.zeros(6)
-        gcs_state[0:2] = np.asarray(home[0:2])
-        gcs_state[2] = self.environment.get_elevation(home[0:2])
-        self.gcs.initialize(state=gcs_state)
+        gcs_states = np.zeros((1,6))
+        gcs_states[0, 0:2] = np.asarray(home[0:2])
+        gcs_states[0, 2] = self.environment.get_elevation(home[0:2])
+        self.gcs.initialize(states=gcs_states)
 
         drone_states = np.zeros((self.num_drones, 6))
-        # drone_states[:, 0:3] = grid_positions(
-        #     num_points=self.num_drones,
-        #     origin=home,
-        #     space=spacing,
-        # )
-        drone_states[:, 0:3] = environment_random_positions(
-            num_positions=self.num_drones, env=self.environment
+        drone_states[:, 0:3] = grid_positions(
+            num_points=self.num_drones,
+            origin=home,
+            space=spacing,
         )
+        # drone_states[:, 0:3] = environment_random_positions(
+        #     num_positions=self.num_drones, env=self.environment
+        # )
         self.drones.initialize(states=drone_states)
 
         user_states = np.zeros((self.num_users, 6))
@@ -188,7 +186,7 @@ class SDQNTrainer(MultiAgentSimulator):
 
     def simulation_status_str(self) -> str:
         area_cov = self.metrics.area_coverage
-        users_cov = self.metrics.users_coverage
+        users_cov = self.metrics.user_coverage
         direct_conn = self.metrics.direct_conn
         global_conn = self.metrics.global_conn
         return (

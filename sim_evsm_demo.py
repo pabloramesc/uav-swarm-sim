@@ -57,7 +57,7 @@ while True:
         [
             sim.sim_step,
             sim.metrics.area_coverage,
-            sim.metrics.users_coverage,
+            sim.metrics.user_coverage,
             sim.metrics.direct_conn,
             sim.metrics.global_conn,
         ]

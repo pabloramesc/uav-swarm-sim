@@ -57,7 +57,7 @@ class SDQNWrapper:
             policy=self.policy,
             # memory_size=500_000,
             memory=self.memory,
-            update_steps=5_000,
+            update_steps=5000,
             autosave_steps=1000,
             file_name=self.model_path,
         )
@@ -72,7 +72,6 @@ class SDQNWrapper:
 
         self.train_metrics: dict = None
         self.min_train_samples = 10_000
-        self.cumulative_reward = 0.0
 
     def add_experiences(
         self,
@@ -116,7 +115,6 @@ class SDQNWrapper:
             dones=dones,
         )
         self.dqn_agent.add_experiences_batch(batch)
-        self.cumulative_reward += np.sum(rewards)
 
     def train(self) -> dict:
         """

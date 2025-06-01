@@ -31,7 +31,7 @@ class MetricsGenerator:
         return self.calcaulte_area_coverage(self._drone_states[:, :3])
 
     @property
-    def users_coverage(self):
+    def user_coverage(self):
         if self._drone_states is None or self._user_states is None:
             return 0.0
         return self.calculate_users_coverage(self._drone_states[:, :3], self._user_states[:, :3])
