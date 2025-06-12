@@ -33,6 +33,8 @@ class SwarmLink:
         self.time: float = 0.0
         self.position: np.ndarray = np.zeros(3)
         self.data_packets: list[DataPacket] = deque(maxlen=1024)
+        self.send_counter: int = 0
+        self.recv_counter: int = 0
 
         self.position_provider = PositionsProvider(
             agent_id, network_sim, position_timeout
@@ -88,12 +90,14 @@ class SwarmLink:
             data=pkt.serialize(),
         )
         self.iface.send(sim_pkt)
+        self.send_counter += 1
 
     def get_messages(self, clear: bool = False) -> list[SwarmMessage]:
         messages: list[SwarmMessage] = []
         for pkt in self.data_packets:
             msg = SwarmMessage(pkt.agent_id, pkt.timestamp, pkt.payload.decode())
             messages.append(msg)
+            self.recv_counter += 1
 
         if clear:
             self.data_packets.clear()

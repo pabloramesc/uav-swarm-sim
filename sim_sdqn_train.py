@@ -19,15 +19,15 @@ num_users = 20
 size = 1e3
 num_obstacles = 0
 num_episodes = 1000
-max_steps = 5000
+max_steps = int(5 * 60 / dt)
 
-config = SDQNConfig(target_velocity=20.0, target_height=0.0)
+config = SDQNConfig(displacement=2.0, target_height=0.0)
 sim = SDQNTrainer(
     num_drones=num_drones,
     num_users=num_users,
     dt=dt,
     sdqn_config=config,
-    model_path="data/models/sdqn-m3r1e2-v2.keras",
+    model_path="data/models/sdqn-m102.keras",
     actions_mode="basic",
     logpolar=True,
     train_mode=True,
@@ -54,7 +54,7 @@ def create_environment():
 
 
 logger = CSVLogger(
-    filepath="logs/sdqn_train_m3r1e2.csv",
+    filepath="logs/sdqn_m101.csv",
     columns=[
         "episode",
         "steps",
@@ -68,7 +68,7 @@ logger = CSVLogger(
         "global_conn",
     ],
     header_lines=[
-        "Model: log-polar, Actions: basic, Environment: 2km x 2km, ",
+        "Model: log-polar (binary maps), Actions: basic, Environment: 2km x 2km, ",
         f"Num drones: {num_drones}, Num users: {num_users}, Num obstacles: {num_obstacles}",
         f"Max steps: {max_steps}, Time step: {dt:.2f}",
     ],
@@ -76,11 +76,13 @@ logger = CSVLogger(
 
 # create_environment()
 
+gui = None
+# gui = SDQNViewer(sim, min_fps=1.0, max_fps=1.0)
+gui = SDQNLogPolarViewer(sim, min_fps=1.0, max_fps=1.0)
+
 for episode in range(num_episodes + 1):
     create_environment()
-    gui = None
-    # gui = SDQNViewer(sim)
-    # gui = SDQNLogPolarViewer(sim)
+    # gui.reset() if gui else None
 
     cumulative_reward = 0.0
     episode_losses = []
@@ -88,8 +90,8 @@ for episode in range(num_episodes + 1):
         sim.update()
         fps = gui.update(force=False) if gui else np.nan
 
+        cumulative_reward += np.mean(sim.rewards)
         if sim.sdqn_brain.wrapper.train_steps > 0:
-            cumulative_reward += np.mean(sim.rewards)
             episode_losses.append(sim.sdqn_brain.wrapper.loss)
 
         print(
@@ -99,6 +101,7 @@ for episode in range(num_episodes + 1):
                 f"Sim time: {sim.sim_time:.2f} s, "
                 f"Real time: {sim.real_time:.2f} s, "
                 f"User cov: {sim.metrics.user_coverage*100:.2f} %, "
+                f"Global conn: {sim.metrics.global_conn*100:.2f} %, "
                 f"Cum reward: {cumulative_reward:.2f}, "
                 f"Loss: {sim.sdqn_brain.wrapper.loss:.4e}, "
                 f"Epsilon: {sim.sdqn_brain.wrapper.epsilon:.4f}, "
@@ -107,8 +110,8 @@ for episode in range(num_episodes + 1):
             end="\r",
         )
 
-        if np.any(sim.dones) or sim.metrics.user_coverage >= 1.00:
-            break
+        # if np.any(sim.dones):
+        #     break
 
     print(
         f"Episode: {episode}/{num_episodes}, "
@@ -122,7 +125,7 @@ for episode in range(num_episodes + 1):
         f"Cum reward: {cumulative_reward:.2f}, "
         f"Loss: {sim.sdqn_brain.wrapper.loss:.4e}, "
         f"Epsilon: {sim.sdqn_brain.wrapper.epsilon:.4f}, "
-        f"Train steps: {sim.sdqn_brain.wrapper.train_steps}"
+        f"Train steps: {sim.sdqn_brain.wrapper.train_steps}, "
         f"Train speed: {sim.sdqn_brain.wrapper.train_speed:.2f} steps/s, "
         f"Train elapsed: {sim.sdqn_brain.wrapper.train_elapsed:.2f} s"
     )

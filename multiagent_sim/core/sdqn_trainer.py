@@ -65,9 +65,9 @@ class SDQNTrainer(MultiAgentSimulator):
 
     def _create_sdqn_brain(self) -> SDQNBrain:
         if self.logpolar:
-            frame_shape = LogPolarFrameGenerator.calculate_frame_shape()
+            frame_shape = LogPolarFrameGenerator.calculate_frame_shape(num_radial=64, num_angular=64)
         else:
-            frame_shape = GridFrameGenerator.calculate_frame_shape()
+            frame_shape = GridFrameGenerator.calculate_frame_shape(num_cells=64)
         wrapper = SDQNWrapper(
             frame_shape=frame_shape,
             num_actions=self.num_actions,
@@ -78,9 +78,9 @@ class SDQNTrainer(MultiAgentSimulator):
 
     def _create_sdqn_interface(self, iface_id: int) -> SDQNInterface:
         if self.logpolar:
-            frame_gen = LogPolarFrameGenerator(env=self.environment)
+            frame_gen = LogPolarFrameGenerator(env=self.environment, num_radial=64, num_angular=64)
         else:
-            frame_gen = GridFrameGenerator(env=self.environment, frame_radius=500.0)
+            frame_gen = GridFrameGenerator(env=self.environment, num_cells=64, frame_radius=500.0)
         interface = SDQNInterface(iface_id, frame_gen)
         self.sdqn_brain.register_interface(interface)
         return interface
@@ -110,14 +110,14 @@ class SDQNTrainer(MultiAgentSimulator):
         self.gcs.initialize(states=gcs_states)
 
         drone_states = np.zeros((self.num_drones, 6))
-        drone_states[:, 0:3] = grid_positions(
-            num_points=self.num_drones,
-            origin=home,
-            space=spacing,
-        )
-        # drone_states[:, 0:3] = environment_random_positions(
-        #     num_positions=self.num_drones, env=self.environment
+        # drone_states[:, 0:3] = grid_positions(
+        #     num_points=self.num_drones,
+        #     origin=home,
+        #     space=spacing,
         # )
+        drone_states[:, 0:3] = environment_random_positions(
+            num_positions=self.num_drones, env=self.environment
+        )
         self.drones.initialize(states=drone_states)
 
         user_states = np.zeros((self.num_users, 6))
@@ -149,7 +149,8 @@ class SDQNTrainer(MultiAgentSimulator):
             time=self.sim_time,
         )
 
-        self.reset_collided_drones(self.dones)
+        if self.train_mode:
+            self.reset_collided_drones(self.dones)
 
         self.sdqn_brain.step()
 

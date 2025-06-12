@@ -8,6 +8,7 @@ https://opensource.org/licenses/MIT
 import time
 from abc import ABC, abstractmethod
 
+import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 
@@ -27,6 +28,13 @@ class MultiAgentViewer(ABC):
         max_fps: float = 60.0,
     ):
         plt.ion()
+        
+        if min_fps <= 0.0:
+            raise ValueError("Minimum FPS must be greater than 0.0")
+        if max_fps <= 0.0:
+            raise ValueError("Maximum FPS must be greater than 0.0")
+        if min_fps > max_fps:
+            raise ValueError("Minimum FPS cannot be greater than maximum FPS")
 
         self.sim = sim
         self.xlim = xlim
@@ -56,8 +64,8 @@ class MultiAgentViewer(ABC):
     def reset(self) -> None:
         self._reset_timers()
         self._init_plots()
-        self._update_plots()
-        self._render_figure()
+        # self._update_plots()
+        # self._render_figure()
 
     def update(self, force: bool = False) -> float:
         if not (force or self._need_render()):
@@ -91,3 +99,11 @@ class MultiAgentViewer(ABC):
         
         self.fps = 0.9 * self.fps + 0.1 * self.current_fps
         self.last_render_time = self.time
+        
+    def capture_frame(self) -> np.ndarray:
+        self.fig.canvas.draw()
+        width, height = self.fig.canvas.get_width_height()
+        buf = self.fig.canvas.buffer_rgba()
+        img = np.frombuffer(buf, dtype=np.uint8).reshape((height, width, 4))
+        img = img[..., :3].copy()  # Remove alpha channel
+        return img

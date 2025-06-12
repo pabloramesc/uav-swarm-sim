@@ -77,14 +77,14 @@ class FrameGenerator(ABC):
     def generate_frame(self) -> np.ndarray:
         frame = np.zeros(self.frame_shape)
         frame[..., 0] = self.collision_risk_heatmap()
-        frame[..., 1] = self.signal_heatmap(self.rel_drones)
-        frame[..., 2] = self.signal_heatmap(self.rel_users)
+        frame[..., 1] = self.drones_coverage_map(self.rel_drones)
+        frame[..., 2] = self.users_coverage_map(self.rel_users)
         return (frame * 255.0).astype(np.uint8)
 
     def positions_binary_map(self, positions: np.ndarray) -> np.ndarray:
         indices = self.positions_to_cell_indices(positions)
         matrix = np.zeros(self.channel_shape)
-        matrix[indices[:, 1], indices[:, 0]] = 1.0
+        matrix[indices[:, 0], indices[:, 1]] = 1.0
         return matrix
 
     def obstacles_repulsion_heatmap(self) -> np.ndarray:
@@ -121,6 +121,36 @@ class FrameGenerator(ABC):
         quality = rssi_to_signal_quality(rssi)
         points = self.positions_binary_map(rel_positions)
         return np.clip(quality + points, 0.0, 1.0)
+
+    def coverage_binary_map(
+        self, rel_positions: np.ndarray, rssi_min: float = -80.0
+    ) -> np.ndarray:
+        if rel_positions.shape[0] == 0:
+            return np.zeros(self.channel_shape)
+        flat_rel_cells = self.rel_cell_positions.reshape(-1, 2)
+        rssi = signal_strength(
+            rel_positions, flat_rel_cells, f=2412, n=2.4, tx_power=20, mode="max"
+        ).reshape(self.channel_shape)
+        return (rssi > rssi_min).astype(np.float32)
+
+    def drones_coverage_map(self, drone_positions: np.ndarray) -> np.ndarray:
+        frame = np.zeros(self.channel_shape)
+        if drone_positions.shape[0] == 0:
+            return frame
+        frame = self.positions_binary_map(drone_positions)
+        # frame += 0.5 * self.coverage_binary_map(drone_positions, rssi_min=-80.0)
+        frame += self.signal_heatmap(drone_positions)
+        return np.clip(frame, 0.0, 1.0)
+
+    def users_coverage_map(self, user_positions: np.ndarray) -> np.ndarray:
+        frame = np.zeros(self.channel_shape)
+        if user_positions.shape[0] == 0:
+            return frame
+        frame = self.positions_binary_map(user_positions)
+        # frame += 0.5 * self.coverage_binary_map(np.zeros(2), rssi_min=-80.0)
+        # frame += self.signal_heatmap(user_positions)
+        frame += self.signal_heatmap(rel_positions=np.zeros((1, 2)))
+        return np.clip(frame, 0.0, 1.0)
 
 
 class GridFrameGenerator(FrameGenerator):
@@ -198,7 +228,7 @@ class LogPolarFrameGenerator(FrameGenerator):
         num_radial: int = 64,
         num_angular: int = 64,
         min_radius: float = 1e0,
-        max_radius: float = 10e3,
+        max_radius: float = 1e3,
         collision_distance: float = 10.0,
     ):
         self.num_radial = num_radial
@@ -210,12 +240,15 @@ class LogPolarFrameGenerator(FrameGenerator):
             channel_shape=(num_radial, num_angular),
             collision_distance=collision_distance,
         )
+        self.positional_encoding = None  # (num_radial, num_angular, 3)
+        self.update_rel_cells_positions()
 
     @staticmethod
     def calculate_frame_shape(
         num_radial: int = 64, num_angular: int = 64
     ) -> tuple[int, int, int]:
-        return (num_radial, num_angular, 3)
+        # 3 original + 3 positional encoding channels
+        return (num_radial, num_angular, 6)
 
     def get_logpolar_mesh_edges(self) -> tuple[np.ndarray, np.ndarray]:
         log_r_min = np.log(self.min_radius)
@@ -229,15 +262,21 @@ class LogPolarFrameGenerator(FrameGenerator):
         log_r_max = np.log(self.max_radius)
         radial = np.exp(np.linspace(log_r_min, log_r_max, self.num_radial))
         angular = np.linspace(-np.pi, +np.pi, self.num_angular, endpoint=True)
-        
-        theta_grid, r_grid = np.meshgrid(angular, radial, indexing="ij")
+
+        r_grid, theta_grid = np.meshgrid(radial, angular, indexing="ij")
         px = r_grid * np.cos(theta_grid)
         py = r_grid * np.sin(theta_grid)
-        
+
         self.rel_cell_positions = np.stack([px, py], axis=-1)
 
+        # Positional encoding: r_norm, sin(theta), cos(theta)
+        r_norm = (np.log(r_grid) - log_r_min) / (log_r_max - log_r_min)
+        sin_theta = (np.sin(theta_grid) + 1.0) / 2.0  # Normalize to [0, 1]
+        cos_theta = (np.cos(theta_grid) + 1.0) / 2.0  # Normalize to [0, 1]
+        self.positional_encoding = np.stack([r_norm, sin_theta, cos_theta], axis=-1)
+
     def positions_to_cell_indices(self, positions: np.ndarray) -> np.ndarray:
-        rel = positions
+        rel = np.atleast_2d(positions)
         r = np.linalg.norm(rel, axis=1)
         theta = np.arctan2(rel[:, 1], rel[:, 0])
 
@@ -253,6 +292,15 @@ class LogPolarFrameGenerator(FrameGenerator):
         radial_indices = np.clip(radial_indices, 0, self.num_radial - 1)
         angular_indices = np.mod(angular_indices, self.num_angular)
         return np.stack([radial_indices, angular_indices], axis=1)
+
+    def generate_frame(self) -> np.ndarray:
+        # Get the original 3-channel frame
+        frame = super().generate_frame()
+        # Concatenate positional encoding channels
+        frame = np.concatenate(
+            [frame, (self.positional_encoding * 255.0).astype(np.uint8)], axis=-1
+        )
+        return frame
 
 
 class _FrameGenerator:

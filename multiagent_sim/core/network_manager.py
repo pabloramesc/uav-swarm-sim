@@ -30,7 +30,7 @@ class NetworkManager:
         self.netsim.verify_node_positions()
 
     def update(self, time: float, positions: dict[int, np.ndarray]) -> None:
-        if not self._needs_update(time):
+        if self._needs_update(time):
             agent_positions = positions
             self._last_update_time = time
         else:

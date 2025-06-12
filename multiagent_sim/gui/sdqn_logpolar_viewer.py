@@ -175,10 +175,11 @@ class SDQNLogPolarViewer(SimpleViewer):
         return [self.ax, self.ax1, self.ax2, self.ax3]
 
     def _init_plots(self) -> None:
-        self._init_frame_images()
+        # self._init_frame_images()
         (self.drone0_point,) = self.ax.plot([], [], "rx", label="drone0")
         super()._init_plots()
-        self.ax.get_legend().remove()
+        if self.ax.get_legend() is not None:
+            self.ax.get_legend().remove()
 
     def _update_plots(self):
         self._update_frame_images()
@@ -194,6 +195,10 @@ class SDQNLogPolarViewer(SimpleViewer):
         )
 
     def _init_frame_images(self) -> None:
+        if self.frame_meshes is not None:
+            for pm in self.frame_meshes:
+                pm.remove()
+            self.frame_meshes = None
         frames = self._get_drone_frames()
         labels = self._get_frame_labels()
         pm1 = self._init_polar_mesh(
@@ -208,9 +213,12 @@ class SDQNLogPolarViewer(SimpleViewer):
         self.frame_meshes = [pm1, pm2, pm3]
 
     def _update_frame_images(self) -> None:
+        if self.frame_meshes is None:
+            self._init_frame_images()
+            return
         frames = self._get_drone_frames()
         for i, pm in enumerate(self.frame_meshes):
-            pm.set_array(frames[..., i].T / 255.0)
+            pm.set_array(frames[..., i] / 255.0)
 
     def _get_drone_frames(self, drone_idx: int = 0) -> np.ndarray:
         return self.sim.sdqn_brain.last_frames[drone_idx]
@@ -230,7 +238,7 @@ class SDQNLogPolarViewer(SimpleViewer):
         if not isinstance(generator, LogPolarFrameGenerator):
             raise ValueError("Frame generator is not log-polar")
         r_edges, theta_edges = generator.get_logpolar_mesh_edges()
-        pm = ax.pcolormesh(theta_edges, r_edges, frame.T / 255.0, cmap=cmap, vmin=0.0, vmax=1.0)
+        pm = ax.pcolormesh(theta_edges, r_edges, frame / 255.0, cmap=cmap, vmin=0.0, vmax=1.0)
         plt.colorbar(pm, ax=ax)
         
         ax.set_rscale(LogScale(ax, base=np.e))

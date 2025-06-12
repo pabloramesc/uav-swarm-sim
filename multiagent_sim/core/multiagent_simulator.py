@@ -39,7 +39,7 @@ class MultiAgentSimulator(ABC):
         self.environment = Environment(dem_path)
 
         if use_network:
-            self.network = NetworkManager(1, num_drones, num_users)
+            self.network = NetworkManager(num_gcs, num_drones, num_users)
             self.netsim = self.network.netsim
         else:
             self.network = None
@@ -60,9 +60,9 @@ class MultiAgentSimulator(ABC):
         self.sim_time = 0.0
         self.sim_step = 0
         
-        self.drone_states: np.ndarray = None
-        self.user_states: np.ndarray = None
-        self.gcs_states: np.ndarray = None
+        self.drone_states = np.zeros((num_drones, 6)) # px, py, pz, vx, vy, vz
+        self.user_states = np.zeros((num_users, 6))
+        self.gcs_states = np.zeros((num_gcs, 6))
 
         register_exit_signal()
 

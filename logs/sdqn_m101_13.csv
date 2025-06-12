@@ -1,0 +1,7 @@
+# Model: log-polar (binary maps), Actions: basic, Environment: 2km x 2km, 
+# Num drones: 16, Num users: 20, Num obstacles: 0
+# Max steps: 3000, Time step: 0.10
+episode,steps,duration,reward,loss,epsilon,area_coverage,user_coverage,direct_conn,global_conn
+0,3000,208.9658215045929,26.706250000002026,0.00020621922,0.9762400000001081,62.4,70.0,87.5,18.75
+1,3000,223.2517547607422,56.06250000000052,8.2366896e-05,0.9462400000002447,68.0,70.0,56.25,31.25
+2,3000,233.8263819217682,61.64375000000027,7.371971e-05,0.9162400000003812,70.1,75.0,56.25,25.0

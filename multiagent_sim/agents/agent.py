@@ -34,7 +34,7 @@ class Agent(ABC):
         self.agent_type = agent_type
         self.environment = environment
         
-        self.logger = create_logger(f"Agent{agent_id}", level="INFO")
+        self.logger = create_logger(f"Agent{agent_id}", level="DEBUG")
 
         self.time = 0.0
         self.state = np.zeros(6)  # px, py, pz, vx, vy, vz

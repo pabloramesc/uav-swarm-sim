@@ -43,10 +43,11 @@ class SDQNViewer(SimpleViewer):
         return [self.ax, self.ax1, self.ax2, self.ax3]
 
     def _init_plots(self) -> None:
-        self._init_frame_images()
+        # self._init_frame_images()
         (self.drone0_point,) = self.ax.plot([], [], "rx", label="drone0")
         super()._init_plots()
-        self.ax.get_legend().remove()
+        if self.ax.get_legend() is not None:
+            self.ax.get_legend().remove()
         self.fig.tight_layout()
 
     def _update_plots(self):
@@ -63,6 +64,10 @@ class SDQNViewer(SimpleViewer):
         )
 
     def _init_frame_images(self) -> None:
+        if self.frame_images is not None:
+            for im in self.frame_images:
+                im.remove()
+            self.frame_images = None
         frames = self._get_drone_frames()
         labels = self._get_frame_labels()
         im1 = self._init_frame(
@@ -77,6 +82,9 @@ class SDQNViewer(SimpleViewer):
         self.frame_images = [im1, im2, im3]
 
     def _update_frame_images(self) -> None:
+        if not self.frame_images:
+            self._init_frame_images()
+            return
         frames = self._get_drone_frames()
         fr = self._get_frame_radius()
         for i, im in enumerate(self.frame_images):

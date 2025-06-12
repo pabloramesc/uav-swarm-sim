@@ -3,6 +3,19 @@ import datetime
 import os
 
 
+def get_unique_log_path(log_folder: str, log_file: str) -> str:
+    """
+    Returns a unique log file path by appending _n if the file already exists.
+    """
+    base_name, ext = os.path.splitext(os.path.basename(log_file))
+    log_path = os.path.join(log_folder, base_name + ext)
+    counter = 1
+    while os.path.exists(log_path):
+        log_path = os.path.join(log_folder, f"{base_name}_{counter}{ext}")
+        counter += 1
+    return log_path
+
+
 class DataLogger:
     def __init__(
         self,
@@ -21,12 +34,7 @@ class DataLogger:
         if not log_file.endswith(".npz"):
             raise ValueError("Log file must have a .npz extension")
 
-        log_path = os.path.join(log_folder, os.path.basename(log_file))
-
-        if os.path.exists(log_path):
-            raise FileExistsError(
-                f"Log file {log_path} already exists. Please choose a different name or remove the existing file."
-            )
+        log_path = get_unique_log_path(log_folder, log_file)
 
         self.columns = columns
         self.log_file = log_path

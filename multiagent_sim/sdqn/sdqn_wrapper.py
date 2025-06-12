@@ -48,7 +48,7 @@ class SDQNWrapper:
                 epsilon=0.0, epsilon_min=0.0, decay_type="fixed"
             )
 
-        self.memory = PriorityReplayBuffer(max_size=200_000, beta_annealing=1e-6)
+        self.memory = PriorityReplayBuffer(max_size=100_000, beta_annealing=1e-6)
 
         self.dqn_agent = DQNAgent(
             model=None,
@@ -71,7 +71,7 @@ class SDQNWrapper:
             raise ValueError("The number of actions does not match the output size")
 
         self.train_metrics: dict = None
-        self.min_train_samples = 10_000
+        self.min_train_samples = 100_000
 
     def add_experiences(
         self,
@@ -147,11 +147,16 @@ class SDQNWrapper:
             [
                 kr.layers.InputLayer(shape=self.frame_shape, dtype="uint8"),
                 kr.layers.Rescaling(1.0 / 255.0),
-                kr.layers.Conv2D(32, (8, 8), strides=(4, 4), activation="relu"),
-                kr.layers.Conv2D(64, (4, 4), strides=(2, 2), activation="relu"),
-                kr.layers.Conv2D(64, (3, 3), strides=(1, 1), activation="relu"),
+                
+                kr.layers.Conv2D(32, (3, 3), strides=1, padding="same", activation="relu"),
+                kr.layers.Conv2D(64, (3, 3), strides=2, padding="same", activation="relu"),
+                kr.layers.Conv2D(64, (3, 3), strides=2, padding="same", activation="relu"),
+                kr.layers.Conv2D(128, (3, 3), strides=2, padding="same", activation="relu"),
                 kr.layers.Flatten(),
+                
                 kr.layers.Dense(512, activation="relu"),
+                # kr.layers.Dropout(0.2),
+                
                 kr.layers.Dense(self.num_actions, activation="linear"),
             ]
         )
