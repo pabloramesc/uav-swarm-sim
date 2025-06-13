@@ -151,6 +151,7 @@ class SDQNWrapper:
                 kr.layers.Conv2D(32, (3, 3), strides=1, padding="same", activation="relu"),
                 kr.layers.Conv2D(64, (3, 3), strides=2, padding="same", activation="relu"),
                 kr.layers.Conv2D(64, (3, 3), strides=2, padding="same", activation="relu"),
+                kr.layers.Conv2D(64, (3, 3), strides=2, padding="same", activation="relu"),
                 kr.layers.Conv2D(128, (3, 3), strides=2, padding="same", activation="relu"),
                 kr.layers.Flatten(),
                 

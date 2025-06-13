@@ -27,9 +27,9 @@ sim = SDQNTrainer(
     num_users=num_users,
     dt=dt,
     sdqn_config=config,
-    model_path="data/models/sdqn-m102.keras",
+    model_path="data/models/sdqn-m200.keras",
     actions_mode="basic",
-    logpolar=True,
+    logpolar=False,
     train_mode=True,
 )
 
@@ -54,7 +54,7 @@ def create_environment():
 
 
 logger = CSVLogger(
-    filepath="logs/sdqn_m101.csv",
+    filepath="logs/sdqn_m200.csv",
     columns=[
         "episode",
         "steps",
@@ -77,8 +77,8 @@ logger = CSVLogger(
 # create_environment()
 
 gui = None
-# gui = SDQNViewer(sim, min_fps=1.0, max_fps=1.0)
-gui = SDQNLogPolarViewer(sim, min_fps=1.0, max_fps=1.0)
+gui = SDQNViewer(sim, min_fps=1.0, max_fps=1.0)
+# gui = SDQNLogPolarViewer(sim, min_fps=1.0, max_fps=1.0)
 
 for episode in range(num_episodes + 1):
     create_environment()

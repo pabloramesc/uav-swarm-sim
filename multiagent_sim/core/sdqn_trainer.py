@@ -10,10 +10,9 @@ from ..sdqn import (
     RewardManager,
     SDQNBrain,
     SDQNWrapper,
-    GridFrameGenerator,
-    LogPolarFrameGenerator,
     SDQNInterface,
 )
+from ..sdqn.frame_generators import GridFrameGenerator, LogPolarFrameGenerator
 from .multiagent_simulator import MultiAgentSimulator
 from ..mobility.utils import environment_random_positions, grid_positions
 
@@ -67,7 +66,7 @@ class SDQNTrainer(MultiAgentSimulator):
         if self.logpolar:
             frame_shape = LogPolarFrameGenerator.calculate_frame_shape(num_radial=64, num_angular=64)
         else:
-            frame_shape = GridFrameGenerator.calculate_frame_shape(num_cells=64)
+            frame_shape = GridFrameGenerator.calculate_frame_shape(num_cells=100)
         wrapper = SDQNWrapper(
             frame_shape=frame_shape,
             num_actions=self.num_actions,
@@ -80,7 +79,7 @@ class SDQNTrainer(MultiAgentSimulator):
         if self.logpolar:
             frame_gen = LogPolarFrameGenerator(env=self.environment, num_radial=64, num_angular=64)
         else:
-            frame_gen = GridFrameGenerator(env=self.environment, num_cells=64, frame_radius=500.0)
+            frame_gen = GridFrameGenerator(env=self.environment, num_cells=100, frame_radius=1e3)
         interface = SDQNInterface(iface_id, frame_gen)
         self.sdqn_brain.register_interface(interface)
         return interface

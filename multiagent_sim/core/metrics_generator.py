@@ -2,6 +2,7 @@ import numpy as np
 
 from ..environment import Environment
 from ..math.path_loss_model import signal_strength
+from ..math.connectivity import connected_clusters, wireless_connectivity_matrix, global_connected
 from ..network import NetworkSimulator
 
 
@@ -28,7 +29,7 @@ class MetricsGenerator:
     def area_coverage(self):
         if self._drone_states is None:
             return 0.0
-        return self.calcaulte_area_coverage(self._drone_states[:, :3])
+        return self.calculate_area_coverage(self._drone_states[:, :3])
 
     @property
     def user_coverage(self):
@@ -46,20 +47,20 @@ class MetricsGenerator:
     def drones_conn_matrix(self):
         if self._drone_states is None:
             return None
-        return self.calculate_drones_conn_matrix(self._drone_states[:, :3])
+        return wireless_connectivity_matrix(self._drone_states[:, :3])
 
     @property
     def global_conn(self):
         matrix = self.drones_conn_matrix
         if matrix is None:
             return 0.0
-        clusters = self.connected_clusters(matrix)
+        clusters = connected_clusters(matrix)
         if not clusters:
             return 0.0
         largest_cluster_size = max(len(cluster) for cluster in clusters)
         return largest_cluster_size / matrix.shape[0]
 
-    def calcaulte_area_coverage(
+    def calculate_area_coverage(
         self,
         drone_positions: np.ndarray,
         num_points: int = 1000,
@@ -117,30 +118,3 @@ class MetricsGenerator:
                 count += 1
 
         return count / num_drones if num_drones > 0 else 0.0
-
-    def calculate_drones_conn_matrix(
-        self,
-        drone_positions: np.ndarray,
-        min_rssi: float = -80.0,
-    ):
-        num_drones = drone_positions.shape[0]
-        matrix = np.zeros((num_drones, num_drones), dtype=bool)
-
-        for i in range(num_drones):
-            tx = drone_positions[i, :]
-            rx = drone_positions[:, :]
-            rssi = signal_strength(tx, rx, f=2412, n=2.4, tx_power=20.0, mode="max")
-            matrix[i, np.where(rssi > min_rssi)[0]] = True
-
-        np.fill_diagonal(matrix, False)  # No self-connections
-
-        return matrix
-
-    def connected_clusters(self, matrix: np.ndarray):
-        from scipy.sparse.csgraph import connected_components
-
-        n_components, labels = connected_components(
-            matrix, directed=False, return_labels=True
-        )
-        clusters = [np.where(labels == i)[0] for i in range(n_components)]
-        return clusters
