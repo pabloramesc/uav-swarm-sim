@@ -12,11 +12,9 @@ from ..sdqn import (
     SDQNWrapper,
     SDQNInterface,
 )
-from ..sdqn.frame_generators import GridFrameGenerator, LogPolarFrameGenerator
+from ..sdqn.frames import FrameBase, FrameFactory
 from .multiagent_simulator import MultiAgentSimulator
 from ..mobility.utils import environment_random_positions, grid_positions
-
-ActionsMode = Literal["basic", "extended"]
 
 
 class SDQNTrainer(MultiAgentSimulator):
@@ -27,22 +25,12 @@ class SDQNTrainer(MultiAgentSimulator):
         num_users: int = 0,
         dt: float = 0.01,
         sdqn_config: SDQNConfig = None,
+        frame_factory: FrameFactory = None,
         model_path: str = None,
-        train_mode: bool = True,
-        logpolar: bool = False,
-        actions_mode: ActionsMode = "basic",
     ) -> None:
         self.sdqn_config = sdqn_config or SDQNConfig()
+        self.frame_factory = frame_factory or FrameFactory()
         self.model_path = model_path
-        self.train_mode = train_mode
-        self.logpolar = logpolar
-
-        if actions_mode == "basic":
-            self.num_actions = 5
-        elif actions_mode == "extended":
-            self.num_actions = 7
-        else:
-            raise ValueError("Invalid actions mode:", actions_mode)
 
         self.sdqn_brain = self._create_sdqn_brain()
 
@@ -63,24 +51,17 @@ class SDQNTrainer(MultiAgentSimulator):
         self.displacement = sdqn_config.target_velocity * dt
 
     def _create_sdqn_brain(self) -> SDQNBrain:
-        if self.logpolar:
-            frame_shape = LogPolarFrameGenerator.calculate_frame_shape(num_radial=64, num_angular=64)
-        else:
-            frame_shape = GridFrameGenerator.calculate_frame_shape(num_cells=100)
+        frame_shape = self.frame_factory.create().shape
         wrapper = SDQNWrapper(
             frame_shape=frame_shape,
-            num_actions=self.num_actions,
             model_path=self.model_path,
-            train_mode=self.train_mode,
+            train_mode=True,
         )
         return SDQNBrain(wrapper)
 
     def _create_sdqn_interface(self, iface_id: int) -> SDQNInterface:
-        if self.logpolar:
-            frame_gen = LogPolarFrameGenerator(env=self.environment, num_radial=64, num_angular=64)
-        else:
-            frame_gen = GridFrameGenerator(env=self.environment, num_cells=100, frame_radius=1e3)
-        interface = SDQNInterface(iface_id, frame_gen)
+        frame_generator = self.frame_factory.create()
+        interface = SDQNInterface(iface_id, frame_generator)
         self.sdqn_brain.register_interface(interface)
         return interface
 
@@ -93,21 +74,22 @@ class SDQNTrainer(MultiAgentSimulator):
             agent_id=len(self.agents),
             environment=self.environment,
             position_controller=dummy_controller,
-            network_sim=self.netsim,
             drones_registry=self.drones,
             users_registry=self.users,
-            neighbor_provider="network" if self.network else "registry",
+            neighbor_provider="registry",
         )
         return drone
 
     def initialize(self, home: ArrayLike = [0.0, 0.0], spacing: float = 5.0) -> None:
         self.logger.info("Initializing simulation ...")
 
+        # Initilaize GSC (Ground Control Station)
         gcs_states = np.zeros((1,6))
         gcs_states[0, 0:2] = np.asarray(home[0:2])
         gcs_states[0, 2] = self.environment.get_elevation(home[0:2])
         self.gcs.initialize(states=gcs_states)
 
+        # Initialize drones
         drone_states = np.zeros((self.num_drones, 6))
         # drone_states[:, 0:3] = grid_positions(
         #     num_points=self.num_drones,
@@ -119,6 +101,7 @@ class SDQNTrainer(MultiAgentSimulator):
         )
         self.drones.initialize(states=drone_states)
 
+        # Initialize users
         user_states = np.zeros((self.num_users, 6))
         user_states[:, 0:3] = environment_random_positions(
             num_positions=self.num_users, env=self.environment
@@ -148,21 +131,19 @@ class SDQNTrainer(MultiAgentSimulator):
             time=self.sim_time,
         )
 
-        if self.train_mode:
-            self.reset_collided_drones(self.dones)
+        self.reset_collided_drones(self.dones)
 
         self.sdqn_brain.step()
 
-        if self.train_mode:
-            self.sdqn_brain.wrapper.add_experiences(
-                frames=self.prev_frames,
-                actions=self.prev_actions.astype(np.uint32),
-                next_frames=self.sdqn_brain.last_frames,
-                rewards=self.rewards.astype(np.float32),
-                dones=self.dones,
-            )
+        self.sdqn_brain.wrapper.add_experiences(
+            frames=self.prev_frames,
+            actions=self.prev_actions.astype(np.uint32),
+            next_frames=self.sdqn_brain.last_frames,
+            rewards=self.rewards.astype(np.float32),
+            dones=self.dones,
+        )
 
-            self.sdqn_brain.wrapper.train()
+        self.sdqn_brain.wrapper.train()
 
         self.prev_frames = self.sdqn_brain.last_frames
         self.prev_actions = self.sdqn_brain.last_actions

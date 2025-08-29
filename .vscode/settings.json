@@ -75,6 +75,7 @@
         "variant": "cpp"
     },
     "python.analysis.extraPaths": [
-        "/home/pablo/workspace/uav-swarm-sim/network_sim/ns-3"
+        "./network_sim/ns-3",
+        "./libs/dqn-lab"
     ]
 }

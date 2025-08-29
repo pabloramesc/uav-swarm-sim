@@ -8,10 +8,12 @@ https://opensource.org/licenses/MIT
 import os
 from datetime import datetime
 
-import keras.api as kr
 import numpy as np
-import tensorflow as tf
 from dqn import DQNAgent, EpsilonGreedyPolicy, ExperiencesBatch, PriorityReplayBuffer
+from keras.layers import Conv2D, Dense, Dropout, Flatten, InputLayer, Rescaling, Input, MaxPooling2D
+from keras.losses import Huber
+from keras.models import Model, Sequential, save_model
+from keras.optimizers import Adam
 
 
 class SDQNWrapper:
@@ -19,7 +21,7 @@ class SDQNWrapper:
     def __init__(
         self,
         frame_shape: tuple[int, int, int],
-        num_actions: int,
+        num_actions: int = 5,
         model_path: str = None,
         train_mode: bool = True,
     ):
@@ -28,7 +30,13 @@ class SDQNWrapper:
         self.model_path = model_path
         self.train_mode = train_mode
 
-        if not train_mode and self.model_path is None:
+        # if len(self.frame_shape) == 2:
+        #     self.frame_shape += (1,)
+
+        if len(self.frame_shape) != 3:
+            raise ValueError("Frame shape must be (height, width, channels)")
+
+        if not self.train_mode and self.model_path is None:
             raise ValueError("Model path shall be provided if not in training mode")
 
         if self.model_path is None:
@@ -37,9 +45,9 @@ class SDQNWrapper:
 
         if not os.path.exists(self.model_path):
             self.model = self.build_keras_model()
-            kr.models.save_model(self.model, self.model_path)
+            save_model(self.model, self.model_path)
 
-        if train_mode:
+        if self.train_mode:
             self.policy = EpsilonGreedyPolicy(
                 epsilon=1.0, epsilon_min=0.1, epsilon_decay=1e-5, decay_type="linear"
             )
@@ -142,29 +150,39 @@ class SDQNWrapper:
         actions = self.dqn_agent.act_on_batch(frames)
         return actions
 
-    def build_keras_model(self) -> kr.Model:
-        model = kr.models.Sequential(
-            [
-                kr.layers.InputLayer(shape=self.frame_shape, dtype="uint8"),
-                kr.layers.Rescaling(1.0 / 255.0),
-                
-                kr.layers.Conv2D(32, (3, 3), strides=1, padding="same", activation="relu"),
-                kr.layers.Conv2D(64, (3, 3), strides=2, padding="same", activation="relu"),
-                kr.layers.Conv2D(64, (3, 3), strides=2, padding="same", activation="relu"),
-                kr.layers.Conv2D(64, (3, 3), strides=2, padding="same", activation="relu"),
-                kr.layers.Conv2D(128, (3, 3), strides=2, padding="same", activation="relu"),
-                kr.layers.Flatten(),
-                
-                kr.layers.Dense(512, activation="relu"),
-                # kr.layers.Dropout(0.2),
-                
-                kr.layers.Dense(self.num_actions, activation="linear"),
-            ]
-        )
+    def build_keras_model(self) -> Model:
+        inputs = Input(shape=self.frame_shape, dtype="uint8")
+        x = Rescaling(1.0 / 255.0)(inputs)
+        
+        # Block 1
+        x = Conv2D(32, 3, strides=1, padding="same", activation="relu")(x)
+        x = Conv2D(32, 3, strides=1, padding="same", activation="relu")(x)
+        x = MaxPooling2D(2)(x)
+        # x = Dropout(0.1)(x)
+        
+        # Block 2
+        x = Conv2D(64, 3, strides=1, padding="same", activation="relu")(x)
+        x = Conv2D(64, 3, strides=1, padding="same", activation="relu")(x)
+        x = MaxPooling2D(2)(x)
+        # x = Dropout(0.1)(x)
+        
+        # Block 3
+        x = Conv2D(128, 3, strides=1, padding="same", activation="relu")(x)
+        x = Conv2D(128, 3, strides=1, padding="same", activation="relu")(x)
+        x = MaxPooling2D(2)(x)
+        # x = Dropout(0.1)(x)
+        
+        # Dense head
+        x = Flatten()(x)
+        x = Dense(512, activation="relu")(x)
+        # x = Dropout(0.2)(x)
+        outputs = Dense(self.num_actions, activation="linear")(x)
+        
+        model = Model(inputs=inputs, outputs=outputs, name="DQN_model")
 
         model.compile(
-            optimizer=kr.optimizers.Adam(learning_rate=0.00025),
-            loss=kr.losses.Huber(delta=1.0),
+            optimizer=Adam(learning_rate=0.00025),
+            loss=Huber(delta=1.0),
             metrics=["accuracy"],
         )
 

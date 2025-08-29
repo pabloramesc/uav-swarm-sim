@@ -1,6 +1,7 @@
 import numpy as np
 
 from ..environment import Environment
+from ..core import MetricsGenerator
 from ..math.distances import pairwise_self_distances
 from ..math.path_loss_model import rssi_to_signal_quality, signal_strength
 from ..math.connectivity import connected_clusters
@@ -16,7 +17,7 @@ class RewardManager:
     proximity to obstacles or collisions.
     """
 
-    def __init__(self, env: Environment) -> None:
+    def __init__(self, env: Environment, metrics: MetricsGenerator) -> None:
         """
         Initialize RewardManager with environment and distance thresholds.
 
@@ -33,6 +34,7 @@ class RewardManager:
             Distance threshold for collisions; below this, heavy penalty and done flag.
         """
         self.env = env
+        self.metrics = metrics # TODO: Complete metrics generator integration
         self.d_obstacles = 10.0
         self.d_collision = 1.0
 
@@ -59,7 +61,7 @@ class RewardManager:
         num_drones = drones.shape[0]
 
         rewards = np.zeros(num_drones)
-        rewards += self.difference_coverage_rewards(drones, users)
+        rewards += self.difference_users_coverage_rewards(drones, users)
         rewards += self.difference_connectivity_rewards(drones)
 
         dist = self.min_separation(drones)
@@ -93,7 +95,32 @@ class RewardManager:
 
         return np.minimum(nearest_drone, nearest_obs)
 
-    def difference_coverage_rewards(
+    def difference_area_coverage_rewards(self, drones: np.ndarray) -> np.ndarray:
+        """
+        Compute area coverage difference rewards: the marginal contribution of each drone to
+        environment area coverage.
+
+        Each drone's reward = global area coverage ratio - coverage ratio without that drone.
+
+        Parameters
+        ----------
+        drones : np.ndarray
+            Drone positions, shape (N, 3).
+
+        Returns
+        -------
+        np.ndarray
+            Coverage difference reward for each drone.
+        """
+        num_drones = drones.shape[0]
+        rewards = np.zeros(num_drones)
+        global_reward = self._area_coverage_ratio(drones)
+        for i in range(num_drones):
+            no_drone_reward = self._area_coverage_ratio(np.delete(drones, i, axis=0))
+            rewards[i] = global_reward - no_drone_reward
+        return rewards
+
+    def difference_users_coverage_rewards(
         self, drones: np.ndarray, users: np.ndarray
     ) -> np.ndarray:
         """
@@ -148,6 +175,32 @@ class RewardManager:
             ) * (1 - 1 / num_drones)
             rewards[i] = global_reward - no_drone_reward
         return rewards
+
+    def _area_coverage_ratio(self, drones: np.ndarray) -> float:
+        """
+        Compute the fraction of environment area covered by the drones.
+
+        Uses a simple 2D circular footprint per drone.
+        """
+        # Define environment grid
+        x_min, y_min = self.env.bounds[0]
+        x_max, y_max = self.env.bounds[1]
+        resolution = 1.0  # grid cell size
+        xs = np.arange(x_min, x_max, resolution)
+        ys = np.arange(y_min, y_max, resolution)
+        xx, yy = np.meshgrid(xs, ys)
+        points = np.stack([xx.ravel(), yy.ravel()], axis=-1)
+
+        # Drone coverage radius
+        coverage_radius = 10.0
+
+        # Check if each grid point is within coverage of any drone
+        covered = np.zeros(points.shape[0], dtype=bool)
+        for drone in drones:
+            dist = np.linalg.norm(points - drone[:2], axis=-1)
+            covered |= dist <= coverage_radius
+
+        return np.mean(covered)
 
     def _users_coverage_ratio(self, drones: np.ndarray, users: np.ndarray) -> float:
         rssi = signal_strength(

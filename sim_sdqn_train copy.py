@@ -16,7 +16,7 @@ from multiagent_sim.sdqn.frames import SignalFrameFactory
 
 dt = 0.1
 num_drones = 16
-num_users = 0
+num_users = 20
 size = 1e3
 num_obstacles = 0
 num_episodes = 1000
@@ -32,7 +32,7 @@ sim = SDQNTrainer(
     dt=dt,
     sdqn_config=config,
     frame_factory=frame_factory,
-    model_path="models/sdqn_test_model.keras",
+    model_path="data/models/sdqn-m200.keras",
 )
 
 sim.environment.set_rectangular_boundary([-size, -size], [+size, +size])
@@ -53,7 +53,29 @@ def create_environment():
         sim.environment.add_rectangular_obstacle(bottom_left, top_right)
 
     sim.initialize(spacing=10.0)
-    
+
+
+logger = CSVLogger(
+    filepath="logs/sdqn_m200.csv",
+    columns=[
+        "episode",
+        "steps",
+        "duration",
+        "reward",
+        "loss",
+        "epsilon",
+        "area_coverage",
+        "user_coverage",
+        "direct_conn",
+        "global_conn",
+    ],
+    header_lines=[
+        "Model: log-polar (binary maps), Actions: basic, Environment: 2km x 2km, ",
+        f"Num drones: {num_drones}, Num users: {num_users}, Num obstacles: {num_obstacles}",
+        f"Max steps: {max_steps}, Time step: {dt:.2f}",
+    ],
+)
+
 # create_environment()
 
 gui = None

@@ -105,4 +105,4 @@ def environment_random_positions(num_positions: int, env: Environment) -> np.nda
     if len(positions) != num_positions:
         raise RuntimeError("Cannot generate random positions inside environment")
 
-    return np.array(positions)
+    return np.array(positions) if positions else np.zeros((0, 3))

@@ -7,9 +7,8 @@ from ..network import NetworkSimulator
 
 
 class MetricsGenerator:
-    def __init__(self, env: Environment, netsim: NetworkSimulator = None):
+    def __init__(self, env: Environment):
         self.env = env
-        self.netsim = netsim
         self._drone_states = None
         self._user_states = None
 

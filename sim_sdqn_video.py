@@ -27,9 +27,9 @@ sim = SDQNTrainer(
     num_users,
     dt,
     sdqn_config=config,
-    model_path="data/models/sdqn-m3r1e2-v2.keras",
+    model_path="data/models/sdqn_test_model.keras",
     actions_mode="basic",
-    logpolar=True,
+    logpolar=False,
     train_mode=False,
 )
 
@@ -48,8 +48,8 @@ for _ in range(num_obstacles):
 
 sim.initialize()
 
-# gui = SDQNViewer(sim)
-gui = SDQNLogPolarViewer(sim)
+gui = SDQNViewer(sim)
+# gui = SDQNLogPolarViewer(sim)
 
 video_folder = "videos"
 os.makedirs(video_folder, exist_ok=True)

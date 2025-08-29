@@ -19,6 +19,11 @@ from .utils import (
     gaussian_decay,
 )
 
+class ChannelGenerator(ABC):
+    """Abstract base class for a single channel generation"""
+    
+    def __init__(self, frame_shape: tuple[int, int]):
+        self.frame_shape = frame_shape
 
 class FrameGenerator(ABC):
     def __init__(

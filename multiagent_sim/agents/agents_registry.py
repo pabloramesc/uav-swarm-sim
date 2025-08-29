@@ -63,13 +63,14 @@ class AgentsRegistry(ABC):
         Returns an array of all agent states.
         If `exclude_id` is provided, excludes the agent with that ID.
         """
-        return np.array(
+        states = np.array(
             [
                 agent.state
                 for agent_id, agent in self._agents_dict.items()
                 if agent_id != exclude_id
             ]
         )
+        return states if states.shape[0] > 0 else np.zeros((0, 6))
 
     def get_states_dict(self, exclude_id: int = None) -> dict[int, np.ndarray]:
         """
@@ -106,7 +107,7 @@ class AgentsRegistry(ABC):
             if 0.0 < np.linalg.norm(agent.position - position) < distance
         ]
         return np.array(positions)
-    
+
     def get_id(self, index: int) -> int:
         return self._index_to_id[index]
 
