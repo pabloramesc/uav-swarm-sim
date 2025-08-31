@@ -12,12 +12,13 @@ import numpy as np
 
 
 class FrameBase(ABC):
-    def __init__(self, height: int, width: int, channels: int = 1, label: str = "frame"):
+    def __init__(self, height: int, width: int, channels: int = 1, label: str = "frame", channel_labels: str = None):
         self.height = height
         self.width = width
         self.channels = channels
         self.shape = (height, width, channels)
         self.label = label
+        self.channel_labels = channel_labels or [label]
         self.frame = np.zeros(self.shape, dtype=np.float32)
 
     @abstractmethod

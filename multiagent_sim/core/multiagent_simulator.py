@@ -14,7 +14,7 @@ from ..agents import Agent, AgentsRegistry, ControlStation, User, Drone
 from ..environment import Environment
 from ..utils.exit_signal import register_exit_signal
 from ..utils.logger import create_logger
-from .metrics_generator import MetricsGenerator
+from .metrics import MetricsSnapshot
 from .network_manager import NetworkManager
 
 
@@ -48,19 +48,19 @@ class MultiAgentSimulator(ABC):
         self.gcs = AgentsRegistry()
         self.drones = AgentsRegistry()
         self.users = AgentsRegistry()
-        
+
         self.agents = AgentsRegistry()
         self._create_agents(**kwargs)
 
-        self.metrics = MetricsGenerator(env=self.environment, netsim=self.netsim)
+        self.metrics: MetricsSnapshot = None
 
         self.logger = create_logger(name="MultiAgentSimulator", level="INFO")
 
         self.init_time: float = None
         self.sim_time = 0.0
         self.sim_step = 0
-        
-        self.drone_states = np.zeros((num_drones, 6)) # px, py, pz, vx, vy, vz
+
+        self.drone_states = np.zeros((num_drones, 6))  # px, py, pz, vx, vy, vz
         self.user_states = np.zeros((num_users, 6))
         self.gcs_states = np.zeros((num_gcs, 6))
 
@@ -72,12 +72,12 @@ class MultiAgentSimulator(ABC):
         Returns the real time elapsed since the simulation started.
         """
         return time.time() - self.init_time if self.init_time else 0.0
-    
+
     def _create_agents(self, **kwargs) -> None:
         self._create_gcs()
         self._create_drones(**kwargs)
         self._create_users()
-    
+
     def _create_gcs(self) -> None:
         for _ in range(self.num_gcs):
             gcs = ControlStation(
@@ -87,7 +87,7 @@ class MultiAgentSimulator(ABC):
             )
             self.gcs.register(gcs)
             self.agents.register(gcs)
-        
+
     def _create_users(self) -> None:
         for _ in range(self.num_users):
             user = User(
@@ -103,11 +103,11 @@ class MultiAgentSimulator(ABC):
             drone = self._create_drone(**kwargs)
             self.drones.register(drone)
             self.agents.register(drone)
-    
+
     @abstractmethod
     def _create_drone(self, **kwargs) -> Drone:
         pass
-            
+
     @abstractmethod
     def initialize(self, *args, **kwargs) -> None:
         if self.network is not None:
@@ -117,7 +117,7 @@ class MultiAgentSimulator(ABC):
         self.init_time = time.time()
         self.sim_time = 0.0
         self.sim_step = 0
-        
+
         self._update_states_cache()
 
     @abstractmethod
@@ -132,10 +132,11 @@ class MultiAgentSimulator(ABC):
 
         for agent in self.agents:
             agent.update(dt)
-        
+
         self._update_states_cache()
-        
-        self.metrics.update(
+
+        self.metrics = MetricsSnapshot(
+            env=self.environment,
             drone_states=self.drone_states,
             user_states=self.user_states,
         )

@@ -126,8 +126,8 @@ class SDQNTrainer(MultiAgentSimulator):
         )
 
         self.rewards, self.dones = self.reward_manager.update(
-            drones=self.drone_states[:, 0:2],
-            users=self.user_states[:, 0:2],
+            drones=self.drone_states[:, 0:3],
+            users=self.user_states[:, 0:3],
             time=self.sim_time,
         )
 

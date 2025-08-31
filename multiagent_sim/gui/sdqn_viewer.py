@@ -98,7 +98,7 @@ class SDQNViewer(SimpleViewer):
 
     def _get_frame_labels(self, iface_idx: int = 0) -> list[str]:
         iface = self.sim.sdqn_brain.ifaces[iface_idx]
-        return iface.frame_generator.channel_names
+        return iface.frame_generator.channel_labels
 
     def _get_frame_radius(self, iface_idx: int = 0) -> float:
         iface = self.sim.sdqn_brain.ifaces[iface_idx]

@@ -57,7 +57,7 @@ class SignalFrame(SquareFrame):
             )
             self.frame[:] = rssi_to_signal_quality(
                 rssi, vmin=self.rssi_min, vmax=self.rssi_max
-            )
+            ).reshape(self.shape)
 
         if self.plot_tx:
             self.set_cells(positions=self.relative_positions, value=1.0)

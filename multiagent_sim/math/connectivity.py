@@ -8,12 +8,61 @@ from scipy.sparse.csgraph import connected_components
 from .path_loss_model import signal_strength
 
 
-def wireless_connectivity_matrix(
+def covered_positions(
+    tx_positions: np.ndarray,
+    rx_positions: np.ndarray,
+    tx_power: float = 20.0,
+    min_rssi: float = -80.0,
+    freq_mhz: float = 2412.0,
+    path_loss_exp: float = 2.4,
+):
+    """
+    Compute the indices of receiver points covered by a set of transmitters.
+
+    Parameters
+    ----------
+    tx_positions : np.ndarray
+        Array of shape (N, 3) representing the 3D positions of N transmitters.
+    rx_positions : np.ndarray
+        Array of shape (M, 3) representing the 3D positions of M receivers.
+    tx_power : float, optional
+        Transmit power in dBm. Default is 20.0.
+    min_rssi : float, optional
+        Minimum RSSI threshold (in dBm) for a receiver to be considered covered.
+        Default is -80.0.
+    freq_mhz : float, optional
+        Carrier frequency in MHz. Default is 2412 (2.4 GHz Wi-Fi).
+    path_loss_exp : float, optional
+        Path loss exponent. Default is 2.4.
+
+    Returns
+    -------
+    np.ndarray
+        Indices of receivers (rows in `rx_positions`) that are covered.
+        Returns an empty array if no receivers are covered or if input arrays are empty.
+    """
+    if tx_positions.size == 0 or rx_positions.size == 0:
+        return np.array([], dtype=int)
+
+    rssi = signal_strength(
+        tx_positions,
+        rx_positions,
+        f=freq_mhz,
+        n=path_loss_exp,
+        tx_power=tx_power,
+        mode="max",
+    )
+    covered = rssi > min_rssi
+    indices = np.where(covered)[0]
+    return indices
+
+
+def pairwise_connectivity_matrix(
     positions: np.ndarray,
     tx_power: float = 20.0,
     min_rssi: float = -80.0,
-    f: float = 2412,
-    n: float = 2.4,
+    freq_mhz: float = 2412,
+    path_loss_exp: float = 2.4,
 ) -> np.ndarray:
     """
     Computes a boolean connectivity matrix based on pairwise RSSI values between nodes.
@@ -29,9 +78,9 @@ def wireless_connectivity_matrix(
         Transmit power in dBm. Default is 20.0.
     min_rssi : float, optional
         Minimum RSSI threshold (in dBm) to consider a connection valid. Default is -80.0.
-    f : float, optional
+    freq_mhz : float, optional
         Frequency in MHz used for signal strength calculation. Default is 2412 (2.4 GHz Wi-Fi).
-    n : float, optional
+    path_loss_exp : float, optional
         Path loss exponent. Default is 2.4 (typical for indoor environments).
 
     Returns
@@ -46,11 +95,60 @@ def wireless_connectivity_matrix(
     for i in range(N):
         tx = positions[i, :]
         rx = positions[:, :]
-        rssi = signal_strength(tx, rx, f=f, n=n, tx_power=tx_power, mode="max")
+        rssi = signal_strength(
+            tx, rx, f=freq_mhz, n=path_loss_exp, tx_power=tx_power, mode="max"
+        )
         matrix[i, np.where(rssi > min_rssi)[0]] = True
 
     np.fill_diagonal(matrix, False)  # No self-connections
     return matrix
+
+
+def directly_connected(
+    positions: np.ndarray,
+    tx_power: float = 20.0,
+    min_rssi: float = -80.0,
+    freq_mhz: float = 2412.0,
+    path_loss_exp: float = 2.4,
+) -> np.ndarray:
+    """
+    Returns the indices of nodes that have at least one direct link
+    with another node above the given RSSI threshold.
+
+    Parameters
+    ----------
+    positions : np.ndarray
+        Array of shape (N, 3) representing the 3D positions of N nodes.
+    tx_power : float, optional
+        Transmit power in dBm. Default is 20.0.
+    min_rssi : float, optional
+        Minimum RSSI threshold (in dBm) to consider a direct connection. Default is -80.0.
+    freq_mhz : float, optional
+        Frequency in MHz. Default is 2412 (2.4 GHz Wi-Fi).
+    path_loss_exp : float, optional
+        Path loss exponent. Default is 2.4.
+
+    Returns
+    -------
+    np.ndarray
+        Array of node indices that are directly connected to at least one other node.
+    """
+    N = positions.shape[0]
+    if N == 0:
+        return np.array([], dtype=int)
+
+    connected = []
+    for i in range(N):
+        tx = np.delete(positions, i, axis=0)
+        rx = positions[i, :]
+        rssi = signal_strength(
+            tx, rx, f=freq_mhz, n=path_loss_exp, tx_power=tx_power, mode="max"
+        )
+        if np.any(rssi > min_rssi):
+            connected.append(i)
+
+    return np.array(connected, dtype=int)
+
 
 def connected_clusters(conn: np.ndarray) -> list[np.ndarray]:
     """
@@ -59,7 +157,7 @@ def connected_clusters(conn: np.ndarray) -> list[np.ndarray]:
     Parameters
     ----------
     conn : np.ndarray
-        Boolean NxN connectivity matrix.
+        Boolean (N, N) connectivity matrix.
 
     Returns
     -------
@@ -72,12 +170,13 @@ def connected_clusters(conn: np.ndarray) -> list[np.ndarray]:
     clusters = [np.where(labels == i)[0] for i in range(n_components)]
     return clusters
 
-def global_connected(
+
+def globally_connected(
     positions: np.ndarray,
     tx_power: float = 20.0,
     min_rssi: float = -80.0,
-    f: float = 2412,
-    n: float = 2.4,
+    freq_mhz: float = 2412,
+    path_loss_exp: float = 2.4,
 ):
     """
     Returns the indices of the positions connected to the largest cluster.
@@ -90,9 +189,9 @@ def global_connected(
         Transmit power in dBm. Default is 20.0.
     min_rssi : float, optional
         Minimum RSSI threshold (in dBm) to consider a connection valid. Default is -80.0.
-    f : float, optional
+    freq_mhz : float, optional
         Frequency in MHz used for signal strength calculation. Default is 2412 (2.4 GHz Wi-Fi).
-    n : float, optional
+    path_loss_exp : float, optional
         Path loss exponent. Default is 2.4 (typical for indoor environments).
 
     Returns
@@ -100,7 +199,7 @@ def global_connected(
     np.ndarray
         Indices of nodes in the largest connected cluster.
     """
-    conn = wireless_connectivity_matrix(positions, tx_power, min_rssi, f, n)
+    conn = pairwise_connectivity_matrix(positions, tx_power, min_rssi, freq_mhz, path_loss_exp)
     clusters = connected_clusters(conn)
     largest_cluster = np.argmax(len(cluster) for cluster in clusters)
     return clusters[largest_cluster]
