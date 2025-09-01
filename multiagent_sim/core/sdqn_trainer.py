@@ -12,7 +12,7 @@ from ..sdqn import (
     SDQNWrapper,
     SDQNInterface,
 )
-from ..sdqn.frames import FrameBase, FrameFactory
+from ..sdqn.frames import FrameGeneratorFactory
 from .multiagent_simulator import MultiAgentSimulator
 from ..mobility.utils import environment_random_positions, grid_positions
 
@@ -25,11 +25,11 @@ class SDQNTrainer(MultiAgentSimulator):
         num_users: int = 0,
         dt: float = 0.01,
         sdqn_config: SDQNConfig = None,
-        frame_factory: FrameFactory = None,
+        frame_factory: FrameGeneratorFactory = None,
         model_path: str = None,
     ) -> None:
         self.sdqn_config = sdqn_config or SDQNConfig()
-        self.frame_factory = frame_factory or FrameFactory()
+        self.frame_factory = frame_factory
         self.model_path = model_path
 
         self.sdqn_brain = self._create_sdqn_brain()
@@ -51,7 +51,7 @@ class SDQNTrainer(MultiAgentSimulator):
         self.displacement = sdqn_config.target_velocity * dt
 
     def _create_sdqn_brain(self) -> SDQNBrain:
-        frame_shape = self.frame_factory.create().shape
+        frame_shape = self.frame_factory.create(env=None).shape
         wrapper = SDQNWrapper(
             frame_shape=frame_shape,
             model_path=self.model_path,
@@ -60,7 +60,7 @@ class SDQNTrainer(MultiAgentSimulator):
         return SDQNBrain(wrapper)
 
     def _create_sdqn_interface(self, iface_id: int) -> SDQNInterface:
-        frame_generator = self.frame_factory.create()
+        frame_generator = self.frame_factory.create(env=self.environment)
         interface = SDQNInterface(iface_id, frame_generator)
         self.sdqn_brain.register_interface(interface)
         return interface

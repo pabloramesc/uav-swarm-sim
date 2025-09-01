@@ -1,4 +1,4 @@
-from .frames import FrameBase
+from .frames import FrameGenerator, ScenarioState
 from .actions import Action, action_to_displacement
 
 import numpy as np
@@ -9,7 +9,7 @@ class SDQNInterface:
     def __init__(
         self,
         iface_id: int,
-        frame_generator: FrameBase,
+        frame_generator: FrameGenerator,
     ):
         self.iface_id = iface_id
         self.frame_generator = frame_generator
@@ -28,10 +28,10 @@ class SDQNInterface:
         self.position = position
         self.drones = drones
         self.users = users
-        self.frame_generator.set_data(agent=position, tx_positions=drones, users=users)
 
     def generate_frame(self) -> np.ndarray:
-        self.frame = self.frame_generator.generate(update=True)
+        state = ScenarioState(agent_position=self.position, neighbor_positions=self.drones, user_positions=self.users)
+        self.frame = self.frame_generator.generate(state)
         return self.frame
 
     def update_action(self, action: Action) -> None:

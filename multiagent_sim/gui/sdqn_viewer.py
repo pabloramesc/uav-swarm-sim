@@ -26,21 +26,20 @@ class SDQNViewer(SimpleViewer):
         max_fps: float = 60.0,
         background_type: BackgroundType = "rssi",
     ):
-        self.frame_images: list[AxesImage] = None
+        self.frame_images: list[AxesImage] = []
         super().__init__(sim, xlim, ylim, fig_size, min_fps, max_fps, background_type)
         self.sim: SDQNSimulator = sim
 
     def _create_axes(self) -> list[Axes]:
-        # self.ax = self.fig.add_subplot(221)
-        # self.ax1 = self.fig.add_subplot(222)
-        # self.ax2 = self.fig.add_subplot(223)
-        # self.ax3 = self.fig.add_subplot(224)
-        self.fig.set_size_inches(16, 4)
-        self.ax = self.fig.add_subplot(141)
-        self.ax1 = self.fig.add_subplot(142)
-        self.ax2 = self.fig.add_subplot(143)
-        self.ax3 = self.fig.add_subplot(144)
-        return [self.ax, self.ax1, self.ax2, self.ax3]
+        num_channels = self._get_frame_channels()
+        total_axes = 1 + num_channels # Main sim plot + frame channels
+        self.fig.set_size_inches(4 * total_axes, 4)
+        axes = [
+            self.fig.add_subplot(1, total_axes, i + 1) for i in range(total_axes)
+        ]
+        self.ax = axes[0]
+        self.frame_axes = axes[1:]
+        return axes
 
     def _init_plots(self) -> None:
         # self._init_frame_images()
@@ -64,45 +63,51 @@ class SDQNViewer(SimpleViewer):
         )
 
     def _init_frame_images(self) -> None:
-        if self.frame_images is not None:
-            for im in self.frame_images:
-                im.remove()
-            self.frame_images = None
+        # Remove old images
+        for im in self.frame_images:
+            im.remove()
+        self.frame_images = []
+
         frames = self._get_drone_frames()
         labels = self._get_frame_labels()
-        im1 = self._init_frame(
-            frames[..., 0], ax=self.ax1, cmap="gray", label=labels[0]
-        )
-        im2 = self._init_frame(
-            frames[..., 1], ax=self.ax2, cmap="viridis", label=labels[1]
-        )
-        im3 = self._init_frame(
-            frames[..., 2], ax=self.ax3, cmap="plasma", label=labels[2]
-        )
-        self.frame_images = [im1, im2, im3]
+        cmaps = ["gray", "viridis", "plasma", "magma", "cividis"]
+
+        for i, ax in enumerate(self.frame_axes):
+            im = self._init_frame(
+                frame=frames[..., 0],
+                ax=ax,
+                cmap=cmaps[i % len(cmaps)],
+                label=labels[i] if i < len(labels) else "Channel {i}",
+            )
+            self.frame_images.append(im)
 
     def _update_frame_images(self) -> None:
         if not self.frame_images:
             self._init_frame_images()
             return
+
         frames = self._get_drone_frames()
-        fr = self._get_frame_radius()
+        radius = self._get_frame_radius()
         for i, im in enumerate(self.frame_images):
             im.set_data(frames[..., i] / 255.0)
-            im.set_extent([-fr, +fr, -fr, +fr])
-            im.axes.set_xlim([-fr, +fr])
-            im.axes.set_ylim([-fr, +fr])
-
+            im.set_extent([-radius, +radius, -radius, +radius])
+            im.axes.set_xlim([-radius, +radius])
+            im.axes.set_ylim([-radius, +radius])
+            
     def _get_drone_frames(self, drone_idx: int = 0) -> np.ndarray:
         return self.sim.sdqn_brain.last_frames[drone_idx]
-
+    
+    def _get_frame_channels(self, iface_idx: int = 0) -> int:
+        iface = self.sim.sdqn_brain.ifaces[iface_idx]
+        return iface.frame_generator.channels
+    
     def _get_frame_labels(self, iface_idx: int = 0) -> list[str]:
         iface = self.sim.sdqn_brain.ifaces[iface_idx]
-        return iface.frame_generator.channel_labels
+        return [layer.label for layer in iface.frame_generator.layers]
 
     def _get_frame_radius(self, iface_idx: int = 0) -> float:
         iface = self.sim.sdqn_brain.ifaces[iface_idx]
-        return iface.frame_generator.frame_radius
+        return iface.frame_generator.geometry.radius
 
     def _init_frame(
         self, frame: np.ndarray, ax: Axes, cmap: str, label: str

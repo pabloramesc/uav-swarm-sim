@@ -11,7 +11,14 @@ from multiagent_sim.core.sdqn_trainer import SDQNTrainer, SDQNConfig
 from multiagent_sim.gui.sdqn_viewer import SDQNViewer
 from multiagent_sim.gui.sdqn_logpolar_viewer import SDQNLogPolarViewer
 from multiagent_sim.utils.csv_logger import CSVLogger
-from multiagent_sim.sdqn.frames import SignalFrameFactory
+from multiagent_sim.sdqn.frames import (
+    FrameGeneratorFactory,
+    SquareGeometryFactory,
+    SignalLayerFactory,
+    SignalLayerConfig,
+    get_neighbor_positions,
+    get_user_positions,
+)
 
 
 dt = 0.1
@@ -24,7 +31,19 @@ max_steps = int(5 * 60 / dt)
 
 config = SDQNConfig(displacement=2.0, target_height=0.0)
 
-frame_factory = SignalFrameFactory(num_cells=64, frame_radius=100.0)
+
+neighbors_layer = SignalLayerFactory(
+    config=SignalLayerConfig(
+        positions_getter=get_neighbor_positions, label="Drones Signal"
+    )
+)
+users_layer = SignalLayerFactory(
+    config=SignalLayerConfig(positions_getter=get_user_positions, label="Users Signal")
+)
+frame_factory = FrameGeneratorFactory(
+    geometry_factory=SquareGeometryFactory(num_cells=64, radius=1000.0),
+    layer_factories=[neighbors_layer, users_layer],
+)
 
 sim = SDQNTrainer(
     num_drones=num_drones,
@@ -53,7 +72,8 @@ def create_environment():
         sim.environment.add_rectangular_obstacle(bottom_left, top_right)
 
     sim.initialize(spacing=10.0)
-    
+
+
 # create_environment()
 
 gui = None
@@ -80,8 +100,8 @@ for episode in range(num_episodes + 1):
                 f"Step: {step + 1}/{max_steps}, "
                 f"Sim time: {sim.sim_time:.2f} s, "
                 f"Real time: {sim.real_time:.2f} s, "
-                f"User cov: {sim.metrics.user_coverage*100:.2f} %, "
-                f"Global conn: {sim.metrics.global_conn*100:.2f} %, "
+                f"User cov: {sim.metrics.users_coverage*100:.2f} %, "
+                f"Global conn: {sim.metrics.global_connections*100:.2f} %, "
                 f"Cum reward: {cumulative_reward:.2f}, "
                 f"Loss: {sim.sdqn_brain.wrapper.loss:.4e}, "
                 f"Epsilon: {sim.sdqn_brain.wrapper.epsilon:.4f}, "
