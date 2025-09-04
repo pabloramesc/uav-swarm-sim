@@ -67,7 +67,7 @@ class SimBridge:
         # Attributes to store last received values
         self.last_positions: dict[int, np.ndarray] = {}
         self.last_addresses: dict[int, str] = {}
-        self.last_sim_time: float = None
+        self.last_ns3_time: float = None
         self.packets_rtt: deque[float] = deque(maxlen=100)
 
         self.packets: deque[SimPacket] = deque(maxlen=1024)
@@ -146,8 +146,8 @@ class SimBridge:
         self.last_addresses = addresses
         return addresses
 
-    def request_sim_time(self, timeout: float = 1.0) -> float:
-        """Request current simulation time and store in last_sim_time."""
+    def request_ns3_time(self, timeout: float = 1.0) -> float:
+        """Request current NS-3 simulation time and store in last_sim_time."""
         self.logger.debug("Requesting simulation time from NS-3...")
         reply = self._send_and_receive(
             SimCommandCode.REQUEST_SIM_TIME,
@@ -155,7 +155,7 @@ class SimBridge:
             timeout=timeout,
         )
         sim_time = float(np.frombuffer(reply.payload, dtype=np.float64)[0])
-        self.last_sim_time = sim_time
+        self.last_ns3_time = sim_time
         self.logger.debug(f"Received simulation time: {sim_time}.")
         return sim_time
 
@@ -202,7 +202,7 @@ class SimBridge:
             if sim.command == SimCommandCode.EGRESS_PACKET:
                 pkt = self._sim_to_packet(sim)
                 self.packets.append(pkt)
-                self.last_sim_time = pkt.egress_time
+                self.last_ns3_time = pkt.egress_time
                 self.packets_rtt.append(pkt.egress_time - pkt.ingress_time)
                 self.logger.debug(f"Egress packet added to buffer: {pkt}")
 

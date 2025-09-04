@@ -80,8 +80,8 @@ class MultiAgentSimulator:
 
         self.gcs = ControlStation(
             agent_id=len(agents),
-            environment=self.environment,
-            network_sim=self.network_simulator,
+            env=self.environment,
+            netsim=self.network_simulator,
         )
         agents.append(self.gcs)
 
@@ -107,8 +107,8 @@ class MultiAgentSimulator:
         for _ in range(self.num_users):
             user = User(
                 agent_id=len(agents),
-                environment=self.environment,
-                network_sim=self.network_simulator,
+                env=self.environment,
+                netsim=self.network_simulator,
             )
             self.users.register(user)
             agents.append(user)
@@ -189,7 +189,7 @@ class MultiAgentSimulator:
             if ns3_delta < self.SYNC_TOLERANCE:
                 break
             try:
-                self.network_simulator.bridge.request_sim_time(timeout=ns3_delta)
+                self.network_simulator.bridge.request_ns3_time(timeout=ns3_delta)
             except TimeoutError:
                 self.network_simulator.fetch_packets()
 

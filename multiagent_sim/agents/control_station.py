@@ -27,20 +27,20 @@ class ControlStation(Agent):
     def __init__(
         self,
         agent_id: int,
-        environment: Environment,
-        network_sim: NetworkSimulator = None,
+        env: Environment,
+        netsim: NetworkSimulator = None,
     ):
         super().__init__(
             agent_id=agent_id,
             agent_type="gcs",
-            environment=environment,
+            environment=env,
         )
 
         self.swarm_link: SwarmLink = None
-        if network_sim is not None:
+        if netsim is not None:
             self.swarm_link = SwarmLink(
                 agent_id=self.agent_id,
-                network_sim=network_sim,
+                network_sim=netsim,
                 global_bcast_interval=1.0,
             )
 

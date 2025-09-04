@@ -1,57 +1,11 @@
-"""
-Copyright (c) 2025 Pablo Ramirez Escudero
-
-This software is released under the MIT License.
-https://opensource.org/licenses/MIT
-"""
-
+from dataclasses import dataclass
 import numpy as np
-
-from typing import Literal, Protocol
 
 from ..environment.environment import Environment
 from ..mobility.swarm_position_controller import SwarmPositionController
-from ..network.network_simulator import NetworkSimulator
 from ..network.swarm_link import SwarmLink
-from .agent import Agent
-from .agents_registry import AgentsRegistry
-
-
-class NeighborProvider(Protocol):
-    def get_user_positions(self) -> dict[int, np.ndarray]:
-        pass
-
-    def get_drone_positions(self) -> dict[int, np.ndarray]:
-        pass
-
-
-class RegistryNeighborProvider:
-    def __init__(
-        self,
-        agent_id: int,
-        drones_registry: AgentsRegistry,
-        users_registry: AgentsRegistry,
-    ):
-        self.agent_id = int(agent_id)
-        self.drones_registry = drones_registry
-        self.users_registry = users_registry
-
-    def get_user_positions(self) -> dict[int, np.ndarray]:
-        return self.users_registry.get_positions_dict(exclude_id=self.agent_id)
-
-    def get_drone_positions(self) -> dict[int, np.ndarray]:
-        return self.drones_registry.get_positions_dict(exclude_id=self.agent_id)
-
-
-class SwarmLinkNeighborProvider:
-    def __init__(self, swarm_link: SwarmLink):
-        self.swarm_link = swarm_link
-
-    def get_user_positions(self) -> dict[int, np.ndarray]:
-        return self.swarm_link.get_positions(node_type="user")
-
-    def get_drone_positions(self) -> dict[int, np.ndarray]:
-        return self.swarm_link.get_positions(node_type="drone")
+from .agent import Agent, AgentFactory
+from .neighbor_provider import NeighborProvider
 
 
 class Drone(Agent):
@@ -139,3 +93,13 @@ class Drone(Agent):
     def _update_neighbors(self) -> None:
         self.drone_positions = self.neighbor_provider.get_drone_positions()
         self.user_positions = self.neighbor_provider.get_user_positions()
+
+
+@dataclass
+class DroneFactory(AgentFactory):
+
+    def create(self, agent_id: int):
+        return Drone(
+            agent_id=agent_id,
+            environment=self.env,
+        )

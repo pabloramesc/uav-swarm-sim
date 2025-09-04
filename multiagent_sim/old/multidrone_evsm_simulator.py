@@ -183,7 +183,7 @@ class MultiDroneEVSMSimulator:
             if ns3_delta < self.SYNC_TOLERANCE:
                 break
             try:
-                self.network_simulator.bridge.request_sim_time(timeout=ns3_delta)
+                self.network_simulator.bridge.request_ns3_time(timeout=ns3_delta)
             except TimeoutError:
                 self.network_simulator.fetch_packets()
 

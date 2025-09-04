@@ -69,7 +69,7 @@ class MultiAgentSDQNGym:
     def _create_agents(self) -> list[Agent]:
         agents: list[Agent] = []
 
-        self.gcs = ControlStation(agent_id=len(agents), environment=self.environment)
+        self.gcs = ControlStation(agent_id=len(agents), env=self.environment)
         agents.append(self.gcs)
 
         self.drones = AgentsRegistry()
@@ -94,7 +94,7 @@ class MultiAgentSDQNGym:
             agents.append(drone)
 
         for _ in range(self.num_users):
-            user = User(agent_id=len(agents), environment=self.environment)
+            user = User(agent_id=len(agents), env=self.environment)
             self.users.register(user)
             agents.append(user)
 

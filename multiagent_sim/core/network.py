@@ -47,7 +47,7 @@ class NetworkManager:
     def wait(self, timeout: float) -> None:
         self.netsim.fetch_packets()
         try:
-            self.netsim.bridge.request_sim_time(timeout)
+            self.netsim.bridge.request_ns3_time(timeout)
         except TimeoutError:
             pass
 

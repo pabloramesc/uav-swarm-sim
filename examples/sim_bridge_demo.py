@@ -26,7 +26,7 @@ while not bridge.is_ns3_running():
 print("NS-3 process is running.")
 
 # Query and print the current NS-3 simulation time
-sim_time = bridge.request_sim_time()
+sim_time = bridge.request_ns3_time()
 if sim_time is not None:
     print(f"Initial NS-3 simulation time: {sim_time:.6f} s")
 else:
@@ -78,7 +78,7 @@ for packet in egress_packets:
     print("-", packet)
 
 # Final simulation time
-sim_time = bridge.request_sim_time()
+sim_time = bridge.request_ns3_time()
 if sim_time is not None:
     print(f"Final NS-3 simulation time: {sim_time:.6f} s")
 else:

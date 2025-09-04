@@ -1,11 +1,5 @@
-"""
-Copyright (c) 2025 Pablo Ramirez Escudero
-
-This software is released under the MIT License.
-https://opensource.org/licenses/MIT
-"""
-
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
@@ -120,3 +114,12 @@ class Agent(ABC):
         pos_str = f"[{pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f}] m"
         vel_str = f"[{vel[0]:.2f}, {vel[1]:.2f}, {vel[2]:.2f}] m/s"
         return f"Agent(id={self.agent_id}, type='{self.agent_type}', position={pos_str}, velocity={vel_str})"
+
+
+@dataclass
+class AgentFactory(ABC):
+    env: Environment
+
+    @abstractmethod
+    def create(self, agent_id: int) -> Agent:
+        pass

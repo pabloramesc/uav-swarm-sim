@@ -86,7 +86,7 @@ class SDQNSimulator(MultiAgentSimulator):
         self.sdqn_brain.register_interface(interface)
         return interface
 
-    def _create_drone(self, sdqn_config: SDQNConfig = None, **kwargs) -> Drone:
+    def create_drone(self, sdqn_config: SDQNConfig = None, **kwargs) -> Drone:
         iface = self._create_sdqn_interface(iface_id=len(self.agents))
         dummy_controller = DummyPositionController(
             config=self.sdqn_config, env=self.environment

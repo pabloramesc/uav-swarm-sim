@@ -1,26 +1,24 @@
-"""
-Copyright (c) 2025 Pablo Ramirez Escudero
-
-This software is released under the MIT License.
-https://opensource.org/licenses/MIT
-"""
-
-import time
-from abc import ABC, abstractmethod
-
 import numpy as np
 
-from ..agents import Agent, AgentsRegistry, ControlStation, User, Drone
+from ..agents import (
+    ControlStation,
+    Drone,
+    RegistryNeighborProvider,
+    SwarmLinkNeighborProvider,
+    User,
+)
 from ..environment import Environment
+from ..network import SwarmLink
 from ..utils.exit_signal import register_exit_signal
 from ..utils.logger import create_logger
+from .clock import SimulationClock
 from .metrics import MetricsSnapshot
-from .network_manager import NetworkManager
+from .network import NetworkManager
+from .agents import AgentsManager
 
 
-class MultiAgentSimulator(ABC):
-
-    SYNC_TOLERANCE = 0.1
+class MultiAgentSimulator:
+    """Base class for multi-agent simulations with drones, users, and GCS agents."""
 
     def __init__(
         self,
@@ -30,136 +28,158 @@ class MultiAgentSimulator(ABC):
         dt: float = 0.01,
         dem_path: str = None,
         use_network: bool = False,
-        **kwargs,
     ) -> None:
-        self.num_drones = num_drones
-        self.num_users = num_users
-        self.num_gcs = num_gcs
-        self.dt = dt
+        """Initializes the multi-agent simulator.
+
+        Args:
+            num_drones: Number of drone agents.
+            num_users: Number of user agents.
+            num_gcs: Number of control stations..
+            dt: Default simulation time step in seconds.
+            dem_path: Path to DEM terrain file.
+            use_network: Enable network simulation.
+        """
         self.environment = Environment(dem_path)
+        self.network = (
+            NetworkManager(num_gcs, num_drones, num_users) if use_network else None
+        )
+        self.clock = SimulationClock(dt)
 
-        if use_network:
-            self.network = NetworkManager(num_gcs, num_drones, num_users)
-            self.netsim = self.network.netsim
-        else:
-            self.network = None
-            self.netsim = None
-
-        self.gcs = AgentsRegistry()
-        self.drones = AgentsRegistry()
-        self.users = AgentsRegistry()
-
-        self.agents = AgentsRegistry()
-        self._create_agents(**kwargs)
+        self.agents = AgentsManager()
+        self._create_agents()
 
         self.metrics: MetricsSnapshot = None
-
         self.logger = create_logger(name="MultiAgentSimulator", level="INFO")
 
-        self.init_time: float = None
-        self.sim_time = 0.0
-        self.sim_step = 0
-
-        self.drone_states = np.zeros((num_drones, 6))  # px, py, pz, vx, vy, vz
-        self.user_states = np.zeros((num_users, 6))
+        # States caches [px, py, pz, vx, vy, vz]
         self.gcs_states = np.zeros((num_gcs, 6))
+        self.user_states = np.zeros((num_users, 6))
+        self.drone_states = np.zeros((num_drones, 6))
 
         register_exit_signal()
 
-    @property
-    def real_time(self) -> float:
-        """
-        Returns the real time elapsed since the simulation started.
-        """
-        return time.time() - self.init_time if self.init_time else 0.0
+    def _create_agents(self, num_gcs: int, num_users: int, num_drones: int) -> None:
+        """Create and register all agents."""
+        for _ in range(num_gcs):
+            gcs = self.create_gcs()
+            self.agents.register_agent(gcs)
 
-    def _create_agents(self, **kwargs) -> None:
-        self._create_gcs()
-        self._create_drones(**kwargs)
-        self._create_users()
+        for _ in range(num_users):
+            user = self.create_user()
+            self.agents.register_agent(user)
 
-    def _create_gcs(self) -> None:
-        for _ in range(self.num_gcs):
-            gcs = ControlStation(
-                agent_id=len(self.agents),
-                environment=self.environment,
-                network_sim=self.netsim,
+        for _ in range(num_drones):
+            drone = self.create_drone()
+            self.agents.register_agent(drone)
+
+    def create_gcs(self) -> ControlStation:
+        """Create a ground control station (GCS) agent."""
+        return ControlStation(
+            agent_id=self.agents.size,
+            env=self.environment,
+            netsim=self.network.netsim if self.network else None,
+        )
+
+    def create_user(self) -> User:
+        """Create an user agent."""
+        return User(
+            agent_id=self.agents.size,
+            env=self.environment,
+            netsim=self.network.netsim if self.network else None,
+        )
+
+    def create_drone(self) -> Drone:
+        """Create a drone (UAV) agent."""
+        agent_id = self.agents.id
+
+        if self.network:
+            swarm_link = SwarmLink(
+                agent_id=agent_id,
+                network_sim=self.network.netsim,
+                local_bcast_interval=0.1,
+                global_bcast_interval=1.0,
+                position_timeout=5.0,
             )
-            self.gcs.register(gcs)
-            self.agents.register(gcs)
+            provider = SwarmLinkNeighborProvider(swarm_link=swarm_link)
 
-    def _create_users(self) -> None:
-        for _ in range(self.num_users):
-            user = User(
-                agent_id=len(self.agents),
-                environment=self.environment,
-                network_sim=self.netsim,
+        else:
+            swarm_link = None
+            provider = RegistryNeighborProvider(
+                agent_id=agent_id,
+                drones_registry=self.agents.get_registry("drone"),
+                users_registry=self.agents.get_registry("user"),
             )
-            self.users.register(user)
-            self.agents.register(user)
 
-    def _create_drones(self, **kwargs) -> None:
-        for _ in range(self.num_drones):
-            drone = self._create_drone(**kwargs)
-            self.drones.register(drone)
-            self.agents.register(drone)
+        return Drone(
+            agent_id=agent_id,
+            environment=self.environment,
+            controller=None,
+            provider=provider,
+            swarm_link=swarm_link,
+        )
 
-    @abstractmethod
-    def _create_drone(self, **kwargs) -> Drone:
-        pass
+    def initialize(self, states: np.ndarray) -> None:
+        """Initializes simulation and all agents.
+        
+        Args:
+            states: Initial states array for agents with shape (N, 6).
+        """
+        expected_shape = (self.agents.size, 6)
+        if states.shape != expected_shape:
+            raise ValueError(f"States array shape must be {expected_shape}.")
+        
+        self.clock.start()
 
-    @abstractmethod
-    def initialize(self, *args, **kwargs) -> None:
+        for i, agent in enumerate(self.agents.all_agents):
+            agent.initialize(states[i, :], time=self.clock.sim_time)
+
         if self.network is not None:
-            positions = self.agents.get_positions_dict()
+            positions = self.agents.all_agents.get_positions_dict()
             self.network.initialize(positions)
 
-        self.init_time = time.time()
-        self.sim_time = 0.0
-        self.sim_step = 0
-
         self._update_states_cache()
+        self._update_metrics()
 
-    @abstractmethod
-    def update(self, dt: float = None, **kwargs) -> None:
-        dt = dt if dt is not None else self.dt
-        self.sim_time += dt
-        self.sim_step += 1
+    def update(self, dt: float = None) -> None:
+        """Advances the simulation by one time step.
 
-        if self.network is not None:
-            positions = self.agents.get_positions_dict()
-            self.network.update(self.sim_time, positions)
+        Args:
+            dt: Time step in seconds. If None, use default dt.
+        """
+        
+        dt = self.clock.tick(dt)
 
-        for agent in self.agents:
+        for agent in self.agents.all_agents:
             agent.update(dt)
 
-        self._update_states_cache()
+        if self.network is not None:
+            positions = self.agents.all_agents.get_positions_dict()
+            self.network.update(self.sim_time, positions)
 
+        self._update_states_cache()
+        self._update_metrics()
+
+    def sync(self) -> None:
+        self.clock.sync()
+        if self.network:
+            self._sync_with_ns3()
+
+    def _update_metrics(self) -> None:
         self.metrics = MetricsSnapshot(
             env=self.environment,
             drone_states=self.drone_states,
             user_states=self.user_states,
         )
 
-    def _sync_to_real_time(self) -> None:
-        """
-        Synchronizes the simulation time with real time and NS-3 time.
-        """
-        real_delta = self.sim_time - self.real_time
-        if real_delta > self.SYNC_TOLERANCE:
-            time.sleep(real_delta)
-
-        if self.network is not None:
-            self._sync_to_ns3_time()
-
-    def _sync_to_ns3_time(self) -> None:
+    def _sync_with_ns3(self) -> None:
         while True:
             ns3_delta = self.sim_time - self.network.ns3_time
-            if ns3_delta < self.SYNC_TOLERANCE:
+            if ns3_delta < self.clock.sync_tolerance:
                 break
             self.network.wait(timeout=ns3_delta)
 
     def _update_states_cache(self) -> None:
-        self.gcs_states = self.gcs.get_states_array()
-        self.user_states = self.users.get_states_array()
-        self.drone_states = self.drones.get_states_array()
+        states = self.agents.get_states()
+        self.gcs_states = states["gcs"]
+        self.user_states = states["users"]
+        self.drone_states = states["drones"]

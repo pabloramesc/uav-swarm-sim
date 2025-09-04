@@ -21,9 +21,7 @@ class AgentsRegistry(ABC):
         return len(self._agents_dict)
 
     def _rebuild_index_mapping(self) -> None:
-        """
-        Rebuilds the ID-to-index mapping whenever the registry changes.
-        """
+        """Rebuilds the ID-to-index mapping whenever the registry changes."""
         self._agents_list = list(self._agents_dict.values())
         self._id_to_index = {
             agent_id: idx for idx, agent_id in enumerate(self._agents_dict.keys())
@@ -59,8 +57,7 @@ class AgentsRegistry(ABC):
         return self._agents_dict[agent_id].state
 
     def get_states_array(self, exclude_id: int = None) -> np.ndarray:
-        """
-        Returns an array of all agent states.
+        """Returns an array of all agent states.
         If `exclude_id` is provided, excludes the agent with that ID.
         """
         states = np.array(
@@ -73,8 +70,7 @@ class AgentsRegistry(ABC):
         return states if states.shape[0] > 0 else np.zeros((0, 6))
 
     def get_states_dict(self, exclude_id: int = None) -> dict[int, np.ndarray]:
-        """
-        Returns a dictionary mapping agent IDs to their states.
+        """Returns a dictionary mapping agent IDs to their states.
         If `exclude_id` is provided, that agent will be excluded.
         """
         return {
@@ -84,8 +80,7 @@ class AgentsRegistry(ABC):
         }
 
     def get_positions_dict(self, exclude_id: int = None) -> dict[int, np.ndarray]:
-        """
-        Returns a dictionary mapping agent IDs to their positions.
+        """Returns a dictionary mapping agent IDs to their positions.
         If `exclude_id` is provided, that agent will be excluded.
         """
         return {
@@ -97,8 +92,7 @@ class AgentsRegistry(ABC):
     def get_near_positions(
         self, position: np.ndarray, distance: float = 100.0
     ) -> np.ndarray:
-        """
-        Returns the positions of agents within a given distance from `position`.
+        """Returns the positions of agents within a given distance from `position`.
         Assumes the position is in the first three elements of the state vector.
         """
         positions = [
@@ -112,14 +106,12 @@ class AgentsRegistry(ABC):
         return self._index_to_id[index]
 
     def get_index(self, agent_id: int) -> int:
-        """
-        Returns the contiguous array index for a given global agent ID.
+        """Returns the contiguous array index for a given global agent ID.
         """
         return self._id_to_index[agent_id]
 
     def get_indices(self, agent_ids: list[int]) -> np.ndarray:
-        """
-        Given a list or array of global agent IDs, returns an array of their
+        """Given a list or array of global agent IDs, returns an array of their
         contiguous indices.
         """
         try:

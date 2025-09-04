@@ -69,9 +69,9 @@ class NetworkSimulator:
 
     @property
     def ns3_time(self) -> float:
-        if self.bridge.last_sim_time is None:
+        if self.bridge.last_ns3_time is None:
             return 0.0
-        return self.bridge.last_sim_time
+        return self.bridge.last_ns3_time
 
     def get_broadcast_address(self) -> str:
         return self.NETWORK_BASE + "255.255"
@@ -124,7 +124,7 @@ class NetworkSimulator:
                     f"({self.num_gcs} GCSs, {self.num_drones} drones, and {self.num_users} users)."
                 )
 
-                self.init_time = self.bridge.request_sim_time()
+                self.init_time = self.bridge.request_ns3_time()
                 self.real_init_time = time.time()
 
                 return
@@ -190,7 +190,7 @@ class NetworkSimulator:
         return packets
     
     def update_sim_time(self) -> None:
-        self.bridge.request_sim_time()
+        self.bridge.request_ns3_time()
 
     def _create_nodes(self) -> None:
         node_id = 0

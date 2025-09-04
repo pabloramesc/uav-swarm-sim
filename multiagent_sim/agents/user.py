@@ -22,23 +22,23 @@ class User(Agent):
     """
 
     def __init__(
-        self, agent_id: int, environment: Environment, network_sim: NetworkSimulator = None
+        self, agent_id: int, env: Environment, netsim: NetworkSimulator = None
     ):
         """
         Initializes the user agent with a unique ID, maximum speed, and maximum acceleration.
 
         """
-        super().__init__(agent_id=agent_id, agent_type="user", environment=environment)
+        super().__init__(agent_id=agent_id, agent_type="user", environment=env)
 
         self.swarm_link = None
-        if network_sim is not None:
+        if netsim is not None:
             self.swarm_link = SwarmLink(
                 agent_id=self.agent_id,
-                network_sim=network_sim,
+                network_sim=netsim,
                 global_bcast_interval=1.0,
             )
 
-        self.random_walk = SurfaceRandomWalker(environment)
+        self.random_walk = SurfaceRandomWalker(env)
 
     def initialize(self, state: np.ndarray, time: float = 0.0) -> None:
         super().initialize(state, time)

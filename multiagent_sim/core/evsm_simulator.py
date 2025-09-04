@@ -72,7 +72,7 @@ class EVSMSimulator(MultiAgentSimulator):
 
         self.evsm_monitor = EVSMMonitor(drones=self.drones)
 
-    def _create_drone(self, evsm_config: EVSMConfig = None) -> Drone:
+    def create_drone(self, evsm_config: EVSMConfig = None) -> Drone:
         evsm = EVSMPositionController(
             config=evsm_config, environment=self.environment
         )
