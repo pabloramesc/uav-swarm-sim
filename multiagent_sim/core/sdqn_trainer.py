@@ -73,7 +73,7 @@ class SDQNTrainer(MultiAgentSimulator):
         drone = Drone(
             agent_id=len(self.agents),
             environment=self.environment,
-            position_controller=dummy_controller,
+            controller=dummy_controller,
             drones_registry=self.drones,
             users_registry=self.users,
             neighbor_provider="registry",
@@ -84,7 +84,7 @@ class SDQNTrainer(MultiAgentSimulator):
         self.logger.info("Initializing simulation ...")
 
         # Initilaize GSC (Ground Control Station)
-        gcs_states = np.zeros((1,6))
+        gcs_states = np.zeros((1, 6))
         gcs_states[0, 0:2] = np.asarray(home[0:2])
         gcs_states[0, 2] = self.environment.get_elevation(home[0:2])
         self.gcs.initialize(states=gcs_states)
@@ -109,8 +109,8 @@ class SDQNTrainer(MultiAgentSimulator):
         self.users.initialize(states=user_states)
 
         self.sdqn_brain.step()
-        self.prev_frames = self.sdqn_brain.last_frames
-        self.prev_actions = self.sdqn_brain.last_actions
+        self.prev_frames = self.sdqn_brain.frames
+        self.prev_actions = self.sdqn_brain.actions
 
         super().initialize()
 
@@ -121,32 +121,11 @@ class SDQNTrainer(MultiAgentSimulator):
 
         super().update(dt)
 
-        self.sdqn_brain.update_positions(
+        self.sdqn_brain.update(
             drones=self.drone_states[:, 0:2], users=self.user_states[:, 0:2]
         )
 
-        self.rewards, self.dones = self.reward_manager.update(
-            drones=self.drone_states[:, 0:3],
-            users=self.user_states[:, 0:3],
-            time=self.sim_time,
-        )
-
         self.reset_collided_drones(self.dones)
-
-        self.sdqn_brain.step()
-
-        self.sdqn_brain.wrapper.add_experiences(
-            frames=self.prev_frames,
-            actions=self.prev_actions.astype(np.uint32),
-            next_frames=self.sdqn_brain.last_frames,
-            rewards=self.rewards.astype(np.float32),
-            dones=self.dones,
-        )
-
-        self.sdqn_brain.wrapper.train()
-
-        self.prev_frames = self.sdqn_brain.last_frames
-        self.prev_actions = self.sdqn_brain.last_actions
 
     def reset_collided_drones(self, dones: np.ndarray) -> None:
         done_indices = np.arange(self.num_drones)[dones]

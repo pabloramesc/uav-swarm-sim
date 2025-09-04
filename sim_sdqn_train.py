@@ -15,7 +15,6 @@ from multiagent_sim.sdqn.frames import (
     FrameGeneratorFactory,
     SquareGeometryFactory,
     SignalLayerFactory,
-    SignalLayerConfig,
     get_neighbor_positions,
     get_user_positions,
 )
@@ -33,12 +32,10 @@ config = SDQNConfig(displacement=2.0, target_height=0.0)
 
 
 neighbors_layer = SignalLayerFactory(
-    config=SignalLayerConfig(
-        positions_getter=get_neighbor_positions, label="Drones Signal"
-    )
+    positions_getter=get_neighbor_positions, label="Drones Signal"
 )
 users_layer = SignalLayerFactory(
-    config=SignalLayerConfig(positions_getter=get_user_positions, label="Users Signal")
+    positions_getter=get_user_positions, label="Users Signal"
 )
 frame_factory = FrameGeneratorFactory(
     geometry_factory=SquareGeometryFactory(num_cells=64, radius=1000.0),

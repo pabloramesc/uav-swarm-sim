@@ -14,7 +14,7 @@ class SDQNInterface:
         self.iface_id = iface_id
         self.frame_generator = frame_generator
 
-        self.position = np.zeros(2)
+        self.agent = np.zeros(2)
         self.drones = np.zeros((0, 2))
         self.users = np.zeros((0, 2))
 
@@ -23,14 +23,18 @@ class SDQNInterface:
         self.direction = np.zeros(2)
 
     def update_positions(
-        self, position: np.ndarray, drones: np.ndarray, users: np.ndarray
+        self, agent: np.ndarray, drones: np.ndarray, users: np.ndarray
     ) -> None:
-        self.position = position
+        self.agent = agent
         self.drones = drones
         self.users = users
 
     def generate_frame(self) -> np.ndarray:
-        state = ScenarioState(agent_position=self.position, neighbor_positions=self.drones, user_positions=self.users)
+        state = ScenarioState(
+            agent_position=self.agent,
+            neighbor_positions=self.drones,
+            user_positions=self.users,
+        )
         self.frame = self.frame_generator.generate(state)
         return self.frame
 

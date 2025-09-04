@@ -95,7 +95,7 @@ class SDQNViewer(SimpleViewer):
             im.axes.set_ylim([-radius, +radius])
             
     def _get_drone_frames(self, drone_idx: int = 0) -> np.ndarray:
-        return self.sim.sdqn_brain.last_frames[drone_idx]
+        return self.sim.sdqn_brain.frames[drone_idx]
     
     def _get_frame_channels(self, iface_idx: int = 0) -> int:
         iface = self.sim.sdqn_brain.ifaces[iface_idx]

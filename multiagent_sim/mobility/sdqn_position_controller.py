@@ -151,7 +151,7 @@ class SDQNPositionController(SwarmPositionController):
         drones_array = self._positions_dict_to_array(self.drone_positions)
         users_array = self._positions_dict_to_array(self.user_positions)
         self.sdqn_iface.update_positions(
-            position=self.state[0:2], drones=drones_array, users=users_array
+            agent=self.state[0:2], drones=drones_array, users=users_array
         )
 
     def _positions_dict_to_array(self, positions: dict[int, np.ndarray]) -> np.ndarray:

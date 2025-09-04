@@ -2,6 +2,7 @@
 Frame generator for rendering multi-channel frames from scenario state.
 Supports configurable factory for geometry and layers.
 """
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -59,8 +60,9 @@ class FrameGenerator:
 class FrameGeneratorFactory:
     geometry_factory: FrameGeometryFactory
     layer_factories: list[FrameLayerFactory]
-    
+    label: str = "frame"
+
     def create(self, env: Environment = None) -> FrameGenerator:
         geometry = self.geometry_factory.create()
         layers = [f.create(geometry, env) for f in self.layer_factories]
-        return FrameGenerator(geometry, layers)
+        return FrameGenerator(geometry, layers, label=self.label)

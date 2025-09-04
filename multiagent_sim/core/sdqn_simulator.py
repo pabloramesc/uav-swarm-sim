@@ -97,7 +97,7 @@ class SDQNSimulator(MultiAgentSimulator):
         drone = Drone(
             agent_id=len(self.agents),
             environment=self.environment,
-            position_controller=dummy_controller,
+            controller=dummy_controller,
             network_sim=self.netsim,
             drones_registry=self.drones,
             users_registry=self.users,

@@ -85,7 +85,7 @@ class MultiAgentSDQNGym:
             drone = Drone(
                 agent_id=len(agents),
                 environment=self.environment,
-                position_controller=sdqn,
+                controller=sdqn,
                 drones_registry=self.drones,
                 users_registry=self.users,
                 neighbor_provider="registry",
@@ -122,8 +122,8 @@ class MultiAgentSDQNGym:
         self.sim_steps = 0
 
         self.sdqn_agent.step()
-        self.prev_frames = self.sdqn_agent.last_frames
-        self.prev_actions = self.sdqn_agent.last_actions
+        self.prev_frames = self.sdqn_agent.frames
+        self.prev_actions = self.sdqn_agent.actions
 
         self.sim_time = 0.0
         self.sim_steps = 0
@@ -155,15 +155,15 @@ class MultiAgentSDQNGym:
         self.sdqn_agent.wrapper.add_experiences(
             frames=self.prev_frames,
             actions=self.prev_actions,
-            next_frames=self.sdqn_agent.last_frames,
+            next_frames=self.sdqn_agent.frames,
             rewards=self.rewards,
             dones=dones,
         )
 
         self.sdqn_agent.wrapper.train()
 
-        self.prev_frames = self.sdqn_agent.last_frames
-        self.prev_actions = self.sdqn_agent.last_actions
+        self.prev_frames = self.sdqn_agent.frames
+        self.prev_actions = self.sdqn_agent.actions
 
     def reset_collided_drones(self, dones: np.ndarray) -> None:
         done_indices = np.arange(self.num_drones)[dones]

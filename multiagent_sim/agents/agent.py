@@ -17,9 +17,9 @@ AgentType = Literal["drone", "user", "gcs"]
 
 
 class Agent(ABC):
-    """
-    Represents an agent in the simulation environment.
-    """
+    """Represents an agent in the simulation environment."""
+
+    _agent_ids: set[int] = set()
 
     def __init__(
         self,
@@ -27,110 +27,94 @@ class Agent(ABC):
         agent_type: AgentType,
         environment: Environment,
     ):
+        """Initializes an agent with a unique ID, type, and environment.
+
+        Args:
+            agent_id: Unique identifier of agent.
+            agent_type:
+            environment:
         """
-        Initializes an agent with a unique ID, type, and environment.
-        """
-        self.agent_id = agent_id
+        if agent_id in self._agent_ids:
+            raise ValueError(f"Agent ID {agent_id} is already taken.")
+
+        if agent_type not in AgentType.__args__:
+            raise ValueError(f"Invalid agent type descriptor '{agent_type}'.")
+
+        self.agent_id = int(agent_id)
         self.agent_type = agent_type
         self.environment = environment
-        
+
         self.logger = create_logger(f"Agent{agent_id}", level="DEBUG")
 
         self.time = 0.0
         self.state = np.zeros(6)  # px, py, pz, vx, vy, vz
 
+    @classmethod
+    def reset_ids(self):
+        self._agent_ids.clear()
+
     @property
     def position(self) -> np.ndarray:
-        """
-        Position of the agent [px, py, pz] in meters.
-        """
+        """Position of the agent [px, py, pz] in meters."""
         return self.state[0:3]
 
     @property
     def velocity(self) -> np.ndarray:
-        """
-        Velocity of the agent [vx, vy, vz] in m/s.
-        """
+        """Velocity of the agent [vx, vy, vz] in m/s."""
         return self.state[3:6]
 
     @abstractmethod
     def initialize(self, state: np.ndarray, time: float = 0.0) -> None:
-        """
-        Initializes the state of the agent.
+        """Initializes the agent's state and simulation time.
 
-        Parameters
-        ----------
-        state : np.ndarray
-            Initial state [px, py, pz, vx, vy, vz], where:
-            - px, py, pz: Position in meters.
-            - vx, vy, vz: Velocity in m/s.
+        Args:
+            state: Initial state [px, py, pz, vx, vy, vz], where
+                - px, py, pz: Position in meters.
+                - vx, vy, vz: Velocity in m/s.
+            time: Current simulation time
         """
-        self._check_state(state)
-        self.state = np.copy(state)
-        self.time = time
+        pass
 
     @abstractmethod
     def update(self, dt: float = 0.01) -> None:
         """
         Updates the simulation time for the agent.
 
-        Parameters
-        ----------
-        dt : float, optional
-            Time step in seconds (default is 0.01).
+        Args:
+            dt: Simulation time step in seconds.
         """
-        self.time += dt
 
     def is_collision(self, check_altitude: bool = True) -> bool:
-        """
-        Checks if the agent is in collision with any obstacle or the ground.
+        """Checks if the agent is in collision with any obstacle or the ground.
 
-        Returns
-        -------
-        bool
+        Returns:
             True if the agent is in collision, False otherwise.
         """
         return self.environment.is_collision(self.position, check_altitude)
 
     def is_inside(self) -> bool:
-        """
-        Checks if the agent is inside the environment boundary.
+        """Checks if the agent is inside the environment boundary.
 
-        Returns
-        -------
-        bool
+        Returns:
             True if the agent is inside the boundary, False otherwise.
         """
         return self.environment.is_inside(self.position)
 
+    def _initialize_state(self, state: np.ndarray, time: float) -> None:
+        self._check_state(state)
+        self.state = np.copy(state)
+        self.time = float(time)
+
+    def _advance_time(self, dt: float) -> None:
+        self.time += float(dt)
+
     def _check_state(self, state: np.ndarray) -> None:
-        """
-        Validates the state array.
-
-        Parameters
-        ----------
-        state : np.ndarray
-            State array to validate.
-
-        Raises
-        ------
-        ValueError
-            If the state is not a numpy array or does not have the correct shape.
-        """
         if not isinstance(state, np.ndarray):
             raise ValueError("State must be a numpy array")
         if state.shape != (6,):
             raise ValueError("State must be a 1D array of shape (6,)")
 
     def __repr__(self) -> str:
-        """
-        Returns a string representation of the agent.
-
-        Returns
-        -------
-        str
-            String representation of the agent.
-        """
         pos = self.position
         vel = self.velocity
         pos_str = f"[{pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f}] m"

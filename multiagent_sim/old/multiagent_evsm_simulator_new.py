@@ -95,7 +95,7 @@ class MultiAgentSimulator:
             drone = Drone(
                 agent_id=len(agents),
                 environment=self.environment,
-                position_controller=evsm,
+                controller=evsm,
                 network_sim=self.network_simulator,
                 drones_registry=self.drones,
                 users_registry=self.users,

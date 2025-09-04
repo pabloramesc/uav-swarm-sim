@@ -33,16 +33,21 @@ def get_user_positions(state: ScenarioState) -> np.ndarray:
 
 
 @dataclass
-class SignalLayerConfig:
+class RadioModelConfig:
     tx_power: float = 20.0
     rssi_min: float = -80.0
     rssi_max: float = -30.0
     freq_mhz: float = 2412.0
     path_loss_exp: float = 2.4
+
+
+@dataclass
+class SignalLayerConfig:
+    positions_getter: PositionsGetter
+    label: str = "signal"
     plot_rssi: bool = True
     plot_tx: bool = True
-    positions_getter: PositionsGetter = get_neighbor_positions
-    label: str = "signal"
+    radio: RadioModelConfig = RadioModelConfig()
 
 
 class SignalLayer(FrameLayer):
@@ -69,12 +74,12 @@ class SignalLayer(FrameLayer):
             rssi = signal_strength(
                 tx_positions=relative_positions,
                 rx_positions=self.geometry.flat_cell_positions,
-                f=self.config.freq_mhz,
-                n=self.config.path_loss_exp,
-                tx_power=self.config.tx_power,
+                f=self.config.radio.freq_mhz,
+                n=self.config.radio.path_loss_exp,
+                tx_power=self.config.radio.tx_power,
             )
             frame = rssi_to_signal_quality(
-                rssi, vmin=self.config.rssi_min, vmax=self.config.rssi_max
+                rssi, vmin=self.config.radio.rssi_min, vmax=self.config.radio.rssi_max
             ).reshape(self.geometry.shape)
 
         if self.config.plot_tx:
@@ -85,7 +90,12 @@ class SignalLayer(FrameLayer):
 
 @dataclass
 class SignalLayerFactory(FrameLayerFactory):
-    config: SignalLayerConfig = None
+    positions_getter: PositionsGetter
+    label: str
 
     def create(self, geo: FrameGeometry, env: Environment = None):
-        return SignalLayer(geometry=geo, environment=env, config=self.config)
+        config = SignalLayerConfig(
+            positions_getter=self.positions_getter,
+            label=self.label,
+        )
+        return SignalLayer(geometry=geo, environment=env, config=config)

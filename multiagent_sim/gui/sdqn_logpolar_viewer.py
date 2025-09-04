@@ -93,7 +93,7 @@ class SDQNGridViewer(SimpleViewer):
             im.set_data(frames[..., i].T / 255.0)
 
     def _get_drone_frames(self, drone_idx: int = 0) -> np.ndarray:
-        return self.sim.sdqn_brain.last_frames[drone_idx]
+        return self.sim.sdqn_brain.frames[drone_idx]
 
     def _get_frame_labels(self, iface_idx: int = 0) -> list[str]:
         iface = self.sim.sdqn_brain.ifaces[iface_idx]
@@ -221,7 +221,7 @@ class SDQNLogPolarViewer(SimpleViewer):
             pm.set_array(frames[..., i] / 255.0)
 
     def _get_drone_frames(self, drone_idx: int = 0) -> np.ndarray:
-        return self.sim.sdqn_brain.last_frames[drone_idx]
+        return self.sim.sdqn_brain.frames[drone_idx]
 
     def _get_frame_labels(self, iface_idx: int = 0) -> list[str]:
         iface = self.sim.sdqn_brain.ifaces[iface_idx]
