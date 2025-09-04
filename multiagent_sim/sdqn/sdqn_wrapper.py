@@ -7,12 +7,22 @@ https://opensource.org/licenses/MIT
 
 import os
 from datetime import datetime
+import time
 
 import numpy as np
-from dqn import DQNAgent, EpsilonGreedyPolicy, ExperiencesBatch, PriorityReplayBuffer
-from keras.layers import Conv2D, Dense, Dropout, Flatten, InputLayer, Rescaling, Input, MaxPooling2D
+from dqn import DQNAgentPER, EpsilonGreedyPolicy, ExperiencesBatch
+from keras.layers import (
+    Conv2D,
+    Dense,
+    Dropout,
+    Flatten,
+    InputLayer,
+    Rescaling,
+    Input,
+    MaxPooling2D,
+)
 from keras.losses import Huber
-from keras.models import Model, Sequential, save_model
+from keras.models import Model, Sequential, save_model, load_model
 from keras.optimizers import Adam
 
 
@@ -39,37 +49,37 @@ class SDQNWrapper:
         if not self.train_mode and self.model_path is None:
             raise ValueError("Model path shall be provided if not in training mode")
 
+        # If not model path provided, create new model file with timestamp
         if self.model_path is None:
             timestamp = datetime.now().strftime("%y%m%d-%H%M%S")
             self.model_path = f"sdqn-model-{timestamp}.keras"
 
+        # If model doesn't exist, create new model and save it
         if not os.path.exists(self.model_path):
-            self.model = self.build_keras_model()
-            save_model(self.model, self.model_path)
+            model = self.build_keras_model()
+            save_model(model=model, filepath=self.model_path)
 
+        # Create linear decaying epsilon-greedy policy with initial random exploration
         if self.train_mode:
-            self.policy = EpsilonGreedyPolicy(
+            policy = EpsilonGreedyPolicy(
                 epsilon=1.0, epsilon_min=0.1, epsilon_decay=1e-5, decay_type="linear"
             )
+        # If not in training mode, use fixed policy with no exploration (epsilon=0)
         else:
-            self.policy = EpsilonGreedyPolicy(
+            policy = EpsilonGreedyPolicy(
                 epsilon=0.0, epsilon_min=0.0, decay_type="fixed"
             )
 
-        self.memory = PriorityReplayBuffer(max_size=100_000, beta_annealing=1e-6)
-
-        self.dqn_agent = DQNAgent(
-            model=None,
+        # Create DQN Agent and set the model
+        model = load_model(filepath=self.model_path, compile=True)
+        self.dqn_agent = DQNAgentPER(
+            model=model,
             batch_size=64,
             gamma=0.99,
-            policy=self.policy,
-            # memory_size=500_000,
-            memory=self.memory,
-            update_steps=5000,
-            autosave_steps=1000,
-            file_name=self.model_path,
+            policy=policy,
+            memory_size=500_000,
+            update_freq=5000,
         )
-        self.dqn_agent.load_model(self.model_path, compile=True)
         self.dqn_agent.model.summary()
 
         if self.frame_shape != self.dqn_agent.model.input_shape[1:]:
@@ -78,8 +88,11 @@ class SDQNWrapper:
         if self.num_actions != self.dqn_agent.model.output_shape[1]:
             raise ValueError("The number of actions does not match the output size")
 
+        self.min_train_samples = 50_000
+        self.autosave_freq = 1000
+
         self.train_metrics: dict = None
-        self.min_train_samples = 100_000
+        self.train_t0 = None
 
     def add_experiences(
         self,
@@ -89,26 +102,18 @@ class SDQNWrapper:
         rewards: np.ndarray,
         dones: np.ndarray,
     ) -> None:
-        """
-        Add a batch of experiences to the agent's memory.
+        """Add a batch of experiences to the agent's memory.
 
-        Parameters
-        ----------
-        frames : np.ndarray
-            Array of frames.
-        actions : np.ndarray
-            Array of actions taken.
-        next_frames : np.ndarray
-            Array of next frames.
-        rewards : np.ndarray
-            Array of rewards received.
-        dones : np.ndarray
-            Array of done flags indicating episode termination.
+        Args:
+            frames: Array of frames.
+            actions: Array of actions taken.
+            next_frames: Array of next frames.
+            rewards: Array of rewards received.
+            dones: Array of done flags indicating episode termination.
 
-        Raises
-        ------
-        ValueError
-            If the frames or next frames are not valid.
+        Raises:
+            ValueError: If the frames or next frames are not valid.
+            Warning: If called while not in training mode.
         """
         if not self.train_mode:
             raise Warning("Do not add experiences in no training mode!")
@@ -125,15 +130,10 @@ class SDQNWrapper:
         self.dqn_agent.add_experiences_batch(batch)
 
     def train(self) -> dict:
-        """
-        Train the agent using the experiences in memory.
+        """Train the agent using the experiences in memory and returns metrics
+        dictionary with training performance indicators. Autosave model if needed.
 
-        It also updates and returns metrics dictionary with training
-        performance indicators.
-
-        Returns
-        -------
-        dict
+        Returns:
             Training metrics, or None if training is not performed.
         """
         if not self.train_mode:
@@ -143,6 +143,13 @@ class SDQNWrapper:
             return None
 
         self.train_metrics = self.dqn_agent.train()
+
+        if self.train_t0 is None:
+            self.train_t0 = time.time()
+
+        if self.dqn_agent.train_steps % self.autosave_freq:
+            self.dqn_agent.model.save(filepath=self.model_path, overwrite=True)
+
         return self.train_metrics
 
     def act(self, frames: np.ndarray) -> np.ndarray:
@@ -153,37 +160,36 @@ class SDQNWrapper:
     def build_keras_model(self) -> Model:
         inputs = Input(shape=self.frame_shape, dtype="uint8")
         x = Rescaling(1.0 / 255.0)(inputs)
-        
+
         # Block 1
         x = Conv2D(32, 3, strides=1, padding="same", activation="relu")(x)
         x = Conv2D(32, 3, strides=1, padding="same", activation="relu")(x)
         x = MaxPooling2D(2)(x)
         # x = Dropout(0.1)(x)
-        
+
         # Block 2
         x = Conv2D(64, 3, strides=1, padding="same", activation="relu")(x)
         x = Conv2D(64, 3, strides=1, padding="same", activation="relu")(x)
         x = MaxPooling2D(2)(x)
         # x = Dropout(0.1)(x)
-        
+
         # Block 3
         x = Conv2D(128, 3, strides=1, padding="same", activation="relu")(x)
         x = Conv2D(128, 3, strides=1, padding="same", activation="relu")(x)
         x = MaxPooling2D(2)(x)
         # x = Dropout(0.1)(x)
-        
+
         # Dense head
         x = Flatten()(x)
         x = Dense(512, activation="relu")(x)
         # x = Dropout(0.2)(x)
         outputs = Dense(self.num_actions, activation="linear")(x)
-        
+
         model = Model(inputs=inputs, outputs=outputs, name="DQN_model")
 
         model.compile(
             optimizer=Adam(learning_rate=0.00025),
             loss=Huber(delta=1.0),
-            metrics=["accuracy"],
         )
 
         return model
@@ -203,11 +209,13 @@ class SDQNWrapper:
 
     @property
     def train_elapsed(self) -> float:
-        return self.dqn_agent.train_elapsed or 0.0
+        if self.train_t0 is None:
+            return np.nan
+        time.time() - self.train_t0
 
     @property
     def train_speed(self) -> float:
-        return self.dqn_agent.train_speed or 0.0
+        return self.train_steps / self.train_elapsed
 
     @property
     def memory_size(self) -> int:
@@ -215,28 +223,20 @@ class SDQNWrapper:
 
     @property
     def epsilon(self) -> float:
-        return self.policy.epsilon
-
-    @property
-    def accuracy(self) -> float:
-        if self.train_metrics is not None and "accuracy" in self.train_metrics:
-            return self.train_metrics["accuracy"]
-        return np.nan
+        return self.dqn_agent.policy.epsilon
 
     @property
     def loss(self) -> float:
-        if self.train_metrics is not None and "loss" in self.train_metrics:
-            return self.train_metrics["loss"]
-        return np.nan
+        if self.train_metrics is None:
+            return np.nan
+        return self.train_metrics.get("loss", np.nan)
 
     def training_status_str(self) -> str:
         return (
-            f"Train time: {self.train_elapsed:.2f} s, "
             f"Train steps: {self.train_steps}, "
+            f"Train time: {self.train_elapsed:.0f} s, "
             f"Train speed: {self.train_speed:.2f} sps, "
             f"Memory size: {self.memory_size}, "
             f"Epsilon: {self.epsilon:.4f}, "
-            f"Loss: {self.loss:.4e}, "
-            # f"Accuracy: {self.accuracy*100:.2f} %"
-            f"Cumulative reward: {self.cumulative_reward:.4f}"
+            f"Loss: {self.loss:.4e}"
         )

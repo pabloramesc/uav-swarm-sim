@@ -42,7 +42,7 @@ users_layer = SignalLayerFactory(
 )
 frame_factory = FrameGeneratorFactory(
     geometry_factory=SquareGeometryFactory(num_cells=64, radius=1000.0),
-    layer_factories=[neighbors_layer, users_layer],
+    layer_factories=[neighbors_layer],
 )
 
 sim = SDQNTrainer(
@@ -96,16 +96,16 @@ for episode in range(num_episodes + 1):
 
         print(
             (
-                f"Episode: {episode}/{num_episodes}, "
-                f"Step: {step + 1}/{max_steps}, "
+                f"Episode: {episode}, "
+                f"Step: {step + 1}, "
                 f"Sim time: {sim.sim_time:.2f} s, "
                 f"Real time: {sim.real_time:.2f} s, "
+                f"Area cov: {sim.metrics.area_coverage*100:.2f} %, "
                 f"User cov: {sim.metrics.users_coverage*100:.2f} %, "
+                f"Direct conn: {sim.metrics.direct_connections*100:.2f} %, "
                 f"Global conn: {sim.metrics.global_connections*100:.2f} %, "
                 f"Cum reward: {cumulative_reward:.2f}, "
-                f"Loss: {sim.sdqn_brain.wrapper.loss:.4e}, "
-                f"Epsilon: {sim.sdqn_brain.wrapper.epsilon:.4f}, "
-                f"Train speed: {sim.sdqn_brain.wrapper.train_speed:.2f} steps/s"
+                + sim.sdqn_brain.wrapper.training_status_str()
             ),
             end="\r",
         )
@@ -113,32 +113,4 @@ for episode in range(num_episodes + 1):
         # if np.any(sim.dones):
         #     break
 
-    print(
-        f"Episode: {episode}/{num_episodes}, "
-        f"Steps: {step + 1}, "
-        f"Sim time: {sim.sim_time:.2f} s, "
-        f"Real time: {sim.real_time:.2f} s, "
-        f"Area cov: {sim.metrics.area_coverage*100:.2f} %, "
-        f"User cov: {sim.metrics.user_coverage*100:.2f} %, "
-        f"Direct conn: {sim.metrics.direct_conn*100:.2f} %, "
-        f"Global conn: {sim.metrics.global_conn*100:.2f} %, "
-        f"Cum reward: {cumulative_reward:.2f}, "
-        f"Loss: {sim.sdqn_brain.wrapper.loss:.4e}, "
-        f"Epsilon: {sim.sdqn_brain.wrapper.epsilon:.4f}, "
-        f"Train steps: {sim.sdqn_brain.wrapper.train_steps}, "
-        f"Train speed: {sim.sdqn_brain.wrapper.train_speed:.2f} steps/s, "
-        f"Train elapsed: {sim.sdqn_brain.wrapper.train_elapsed:.2f} s"
-    )
-
-    logger.log(
-        episode=episode,
-        steps=step + 1,
-        duration=sim.real_time,
-        reward=cumulative_reward,
-        loss=np.mean(episode_losses),
-        epsilon=sim.sdqn_brain.wrapper.epsilon,
-        area_coverage=sim.metrics.area_coverage * 100.0,
-        user_coverage=sim.metrics.user_coverage * 100.0,
-        direct_conn=sim.metrics.direct_conn * 100.0,
-        global_conn=sim.metrics.global_conn * 100.0,
-    )
+    print()
