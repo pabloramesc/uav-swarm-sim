@@ -5,7 +5,7 @@ from numpy.typing import ArrayLike
 
 from ..agents import Drone
 from ..mobility.sdqn_position_controller import SDQNConfig
-from ..mobility.swarm_position_controller import DummyPositionController
+from ..mobility.position_controller import DummyPositionController
 from ..sdqn import (
     RewardManager,
     SDQNBrain,
@@ -15,7 +15,7 @@ from ..sdqn import (
 from ..sdqn.frames import FrameGeneratorFactory
 from .multiagent_simulator import MultiAgentSimulator
 from ..mobility.utils import environment_random_positions, grid_positions
-
+from multiagent_sim.environment import Environment
 
 class SDQNTrainer(MultiAgentSimulator):
 
@@ -28,12 +28,6 @@ class SDQNTrainer(MultiAgentSimulator):
         frame_factory: FrameGeneratorFactory = None,
         model_path: str = None,
     ) -> None:
-        self.sdqn_config = sdqn_config or SDQNConfig()
-        self.frame_factory = frame_factory
-        self.model_path = model_path
-
-        self.sdqn_brain = self._create_sdqn_brain()
-
         super().__init__(
             num_drones=num_drones,
             num_users=num_users,
@@ -42,6 +36,12 @@ class SDQNTrainer(MultiAgentSimulator):
             dem_path=None,
             use_network=False,
         )
+        
+        self.sdqn_config = sdqn_config or SDQNConfig()
+        self.frame_factory = frame_factory
+        self.model_path = model_path
+
+        self.sdqn_brain = self._create_sdqn_brain()
 
         self.reward_manager = RewardManager(env=self.environment)
 
@@ -57,7 +57,7 @@ class SDQNTrainer(MultiAgentSimulator):
             model_path=self.model_path,
             train_mode=True,
         )
-        return SDQNBrain(wrapper)
+        return SDQNBrain(wrapper=wrapper, environment=self.environment)
 
     def _create_sdqn_interface(self, iface_id: int) -> SDQNInterface:
         frame_generator = self.frame_factory.create(env=self.environment)
@@ -72,7 +72,7 @@ class SDQNTrainer(MultiAgentSimulator):
         )
         drone = Drone(
             agent_id=len(self.agents),
-            environment=self.environment,
+            env=self.environment,
             controller=dummy_controller,
             drones_registry=self.drones,
             users_registry=self.users,

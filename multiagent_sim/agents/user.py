@@ -8,59 +8,48 @@ https://opensource.org/licenses/MIT
 import numpy as np
 
 from ..environment import Environment
-from ..mobility.random_walker import SurfaceRandomWalker
-from ..network.network_simulator import NetworkSimulator
+from .dynamics.random_walker import RandomWalkerDynamics
 from ..network.swarm_link import SwarmLink
 from .agent import Agent
 
 
 class User(Agent):
-    """
-    Represents a user agent in the simulation environment.
+    """Represents a user agent in the simulation environment."""
 
-    The user agent performs a random walk within the environment.
-    """
+    def __init__(self, agent_id: int, env: Environment, swarm_link: SwarmLink = None):
+        self.dynamics = RandomWalkerDynamics(
+            env=env, min_speed=1.0, max_speed=3.0, climb_rate=0.2, turning_rate=0.3
+        )
+        super().__init__(
+            agent_id=agent_id,
+            agent_type="user",
+            dynamics=self.dynamics,
+            environment=env,
+        )
 
-    def __init__(
-        self, agent_id: int, env: Environment, netsim: NetworkSimulator = None
-    ):
-        """
-        Initializes the user agent with a unique ID, maximum speed, and maximum acceleration.
-
-        """
-        super().__init__(agent_id=agent_id, agent_type="user", environment=env)
-
-        self.swarm_link = None
-        if netsim is not None:
-            self.swarm_link = SwarmLink(
-                agent_id=self.agent_id,
-                network_sim=netsim,
-                global_bcast_interval=1.0,
-            )
-
-        self.random_walk = SurfaceRandomWalker(env)
+        self.swarm_link = swarm_link
 
     def initialize(self, state: np.ndarray, time: float = 0.0) -> None:
         super().initialize(state, time)
-        self.random_walk.initialize(self.state)
         self.next_tx_msg: float = 0.0
 
     def update(self, dt: float = 0.01) -> None:
-        """
-        Updates the state of the user agent by performing a random walk.
+        """Updates the state of the user agent by performing a random walk.
 
-        Parameters
-        ----------
-        dt : float, optional
-            The time step in seconds (default is 0.01).
+        Args:
+            dt: The time step in seconds.
         """
-        super().update(dt)
-        self.state = self.random_walk.step(dt)
+        self._update_swarm_link()
 
-        if self.swarm_link is not None:
-            self.swarm_link.update(self.time, self.position)
-            self._send_random_message()
-            self.print_received_messages(clear=True)
+        # super().update(dt)
+        self.state = self.dynamics.step(dt)
+
+    def _update_swarm_link(self) -> None:
+        if self.swarm_link is None:
+            return
+        self.swarm_link.update(self.time, self.position)
+        self._send_random_message()
+        self.print_received_messages(clear=True)
 
     def _send_random_message(self) -> None:
         if self.time < self.next_tx_msg:

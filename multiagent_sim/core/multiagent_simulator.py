@@ -46,7 +46,7 @@ class MultiAgentSimulator:
         self.clock = SimulationClock(dt)
 
         self.agents = AgentsManager()
-        self._create_agents()
+        self._create_agents(num_gcs=num_gcs, num_users=num_users, num_drones=num_drones)
 
         self.metrics: MetricsSnapshot = None
         self.logger = create_logger(name="MultiAgentSimulator", level="INFO")
@@ -112,7 +112,7 @@ class MultiAgentSimulator:
 
         return Drone(
             agent_id=agent_id,
-            environment=self.environment,
+            env=self.environment,
             controller=None,
             provider=provider,
             swarm_link=swarm_link,

@@ -90,11 +90,11 @@ class MultiAgentSimulator:
 
         for _ in range(self.num_drones):
             evsm = EVSMPositionController(
-                config=self.evsm_config, environment=self.environment
+                config=self.evsm_config, env=self.environment
             )
             drone = Drone(
                 agent_id=len(agents),
-                environment=self.environment,
+                env=self.environment,
                 controller=evsm,
                 network_sim=self.network_simulator,
                 drones_registry=self.drones,

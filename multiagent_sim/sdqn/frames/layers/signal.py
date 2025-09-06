@@ -9,7 +9,7 @@ https://opensource.org/licenses/MIT
 Layer implementations for frame generation, including signal and user layers.
 Each layer transforms ScenarioState into a 2D frame given a geometry.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable
 
 import numpy as np
@@ -47,7 +47,7 @@ class SignalLayerConfig:
     label: str = "signal"
     plot_rssi: bool = True
     plot_tx: bool = True
-    radio: RadioModelConfig = RadioModelConfig()
+    radio: RadioModelConfig = field(default_factory=RadioModelConfig)
 
 
 class SignalLayer(FrameLayer):

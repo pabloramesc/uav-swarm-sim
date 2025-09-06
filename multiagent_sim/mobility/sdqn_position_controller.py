@@ -11,13 +11,14 @@ import numpy as np
 
 from ..environment import Environment
 from ..sdqn.sdqn_interface import SDQNInterface
-from .altitude_controller import AltitudeController
-from .swarm_position_controller import SwarmPositionController, SwarmControllerConfig
-from .position_controller import PositionController
+from .pid import PIDController
+from .position_controller import PositionController, ControllerContext
 
 
 @dataclass
-class SDQNConfig(SwarmControllerConfig):
+class SDQNConfig:
+    """Configuration for SDQN position controller."""
+
     displacement: float = 1.0  # in meters
     obstacle_distance: float = 10.0  # in meters
     agent_mass: float = 1.0  # simple equivalence between force and acceleration
@@ -27,28 +28,27 @@ class SDQNConfig(SwarmControllerConfig):
     target_height: float = 100.0  # in meters (AGL - Above Ground Level)
 
 
-class SDQNPositionController(SwarmPositionController):
+class SDQNPositionController(PositionController):
     def __init__(
         self,
         config: SDQNConfig,
         environment: Environment,
         sdqn_iface: SDQNInterface,
     ) -> None:
-        super().__init__(config, environment)
-        self.config: SDQNConfig = config
-        
+        self.config = config
+        self.environment = environment
+        self.sdqn_iface = sdqn_iface
+
         self.control_update_period = 0.0
         self.sdqn_update_period = 0.0
 
-        self.sdqn_iface = sdqn_iface
-
         kp = config.max_acceleration / config.max_displacement
-        
-        kd = 2 * np.sqrt(kp)  # critical damping
-        self.altitude_hold = AltitudeController(kp, kd)
-        
-        kd = config.max_acceleration / config.target_velocity
-        self.position_controller = PositionController(kp, kd)
+
+        kd_alt = 2 * np.sqrt(kp)  # critical damping
+        self.altitude_controller = PIDController(kp, kd_alt)
+
+        kd_pos = config.max_acceleration / config.target_velocity
+        self.position_controller = PIDController(kp, kd_pos)
 
         self.displacement = config.displacement
 
@@ -62,42 +62,29 @@ class SDQNPositionController(SwarmPositionController):
         self._last_control_update_time: float = None
         self._last_sdqn_update_time: float = None
 
-    def initialize(
-        self,
-        time: float,
-        state: np.ndarray,
-        drone_positions: dict[int, np.ndarray] = None,
-        user_positions: dict[int, np.ndarray] = None,
-    ) -> None:
-        super().initialize(time, state)
+    def initialize(self, context: ControllerContext) -> None:
+        if context.drone_positions is None:
+            raise ValueError("Drone positions is required.")
 
-        self.drone_positions = drone_positions
-        self.user_positions = user_positions
+        if context.drone_positions is None:
+            raise ValueError("User positions is required.")
+
+        self.drone_positions = context.drone_positions
+        self.user_positions = context.user_positions
 
         self._update_sdqn_interface()
 
         self.control_force = np.zeros(3)
-        self.target_position = state[0:2]  # px, py
+        self.target_position = context.state[0:2]  # px, py
         self._last_control_update_time: float = None
         self._last_sdqn_update_time: float = None
 
-    def update(
-        self,
-        time: float,
-        state: np.ndarray,
-        drone_positions: dict[int, np.ndarray] = None,
-        user_positions: dict[int, np.ndarray] = None,
-    ) -> np.ndarray:
-        """
-        Updates the DQNS controller's state and computes the control output.
-        """
-        super().update(time, state)
+    def update(self, context: ControllerContext) -> np.ndarray:
+        if context.drone_positions is not None:
+            self.drone_positions = context.drone_positions
 
-        if drone_positions is not None:
-            self.drone_positions = drone_positions
-
-        if user_positions is not None:
-            self.user_positions = user_positions
+        if context.user_positions is not None:
+            self.user_positions = context.user_positions
 
         # if not self._need_update_control(time):
         #     return self.control_force
@@ -109,12 +96,11 @@ class SDQNPositionController(SwarmPositionController):
         #         self.state[0:2] + self.displacement * self.sdqn_iface.direction
         #     )
         #     self._last_sdqn_update_time = time
-        
+
         self._update_sdqn_interface()
-        
+
         vel = self.config.target_velocity * self.sdqn_iface.direction
         self.target_position = self.state[0:2] + vel * 0.1
-        
 
         # if self.env.is_collision(pos=self.target_position, check_boundary=True):
         #     self.target_position = self.state[0:2]
@@ -122,17 +108,21 @@ class SDQNPositionController(SwarmPositionController):
         # Horizontal control using PD (Proportional Derivative)
         self.control_force[0:2] = self.position_controller.control(
             target_position=self.target_position,
-            position=state[0:2],
-            velocity=state[3:5],
+            position=context.state[0:2],
+            velocity=context.state[3:5],
         )
 
         # Vertical control by altitude hold
-        target_altitude = self.env.get_elevation(state[0:2]) + self.config.target_height
-        self.control_force[2] = self.altitude_hold.control(
-            target_altitude=target_altitude, altitude=state[2], vspeed=state[5]
+        target_altitude = (
+            self.env.get_elevation(context.state[0:2]) + self.config.target_height
+        )
+        self.control_force[2] = self.altitude_controller.control(
+            target_altitude=target_altitude,
+            altitude=context.state[2],
+            vspeed=context.state[5],
         )
 
-        return self.control_force
+        return self.control_force.copy()
 
     def get_frame(self) -> np.ndarray:
         return self.dqns.compute_state_frame()

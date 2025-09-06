@@ -1,17 +1,16 @@
 from dataclasses import dataclass
+
 import numpy as np
 
 from ..environment.environment import Environment
 from ..evsm.evsm_algorithm import EVSMAlgorithm
-from .altitude_controller import AltitudeController
-from .swarm_position_controller import SwarmPositionController, SwarmControllerConfig
+from .pid import PIDController
+from .position_controller import PositionController, ControllerContext
 
 
 @dataclass
-class EVSMConfig(SwarmControllerConfig):
-    """
-    Configuration for EVSMPositionController.
-    """
+class EVSMConfig:
+    """Configuration for EVSM position controller."""
 
     separation_distance: float = 100.0
     obstacle_distance: float = 10.0
@@ -24,7 +23,7 @@ class EVSMConfig(SwarmControllerConfig):
     max_position_error: float = 100.0
 
 
-class EVSMPositionController(SwarmPositionController):
+class EVSMPositionController(PositionController):
     """
     Combines EVSM horizontal control with altitude hold.
     """
@@ -34,7 +33,9 @@ class EVSMPositionController(SwarmPositionController):
         config: EVSMConfig,
         environment: Environment,
     ):
-        super().__init__(config, environment)
+        self.config = config
+        self.environment = environment
+
         self.control_update_period = 0.1
         self.springs_update_period = 1.0
 
@@ -49,7 +50,7 @@ class EVSMPositionController(SwarmPositionController):
         kd = 2 * np.sqrt(kp)
 
         self.evsm = EVSMAlgorithm(
-            env=environment,
+            env=self.environment,
             ln=self._initial_nat_length,
             ks=kp,
             kd=kd,
@@ -57,7 +58,7 @@ class EVSMPositionController(SwarmPositionController):
             d_obs=config.obstacle_distance,
         )
 
-        self.vertical_controller = AltitudeController(kp, kd)
+        self.altitude_controller = PIDController(kp, kd)
 
         self.control_force = np.zeros(3)
         self.drone_positions: dict[int, np.ndarray] = {}
@@ -65,67 +66,59 @@ class EVSMPositionController(SwarmPositionController):
         self._last_control_update_time: float = None
         self._last_springs_update_time: float = None
 
-    def initialize(
-        self,
-        time: float,
-        state: np.ndarray,
-        drone_positions: dict[int, np.ndarray] = None,
-        user_positions: dict[int, np.ndarray] = None,
-    ) -> None:
-        super().initialize(time, state)
-        if drone_positions is None:
-            raise ValueError("Drone positions is required for initialization")
+    def initialize(self, context: ControllerContext) -> None:
+        if context.drone_positions is None:
+            raise ValueError("Drone positions is required for initialization.")
+
         self.control_force = np.zeros(3)
-        self.drone_positions = drone_positions
+        self.drone_positions = context.drone_positions
         self._last_control_update_time: float = None
         self._last_springs_update_time: float = None
 
-    def update(
-        self,
-        time: float,
-        state: np.ndarray,
-        drone_positions: dict[int, np.ndarray] = None,
-        user_positions: dict[int, np.ndarray] = None,
-    ) -> np.ndarray:
-        """
-        Compute control forces: [Fx, Fy, Fz]
-        """
-        super().update(time, state)
+    def update(self, context: ControllerContext) -> np.ndarray:
+        """Compute control forces: [Fx, Fy, Fz]"""
+        if context.time is None:
+            raise ValueError("Time is required.")
 
-        if not self._need_update_control(time):
+        if context.drone_positions is not None:
+            topology_changed = (
+                context.drone_positions.keys() != self.drone_positions.keys()
+            )
+            self.drone_positions = context.drone_positions
+
+        if not self._need_update_control(context.time):
             return self.control_force
-        self._last_control_update_time = time
+        self._last_control_update_time = context.time
 
-        update_springs = False
-        topology_changed = drone_positions.keys() != self.drone_positions.keys()
-        if topology_changed or self._need_update_springs(time):
+        if topology_changed or self._need_update_springs(context.time):
             update_springs = True
-            self._last_springs_update_time = time
-            self.drone_positions = drone_positions
+            self._last_springs_update_time = context.time
+        else:
+            update_springs = False
 
         if self.drone_positions:
             neighbors = np.stack([pos[0:2] for pos in self.drone_positions.values()])
         else:
             neighbors = np.zeros((0, 2))
 
-        self._update_natural_length(time)
+        self._update_natural_length(context.time)
 
         # Horizontal control force (EVSM - Extended Virtual Spring Mesh)
         self.control_force[0:2] = self.evsm.update(
-            position=state[0:2],
-            velocity=state[3:5],
+            position=context.state[0:2],
+            velocity=context.state[3:5],
             neighbors=neighbors,
-            time=time,
+            time=context.time,
             update_springs=update_springs,
         )
 
         # Vertical control force (PD altitude controller)
-        ground_elevation = self.env.get_elevation(state[0:2])
+        ground_elevation = self.environment.get_elevation(context.state[0:2])
         desired_alt = ground_elevation + self._target_altitude
-        self.control_force[2] = self.vertical_controller.control(
+        self.control_force[2] = self.altitude_controller.control(
             target_altitude=desired_alt,
-            altitude=state[2],
-            vspeed=state[5],
+            altitude=context.state[2],
+            vspeed=context.state[5],
         )
 
         return self.control_force

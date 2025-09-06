@@ -7,11 +7,13 @@ import numpy as np
 from ..environment.environment import Environment
 from ..utils.logger import create_logger
 
+from .dynamics import Dynamics
+
 AgentType = Literal["drone", "user", "gcs"]
 
 
-class Agent(ABC):
-    """Represents an agent in the simulation environment."""
+class Agent:
+    """Base class for all agents in the simulation."""
 
     _agent_ids: set[int] = set()
 
@@ -19,6 +21,7 @@ class Agent(ABC):
         self,
         agent_id: int,
         agent_type: AgentType,
+        dynamics: Dynamics,
         environment: Environment,
     ):
         """Initializes an agent with a unique ID, type, and environment.
@@ -26,6 +29,7 @@ class Agent(ABC):
         Args:
             agent_id: Unique identifier of agent.
             agent_type:
+            dynamics:
             environment:
         """
         if agent_id in self._agent_ids:
@@ -36,47 +40,36 @@ class Agent(ABC):
 
         self.agent_id = int(agent_id)
         self.agent_type = agent_type
+        self.dynamics = dynamics
         self.environment = environment
 
         self.logger = create_logger(f"Agent{agent_id}", level="DEBUG")
 
         self.time = 0.0
-        self.state = np.zeros(6)  # px, py, pz, vx, vy, vz
 
     @classmethod
     def reset_ids(self):
         self._agent_ids.clear()
 
-    @property
-    def position(self) -> np.ndarray:
-        """Position of the agent [px, py, pz] in meters."""
-        return self.state[0:3]
-
-    @property
-    def velocity(self) -> np.ndarray:
-        """Velocity of the agent [vx, vy, vz] in m/s."""
-        return self.state[3:6]
-
-    @abstractmethod
     def initialize(self, state: np.ndarray, time: float = 0.0) -> None:
         """Initializes the agent's state and simulation time.
 
         Args:
-            state: Initial state [px, py, pz, vx, vy, vz], where
-                - px, py, pz: Position in meters.
-                - vx, vy, vz: Velocity in m/s.
-            time: Current simulation time
+            state: Initial agent state with dynamics appropriate shape.
+            time: Current simulation time in seconds.
         """
-        pass
+        self.dynamics.initialize(state)
+        self.time = float(time)
 
-    @abstractmethod
-    def update(self, dt: float = 0.01) -> None:
+    def update(self, dt: float = 0.01, **kwargs) -> None:
         """
         Updates the simulation time for the agent.
 
         Args:
             dt: Simulation time step in seconds.
         """
+        self.dynamics.step(dt, **kwargs)
+        self.time += float(dt)
 
     def is_collision(self, check_altitude: bool = True) -> bool:
         """Checks if the agent is in collision with any obstacle or the ground.
@@ -93,20 +86,6 @@ class Agent(ABC):
             True if the agent is inside the boundary, False otherwise.
         """
         return self.environment.is_inside(self.position)
-
-    def _initialize_state(self, state: np.ndarray, time: float) -> None:
-        self._check_state(state)
-        self.state = np.copy(state)
-        self.time = float(time)
-
-    def _advance_time(self, dt: float) -> None:
-        self.time += float(dt)
-
-    def _check_state(self, state: np.ndarray) -> None:
-        if not isinstance(state, np.ndarray):
-            raise ValueError("State must be a numpy array")
-        if state.shape != (6,):
-            raise ValueError("State must be a 1D array of shape (6,)")
 
     def __repr__(self) -> str:
         pos = self.position

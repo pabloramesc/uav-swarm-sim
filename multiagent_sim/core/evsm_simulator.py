@@ -57,8 +57,9 @@ class EVSMSimulator(MultiAgentSimulator):
         dem_path: str = None,
         use_network: bool = False,
         evsm_config: EVSMConfig = None,
+        **kwargs
     ) -> None:
-        self.evsm_config = evsm_config or EVSMConfig()
+        self.evsm_config = evsm_config or EVSMConfig(kwargs)
 
         super().__init__(
             num_drones,
@@ -66,19 +67,18 @@ class EVSMSimulator(MultiAgentSimulator):
             num_gcs,
             dt,
             dem_path,
-            use_network,
-            evsm_config=self.evsm_config,
+            use_network
         )
 
         self.evsm_monitor = EVSMMonitor(drones=self.drones)
 
     def create_drone(self, evsm_config: EVSMConfig = None) -> Drone:
         evsm = EVSMPositionController(
-            config=evsm_config, environment=self.environment
+            config=evsm_config, env=self.environment
         )
         drone = Drone(
             agent_id=len(self.agents),
-            environment=self.environment,
+            env=self.environment,
             controller=evsm,
             network_sim=self.netsim,
             drones_registry=self.drones,

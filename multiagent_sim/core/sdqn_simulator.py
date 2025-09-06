@@ -5,7 +5,7 @@ from numpy.typing import ArrayLike
 
 from ..agents import Drone
 from ..mobility.sdqn_position_controller import SDQNConfig, SDQNPositionController
-from ..mobility.swarm_position_controller import DummyPositionController
+from ..mobility.position_controller import DummyPositionController
 from ..sdqn import (
     RewardManager,
     SDQNBrain,
@@ -96,7 +96,7 @@ class SDQNSimulator(MultiAgentSimulator):
         # )
         drone = Drone(
             agent_id=len(self.agents),
-            environment=self.environment,
+            env=self.environment,
             controller=dummy_controller,
             network_sim=self.netsim,
             drones_registry=self.drones,

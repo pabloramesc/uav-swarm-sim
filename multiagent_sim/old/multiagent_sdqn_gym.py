@@ -84,7 +84,7 @@ class MultiAgentSDQNGym:
             )
             drone = Drone(
                 agent_id=len(agents),
-                environment=self.environment,
+                env=self.environment,
                 controller=sdqn,
                 drones_registry=self.drones,
                 users_registry=self.users,

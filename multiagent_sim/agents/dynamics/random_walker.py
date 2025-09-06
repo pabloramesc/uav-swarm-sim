@@ -1,34 +1,31 @@
 import numpy as np
 
-from ..environment import Environment
+from multiagent_sim.environment import Environment
+
+from .base import Dynamics
 
 
-class SurfaceRandomWalker:
+class RandomWalkerDynamics(Dynamics):
     def __init__(
         self,
-        env: Environment,
+        env: Environment = None,
         min_speed: float = 1.0,
         max_speed: float = 3.0,
         climb_rate: float = 0.2,
         turning_rate: float = 0.3,
     ) -> None:
+        super().__init__()
+
         self.env = env
-        self.min_speed = min_speed
-        self.max_speed = max_speed
-        self.climb_rate = climb_rate
-        self.turning_rate = turning_rate
+        self.min_speed = float(min_speed)
+        self.max_speed = float(max_speed)
+        self.climb_rate = float(climb_rate)
+        self.turning_rate = float(turning_rate)
 
         self.repulsion_radius = 5.0
         self.repulsion_force = 1.0
-        
-        self.state: np.ndarray = None
-        
-    def initialize(self, state: np.ndarray) -> None:
-        if state.shape != (6,):
-            raise ValueError("State must be a numpy array with shape (6,)")
-        self.state = np.copy(state)
 
-    def step(self, dt) -> np.ndarray:
+    def step(self, dt: float) -> None:
         pos = self.state[0:2]
         vel = self.state[3:5]
 
@@ -52,19 +49,19 @@ class SurfaceRandomWalker:
         self.state[3:5] = vel
         self.state[0:2] += vel * dt
 
+        # If not environment was provided, skip surface following
+        if self.env is None:
+            return
+
         # Altitude tracking (surface-following)
         current_z = self.state[2]
         target_z = self.env.get_elevation(self.state[0:2])
         climb = np.clip(target_z - current_z, -self.climb_rate, self.climb_rate)
         self.state[5] = climb
         self.state[2] += climb * dt
-        
-        return self.state.copy()
 
     def _obstacle_avoidance(self, position: np.ndarray) -> np.ndarray:
-        """
-        Repulsion force to avoid nearby obstacles.
-        """
+        """Repulsion force to avoid nearby obstacles."""
         force = np.zeros(2)
         for obs in self.env.obstacles:
             d = obs.distance(position)

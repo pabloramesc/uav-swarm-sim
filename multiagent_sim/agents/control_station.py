@@ -9,7 +9,7 @@ from .agent import Agent
 from ..environment import Environment
 from ..network.swarm_link import SwarmLink
 from ..network.network_simulator import NetworkSimulator
-
+from .dynamics import StaticDynamics
 
 class ControlStation(Agent):
     """
@@ -33,6 +33,7 @@ class ControlStation(Agent):
         super().__init__(
             agent_id=agent_id,
             agent_type="gcs",
+            dynamics = StaticDynamics(),
             environment=env,
         )
 
