@@ -10,7 +10,7 @@ import imageio.v2 as imageio
 
 import numpy as np
 
-from multiagent_sim.core.sdqn_trainer import SDQNTrainer, SDQNConfig
+from multiagent_sim.simulators.sdqn_trainer import SDQNTrainer, SDQNConfig
 from multiagent_sim.gui.sdqn_viewer import SDQNViewer
 from multiagent_sim.gui.sdqn_logpolar_viewer import SDQNLogPolarViewer
 from multiagent_sim.utils.data_logger import DataLogger

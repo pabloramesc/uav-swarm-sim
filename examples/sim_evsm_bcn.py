@@ -6,7 +6,7 @@ https://opensource.org/licenses/MIT
 """
 
 from multiagent_sim.gui.evsm_viewer import EVSMViewer
-from multiagent_sim.core.evsm_simulator import EVSMSimulator
+from multiagent_sim.simulators.evsm_simulator import EVSMSimulator
 from multiagent_sim.mobility.evsm_position_controller import EVSMConfig
 
 dt = 0.1

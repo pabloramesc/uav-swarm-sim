@@ -4,15 +4,15 @@ from numpy.typing import ArrayLike
 from ..agents import AgentsRegistry, Drone, Agent, ControlStation, User
 from ..mobility.evsm_position_controller import EVSMPositionController, EVSMConfig
 from ..mobility.utils import grid_positions, environment_random_positions
-from .multiagent_simulator import MultiAgentSimulator
+from .simulator import MultiAgentSimulator
 
 
 class EVSMMonitor:
     def __init__(self, drones: AgentsRegistry):
         self.registry = drones
-        self.edge_mask = np.zeros(drones.num_agents, dtype=bool)
+        self.edge_mask = np.zeros(drones.size, dtype=bool)
         self.springs_matrix = np.zeros(
-            (drones.num_agents, drones.num_agents), dtype=bool
+            (drones.size, drones.size), dtype=bool
         )
 
     def update(self):
@@ -30,7 +30,7 @@ class EVSMMonitor:
             self.springs_matrix[i] = self._drone_springs_mask(controller)
 
     def _drone_springs_mask(self, controller: EVSMPositionController) -> np.ndarray:
-        drone_springs = np.zeros(self.registry.num_agents, dtype=bool)
+        drone_springs = np.zeros(self.registry.size, dtype=bool)
 
         neighbor_ids = np.array(list(controller.drone_positions.keys()))
         neighbor_indices = self.registry.get_indices(neighbor_ids)

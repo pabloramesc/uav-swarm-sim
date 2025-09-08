@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..environment import Environment
-from ..core.metrics import area_coverage
+from ..simulators.metrics import area_coverage
 from ..math.distances import pairwise_self_distances
 from ..math.connectivity import covered_positions, globally_connected
 from .utils import distances_to_obstacles

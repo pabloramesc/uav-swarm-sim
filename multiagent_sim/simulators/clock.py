@@ -1,4 +1,6 @@
 import time
+from typing import Optional
+
 
 class SimulationClock:
     """Handles simulation time, step counting, and synchronization."""
@@ -12,9 +14,9 @@ class SimulationClock:
         """
         self.dt = dt
         self.sync_tolerance = sync_tolerance
-        self.init_time: float = None
-        self.sim_time: float = None
-        self.sim_step: int = None
+        self.init_time: float | None = None
+        self.sim_time = 0.0
+        self.sim_step = int(0)
 
     @property
     def real_time(self) -> float:
@@ -25,23 +27,25 @@ class SimulationClock:
         """Reset the simulation clock to initial values."""
         self.init_time = time.time()
         self.sim_time = 0.0
-        self.sim_step = 0
+        self.sim_step = int(0)
 
-    def tick(self, dt: float = None) -> float:
+    def tick(self, dt: Optional[float] = None) -> float:
         """Advances the simulation by a time step.
-        
+
         Args:
             dt: Time step to advance. If None, use default dt.
-            
+
         Returns:
             The time step used for this tick.
         """
+        if self.init_time is None:
+            raise RuntimeError("Clock not initiated.")
         step_dt = float(dt) if dt is not None else self.dt
         self.sim_time += step_dt
         self.sim_step += 1
         return step_dt
 
-    def sync(self, t: float = None) -> None:
+    def sync(self, t: Optional[float] = None) -> None:
         """Synchronize simulation with external or real time reference.
 
         Args:

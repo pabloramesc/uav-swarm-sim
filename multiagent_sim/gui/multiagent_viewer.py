@@ -1,10 +1,4 @@
-"""
-Copyright (c) 2025 Pablo Ramirez Escudero
-
-This software is released under the MIT License.
-https://opensource.org/licenses/MIT
-"""
-
+import logging
 import time
 from abc import ABC, abstractmethod
 
@@ -12,8 +6,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 
-from ..core.multiagent_simulator import MultiAgentSimulator
-from ..utils.logger import create_logger
+from ..simulators.simulator import MultiAgentSimulator
+
+logger = logging.getLogger(__name__)
 
 
 class MultiAgentViewer(ABC):
@@ -21,14 +16,14 @@ class MultiAgentViewer(ABC):
     def __init__(
         self,
         sim: MultiAgentSimulator,
-        xlim: tuple[float, float] = None,
-        ylim: tuple[float, float] = None,
-        fig_size: tuple[float, float] = None,
+        xlim: tuple[float, float] | None = None,
+        ylim: tuple[float, float] | None = None,
+        fig_size: tuple[float, float] | None = None,
         min_fps: float = 10.0,
         max_fps: float = 60.0,
     ):
         plt.ion()
-        
+
         if min_fps <= 0.0:
             raise ValueError("Minimum FPS must be greater than 0.0")
         if max_fps <= 0.0:
@@ -44,8 +39,6 @@ class MultiAgentViewer(ABC):
 
         self.fig = plt.figure(figsize=fig_size)
         self.axes = self._create_axes()
-
-        self.logger = create_logger(name="MultiAgentViewer", level="INFO")
 
         self.reset()
 
@@ -91,19 +84,19 @@ class MultiAgentViewer(ABC):
     def _need_render(self) -> bool:
         if self.current_fps > self.max_fps:
             return False
-        return self.sim.sim_time > self.time or self.current_fps < self.min_fps
+        return self.sim.clock.sim_time > self.time or self.current_fps < self.min_fps
 
     def _render_figure(self) -> None:
         self.fig.canvas.draw_idle()
         self.fig.canvas.flush_events()
-        
+
         self.fps = 0.9 * self.fps + 0.1 * self.current_fps
         self.last_render_time = self.time
-        
+
     def capture_frame(self) -> np.ndarray:
         self.fig.canvas.draw()
         width, height = self.fig.canvas.get_width_height()
-        buf = self.fig.canvas.buffer_rgba()
+        buf = self.fig.canvas.buffer_rgba()  # type: ignore
         img = np.frombuffer(buf, dtype=np.uint8).reshape((height, width, 4))
         img = img[..., :3].copy()  # Remove alpha channel
         return img

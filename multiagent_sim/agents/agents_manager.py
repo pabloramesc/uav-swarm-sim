@@ -1,6 +1,7 @@
 import numpy as np
 
-from ..agents import Agent, AgentsRegistry
+from .agent import Agent
+from .agents_registry import AgentsRegistry
 
 
 class AgentsManager:
@@ -10,13 +11,18 @@ class AgentsManager:
         self.all_agents = AgentsRegistry()
         self.registries: dict[str, AgentsRegistry] = {
             "gcs": AgentsRegistry(),
-            "users": AgentsRegistry(),
-            "drones": AgentsRegistry(),
+            "user": AgentsRegistry(),
+            "drone": AgentsRegistry(),
         }
 
     @property
     def size(self) -> int:
-        self.all_agents.num_agents
+        return self.all_agents.size
+    
+    def clear_registries(self) -> None:
+        self.all_agents.clear()
+        for reg in self.registries.values():
+            reg.clear()
 
     def register_agent(self, agent: Agent):
         registry = self.registries.get(agent.agent_type)
@@ -26,7 +32,10 @@ class AgentsManager:
         self.all_agents.register(agent)
 
     def get_registry(self, agent_type: str) -> AgentsRegistry:
-        return self.registries.get(agent_type)
+        reg = self.registries.get(agent_type)
+        if reg is None:
+            raise ValueError(f"No register with agent type '{agent_type}'")
+        return reg
 
     def get_states(self) -> dict[str, np.ndarray]:
-        return {atype: reg for atype, reg in self.registries.items()}
+        return {atype: reg.get_states_array() for atype, reg in self.registries.items()}

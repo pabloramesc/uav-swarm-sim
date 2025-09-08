@@ -1,13 +1,17 @@
-import numpy as np
-
 from collections import deque
 from dataclasses import dataclass
+from typing import Optional
 
-from .network_simulator import NetworkSimulator, NodeType
-from .network_interface import NetworkInterface, SimPacket
-from .swarm_packets import parse_packet, PacketType, DataPacket
-from .positions_provider import PositionsProvider
+import numpy as np
+import logging
+
 from .broadcast_service import BroadcastService
+from .network_interface import NetworkInterface, SimPacket
+from .network_simulator import NetworkSimulator, NodeType
+from .positions_provider import PositionsProvider
+from .swarm_packets import DataPacket, PacketType, parse_packet, PositionPacket
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -22,8 +26,8 @@ class SwarmLink:
         self,
         agent_id: int,
         network_sim: NetworkSimulator,
-        local_bcast_interval: float = None,
-        global_bcast_interval: float = None,
+        local_bcast_interval: Optional[float] = None,
+        global_bcast_interval: Optional[float] = None,
         position_timeout: float = 5.0,
     ):
         self.agent_id = agent_id
@@ -32,7 +36,7 @@ class SwarmLink:
 
         self.time: float = 0.0
         self.position: np.ndarray = np.zeros(3)
-        self.data_packets: list[DataPacket] = deque(maxlen=1024)
+        self.data_packets: deque[DataPacket] = deque(maxlen=1024)
         self.send_counter: int = 0
         self.recv_counter: int = 0
 
@@ -59,12 +63,13 @@ class SwarmLink:
             try:
                 pkt = parse_packet(raw.data)
             except Exception:
-                self.logger.warning(f"Failed to parse packet: {raw}")
+                logger.error(f"Failed to parse packet: {raw}")
                 continue
 
-            if pkt.packet_type == PacketType.DATA:
+            if isinstance(pkt, DataPacket):
                 self.data_packets.append(pkt)
-            elif pkt.packet_type == PacketType.POSITION:
+
+            elif isinstance(pkt, PositionPacket):
                 self.position_provider.process(pkt, time)
 
         # Prune stale positions
@@ -95,7 +100,11 @@ class SwarmLink:
     def get_messages(self, clear: bool = False) -> list[SwarmMessage]:
         messages: list[SwarmMessage] = []
         for pkt in self.data_packets:
-            msg = SwarmMessage(pkt.agent_id, pkt.timestamp, pkt.payload.decode())
+            msg = SwarmMessage(
+                source_id=int(pkt.agent_id),
+                timestamp=float(pkt.timestamp),
+                txt=pkt.payload.decode(),
+            )
             messages.append(msg)
             self.recv_counter += 1
 
@@ -104,8 +113,10 @@ class SwarmLink:
 
         return messages
 
-    def get_positions(self, node_type: NodeType = None) -> dict[int, np.ndarray]:
+    def get_positions(
+        self, node_type: Optional[NodeType] = None
+    ) -> dict[int, np.ndarray]:
         return self.position_provider.get_positions(node_type)
 
-    def is_connected(self, node_id: int = None) -> bool:
+    def is_connected(self, node_id: Optional[int] = None) -> bool:
         return self.position_provider.is_connected(node_id)

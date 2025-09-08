@@ -5,8 +5,10 @@ This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
 
+from typing import Optional
+
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 
 from .elevation_map import ElevationMap
 from ..math.geo import enu2geo, geo2enu
@@ -15,132 +17,102 @@ from .obstacles.obstacles import CircularObstacle, Obstacle, RectangularObstacle
 
 
 class Environment:
-    """
-    Manages the environment, including elevation data, boundaries,
-    and obstacles.
-    """
+    """Manages the environment, including elevation data, boundaries,
+    and obstacles."""
 
     def __init__(
         self,
-        dem_path: str = None,
-        boundary: Boundary = None,
+        dem_path: Optional[str] = None,
+        boundary: Optional[Boundary] = None,
         obstacles: list[Obstacle] = [],
     ) -> None:
-        """
-        Initializes the environment with elevation data, calculates the home
+        """Initializes the environment with elevation data, calculates the home
         reference point, and initializes empty boundary/obstacle lists.
 
-        Parameters
-        ----------
-        dem_path : str, optional
-            Path to the DEM (Digital Elevation Model) file. Default is None.
-        boundary : Boundary, optional
-            The boundary object defining the limits of the environment.
-            Default is None.
-        obstacle : list[Obstacle], optional
-            A list with obstacle objects to add to the environment.
-            Default is [].
+        Args:
+            dem_path: Path to the DEM (Digital Elevation Model) file.
+            boundary: A boundary object defining the limits of the environment.
+            obstacle: A list with obstacle objects to add to the environment.
         """
         self.elevation_map = ElevationMap(dem_path) if dem_path is not None else None
-        self.boundary = boundary
-        self.obstacles = obstacles
+        self._boundary = boundary
+        self._obstacles = obstacles
 
         # Calculate the home reference point (bottom-left corner of the elevation map)
         self.home = (
             np.array(
-                [self.elevation_map.bounds.bottom, self.elevation_map.bounds.left, 0.0]
+                [
+                    self.elevation_map.bounds.bottom,
+                    self.elevation_map.bounds.left,
+                    0.0,
+                ]
             )
             if self.elevation_map is not None
             else np.zeros(3)
         )
 
     @property
+    def boundary(self) -> Boundary:
+        if self._boundary is None:
+            raise RuntimeError("Boundary is required.")
+        return self._boundary
+
+    @property
+    def obstacles(self) -> list[Obstacle]:
+        return self._obstacles
+
+    @property
     def boundary_and_obstacles(self) -> list[Obstacle]:
-        """
-        A list of all obstacles, including the boundary as first element.
-        """
+        """A list of all obstacles, including the boundary as first element."""
         return [self.boundary] + self.obstacles
 
-    @property
-    def boundary_xlim(self) -> tuple[float, float]:
-        if self.boundary is None:
-            return None
-        x = self.boundary.shape.exterior.xy[0]
-        return min(x), max(x)
-
-    @property
-    def boundary_ylim(self) -> tuple[float, float]:
-        if self.boundary is None:
-            return None
-        y = self.boundary.shape.exterior.xy[1]
-        return min(y), max(y)
-
     def set_boundary(self, boundary: Boundary) -> None:
-        """
-        Sets the boundary of the environment.
+        """Sets the boundary of the environment.
 
-        Parameters
-        ----------
-        boundary : Boundary
-            The boundary object defining the limits of the environment.
+        Args:
+            boundary: The boundary object defining the limits of the environment.
         """
-        self.boundary = boundary
+        self._boundary = boundary
 
     def add_obstacle(self, obstacle: Obstacle) -> None:
-        """
-        Adds an obstacle to the environment.
+        """Adds an obstacle to the environment.
 
-        Parameters
-        ----------
-        obstacle : Obstacle
-            The obstacle object to add to the environment.
+        Args:
+            obstacle: The obstacle object to add to the environment.
         """
-        self.obstacles.append(obstacle)
+        self._obstacles.append(obstacle)
 
     def clear_obstacles(self) -> None:
-        """
-        Delete all obstacles.
-        """
-        self.obstacles = []
+        """Delete all obstacles."""
+        self._obstacles.clear()
 
     def set_rectangular_boundary(
         self, bottom_left: ArrayLike, top_right: ArrayLike
     ) -> None:
-        """
-        Sets a rectangular boundary for the environment.
+        """Sets a rectangular boundary for the environment.
 
-        Parameters
-        ----------
-        bottom_left : ArrayLike
-            Coordinates of the bottom-left corner of the boundary [x, y].
-        top_right : ArrayLike
-            Coordinates of the top-right corner of the boundary [x, y].
+        Args:
+            bottom_left: Coordinates of the bottom-left corner of the boundary [x, y].
+            top_right: Coordinates of the top-right corner of the boundary [x, y].
         """
         rect = RectangularBoundary(bottom_left, top_right)
         self.set_boundary(rect)
 
     def set_polygonal_boundary(self, vertices: ArrayLike) -> None:
-        """
-        Sets a polygonal boundary for the environment.
+        """Sets a polygonal boundary for the environment.
 
-        Parameters
-        ----------
-        vertices : ArrayLike
-            List of vertices defining the polygonal boundary.
+        Args:
+            vertices: List of vertices defining the polygonal boundary.
         """
         poly = PolygonalBoundary(vertices)
         self.set_boundary(poly)
 
     def add_circular_obstacle(self, center: ArrayLike, radius: float) -> None:
-        """
-        Adds a circular obstacle to the environment.
+        """Adds a circular obstacle to the environment.
 
-        Parameters
-        ----------
-        center : ArrayLike
-            Coordinates of the center of the obstacle [x, y].
-        radius : float
-            Radius of the circular obstacle.
+        Args:
+            center: Coordinates of the center of the obstacle [x, y].
+            radius: Radius of the circular obstacle.
         """
         circ = CircularObstacle(center, radius)
         self.add_obstacle(circ)
@@ -148,35 +120,25 @@ class Environment:
     def add_rectangular_obstacle(
         self, bottom_left: ArrayLike, top_right: ArrayLike
     ) -> None:
-        """
-        Adds a rectangular obstacle to the environment.
+        """Adds a rectangular obstacle to the environment.
 
-        Parameters
-        ----------
-        bottom_left : ArrayLike
-            Coordinates of the bottom-left corner of the obstacle [x, y].
-        top_right : ArrayLike
-            Coordinates of the top-right corner of the obstacle [x, y].
+        Args:
+            bottom_left: Coordinates of the bottom-left corner of the obstacle [x, y].
+            top_right: Coordinates of the top-right corner of the obstacle [x, y].
         """
         rect = RectangularObstacle(bottom_left, top_right)
         self.add_obstacle(rect)
 
-    def is_inside(self, pos: ArrayLike) -> np.ndarray:
-        """
-        Checks if one or more positions are inside the environment boundary.
+    def is_inside(self, pos: NDArray[np.float64]) -> NDArray[np.bool_]:
+        """Checks if one or more positions are inside the environment boundary.
 
-        Parameters
-        ----------
-        pos : ArrayLike
-            Position(s) [x, y, z] in meters. Can be a (3,) array for a single
-            position or an (N, 3) array for multiple positions.
+        Args:
+            pos: Position(s) [x, y, z] in meters. Can be a (3,) array for a
+                single position or a (N, 3) array for multiple positions.
 
-        Returns
-        -------
-        np.ndarray
+        Returns:
             A boolean array of shape (N,) indicating whether each position is
-            inside the boundary. If a single position is provided, a single
-            boolean value is returned.
+                inside the boundary.
         """
         pos = np.atleast_2d(pos)  # Ensure pos is (N, 3)
         if self.boundary is None:
@@ -184,10 +146,12 @@ class Environment:
         return self.boundary.is_inside(pos[:, 0:2])
 
     def is_collision(
-        self, pos: ArrayLike, check_altitude: bool = False, check_boundary: bool = False
-    ) -> np.ndarray:
-        """
-        Checks if one or more positions collide with any obstacle or the ground.
+        self,
+        pos: NDArray[np.float64],
+        check_altitude: bool = False,
+        check_boundary: bool = False,
+    ) -> NDArray[np.bool_]:
+        """Checks if one or more positions collide with any obstacle or the ground.
 
         Parameters
         ----------
@@ -195,21 +159,18 @@ class Environment:
             Position(s) [x, y, z] in meters. Can be a (3,) array for a single
             position or an (N, 3) array for multiple positions.
 
-        Returns
-        -------
-        np.ndarray
+        Returns:
             A boolean array of shape (N,) indicating whether each position
-            collides with an obstacle or the ground. If a single position is
-            provided, a single boolean value is returned.
+                collides with an obstacle or the ground.
         """
         pos = np.atleast_2d(pos)  # Ensure pos is (N, 3)
 
         boundary_collisions = np.zeros(pos.shape[0], dtype=bool)
-        if check_boundary:
+        if check_boundary and self.boundary is not None:
             boundary_collisions = ~self.boundary.is_inside(pos[:, 0:2])
 
         obstacle_collisions = np.array(
-            [obstacle.is_inside(pos[:, 0:2]) for obstacle in self.obstacles]
+            [obstacle.is_inside(pos[:, 0:2]) for obstacle in self._obstacles]
         )
         obstacle_collisions = np.any(obstacle_collisions, axis=0)
 
@@ -224,24 +185,21 @@ class Environment:
 
         return collisions
 
-    def get_elevation(self, pos: ArrayLike) -> np.ndarray:
-        """
-        Gets the elevation at a specific position.
+    def get_elevation(self, pos: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Gets the elevation at a specific position.
 
-        Parameters
-        ----------
-        pos : ArrayLike
-            Horizontal position(s) [x, y] in meters. Can be a (2,) array for a single
-            position or an (N, 2) array for multiple positions.
+        Args:
+            pos: Horizontal position(s) [x, y] in meters. Can be a (2,) array
+                for a single position or an (N, 2) array for multiple positions.
 
-        Returns
-        -------
-        np.ndarray
-            An (N,2) array with elevation values in meters.
+        Returns:
+            A (N,) array with elevation values in meters.
         """
         pos = np.atleast_2d(pos)
+        
         if self.elevation_map is None:
-            return np.zeros(pos.shape[0]) if pos.shape[0] > 1 else 0.0
+            return np.zeros(pos.shape[0])
+        
         # Convert local Cartesian coordinates to geographic coordinates
         enu = np.zeros((pos.shape[0], 3))
         enu[:, 0:2] = pos[:, 0:2]
@@ -250,49 +208,40 @@ class Environment:
         lat, lon = geo[:, 0], geo[:, 1]
         return self.elevation_map.get_elevation(lat, lon)
 
-    def enu2geo(self, pos: np.ndarray) -> np.ndarray:
-        """
-        Converts local ENU (East-North-Up) coordinates to geographic coordinates.
+    def enu2geo(self, pos: ArrayLike) -> NDArray[np.float64]:
+        """Converts local ENU (East-North-Up) coordinates to geographic coordinates.
 
-        Parameters
-        ----------
-        pos : np.ndarray
-            Local ENU coordinates [e, n, u] in meters.
+        Args:
+            pos: Local ENU coordinates [e, n, u] in meters.
 
-        Returns
-        -------
-        np.ndarray
+        Returns:
             Geographic coordinates [latitude, longitude, altitude] in
             (degrees, degrees, meters).
         """
         return enu2geo(pos, self.home)
 
-    def geo2enu(self, geo: np.ndarray) -> np.ndarray:
-        """
-        Converts geographic coordinates to local ENU (East-North-Up) coordinates.
+    def geo2enu(self, geo: ArrayLike) -> NDArray[np.float64]:
+        """Converts geographic coordinates to local ENU (East-North-Up) coordinates.
 
-        Parameters
-        ----------
-        geo : np.ndarray
-            Geographic coordinates [latitude, longitude, altitude] in
-            (degrees, degrees, meters).
+        Args:
+            geo: Geographic coordinates [latitude, longitude, altitude] in
+                (degrees, degrees, meters).
 
-        Returns
-        -------
-        np.ndarray
+        Returns:
             Local ENU coordinates [e, n, u] in meters.
         """
         return geo2enu(geo, self.home)
 
     def plot_environment(self) -> None:
-        """
-        Visualizes the environment, including the boundary, obstacles, and
+        """Visualizes the environment, including the boundary, obstacles, and
         elevation map.
         """
+        raise NotImplementedError
+
         import matplotlib.pyplot as plt
 
         # Plot the elevation map
-        self.elevation_map.plot()
+        self.elevation_map.plot()  # TODO: Review elevation map plot
 
         # Create a new figure for boundaries and obstacles
         fig, ax = plt.subplots(figsize=(10, 8))
@@ -303,7 +252,7 @@ class Environment:
             ax.plot(x, y, color="blue", label="Boundary")
 
         # Plot the obstacles
-        for obstacle in self.obstacles:
+        for obstacle in self._obstacles:
             x, y = obstacle.shape.exterior.xy
             ax.plot(x, y, color="red", label="Obstacle")
 

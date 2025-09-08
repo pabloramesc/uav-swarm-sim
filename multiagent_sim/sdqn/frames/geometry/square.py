@@ -10,16 +10,16 @@ from .base import FrameGeometry, FrameGeometryFactory
 
 
 class SquareGeometry(FrameGeometry):
-    def __init__(self, num_cells: int, radius: float):
-        self.num_cells = num_cells
+    def __init__(self, side_size: int, radius: float):
+        self.side_size = side_size
         self.radius = radius
-        self.cell_size = 2 * radius / num_cells
+        self.cell_size = 2 * radius / side_size
 
-        super().__init__(height=num_cells, width=num_cells)
+        super().__init__(height=side_size, width=side_size)
 
     def calculate_cell_positions(self):
         dx = (
-            np.linspace(-self.radius, self.radius - self.cell_size, self.num_cells)
+            np.linspace(-self.radius, self.radius - self.cell_size, self.side_size)
             + self.cell_size / 2
         )
         x_grid, y_grid = np.meshgrid(dx, dx)  # Same spacing for X and Y axes
@@ -34,15 +34,15 @@ class SquareGeometry(FrameGeometry):
 
         # Clip indices to valid range
         if clip:
-            indices = np.clip(indices, 0, self.num_cells - 1)
+            indices = np.clip(indices, 0, self.side_size - 1)
 
         # Filter out indices that are outside the frame
         else:
             mask = (
                 (indices[:, 0] >= 0)
-                & (indices[:, 0] < self.num_cells)
+                & (indices[:, 0] < self.side_size)
                 & (indices[:, 1] >= 0)
-                & (indices[:, 1] < self.num_cells)
+                & (indices[:, 1] < self.side_size)
             )
             indices = indices[mask]
 
@@ -52,8 +52,8 @@ class SquareGeometry(FrameGeometry):
 
 @dataclass
 class SquareGeometryFactory(FrameGeometryFactory):
-    num_cells: int
+    side_size: int
     radius: float
 
     def create(self) -> SquareGeometry:
-        return SquareGeometry(num_cells=self.num_cells, radius=self.radius)
+        return SquareGeometry(side_size=self.side_size, radius=self.radius)

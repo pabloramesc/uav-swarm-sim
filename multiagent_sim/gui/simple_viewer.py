@@ -1,179 +1,94 @@
-"""
-Copyright (c) 2025 Pablo Ramirez Escudero
-
-This software is released under the MIT License.
-https://opensource.org/licenses/MIT
-"""
-
-from typing import Literal
-
-import matplotlib.colors as mcolors
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
-from matplotlib.image import AxesImage
 
-from ..core.multiagent_simulator import MultiAgentSimulator
-from ..math.path_loss_model import rssi_to_signal_quality, signal_strength_map
-from .multiagent_viewer import MultiAgentViewer
-
-BackgroundType = Literal["elevation", "satellite", "fused", "rssi", "none"]
+from ..simulators.simulator import MultiAgentSimulator
+from .plotters import BackgroundType, BackgroundPlot, AgentsPlot, ObstaclesPlot
+from .fps_control import FPSController
 
 
-class SimpleViewer(MultiAgentViewer):
+class SimpleViewer:
 
     def __init__(
         self,
         sim: MultiAgentSimulator,
-        xlim: tuple[float, float] = None,
-        ylim: tuple[float, float] = None,
-        fig_size: tuple[float, float] = None,
+        limits: tuple[float, float, float, float] | None = None,
+        figsize: tuple[float, float] | None = None,
         min_fps: float = 10.0,
         max_fps: float = 60.0,
         background_type: BackgroundType = "rssi",
         show_legend: bool = False,
     ) -> None:
-        self.background_type: BackgroundType = background_type
-        self.background_image: AxesImage = None
+        self.sim = sim
+        self.limits = self._calculate_axis_limits(limits)
         self.show_legend = show_legend
-        super().__init__(sim, xlim, ylim, fig_size, min_fps, max_fps)
 
-    def _create_axes(self) -> list[Axes]:
-        self.ax = self.fig.add_subplot(111)
-        return [self.ax]
-
-    def _init_plots(self) -> None:
-        """
-        Initiate GCS, drones, and users. Plot avoid regions and elevetion map
-        if needed.
-        """
-        (self.user_points,) = self.ax.plot([], [], "mo", label="users")
-        (self.drone_points,) = self.ax.plot([], [], "bx", label="drones")
-        (self.gcs_points,) = self.ax.plot([], [], "k*", label="GCS")
-
-        self._plot_avoid_regions()
+        plt.ion()
+        self.fig = plt.figure(figsize=figsize)
+        self.ax: Axes = self.fig.add_subplot(111)
         self._configure_axes()
 
-        if self.background_type == "none":
-            pass
-        elif self.background_type == "rssi":
-            self._plot_rssi_heatmap()
-        elif self.background_type == "elevation":
-            self._plot_elevation_img()
-        elif self.background_type == "satellite":
-            self._plot_satellite_img()
-        elif self.background_type == "fused":
-            self._plot_fused_map()
-        else:
-            raise ValueError("Invalid background type option:", self.background_type)
+        self.fps_control = FPSController(min_fps=min_fps, max_fps=max_fps)
 
-    def _update_plots(self) -> None:
-        self._update_agent_points()
-
-        if self.background_type == "rssi":
-            self._plot_rssi_heatmap()
-
-    def _plot_avoid_regions(self) -> None:
-        if self.sim.environment.boundary is not None:
-            self.ax.plot(
-                *self.sim.environment.boundary.shape.exterior.coords.xy,
-                "r-",
-                label="boundaries",
-            )
-
-        for i, obs in enumerate(self.sim.environment.obstacles):
-            self.ax.fill(
-                *obs.shape.exterior.coords.xy,
-                alpha=0.25,
-                facecolor="red",
-                edgecolor="red",
-                hatch="///",
-                label="obstacles" if i == 0 else None,
-            )
-
-    def _plot_elevation_img(self) -> None:
-        self.background_image = self.ax.imshow(
-            self.sim.environment.elevation_map.elevation_img,
-            extent=(*self.xlim, *self.ylim[::-1]),  # Flip Y-axis
-            origin="lower",
-            cmap="terrain",
-            alpha=0.7,
+        self.background = BackgroundPlot(
+            ax=self.ax,
+            sim=self.sim,
+            xlim=self.limits[0:2],
+            ylim=self.limits[2:4],
+            background_type=background_type,
+            show_colorbar=True,
         )
-        plt.colorbar(self.background_image, ax=self.ax, label="Elevation (m)")
+        self.obstacles = ObstaclesPlot(ax=self.ax, sim=self.sim)
+        self.agents = AgentsPlot(ax=self.ax, sim=self.sim)
 
-    def _plot_satellite_img(self) -> None:
-        self.background_image = self.ax.imshow(
-            self.sim.environment.elevation_map.satellite_img,
-            extent=(*self.xlim, *self.ylim[::-1]),  # Flip Y-axis
-            origin="lower",
-            alpha=0.7,
-        )
-        # no colorbar for sat
+    @property
+    def fps(self) -> float:
+        return self.fps_control.smooth_fps
+    
+    def initialize(self) -> None:
+        self.background.plot()
+        self.obstacles.plot()
+        self.agents.update()
 
-    def _plot_fused_map(self) -> None:
-        self.background_image = self.ax.imshow(
-            self.sim.environment.elevation_map.fused_img,
-            extent=(*self.xlim, *self.ylim[::-1]),  # Flip Y-axis
-            origin="lower",
-            alpha=0.7,
-        )
-        elev = self.sim.environment.elevation_map.elevation_data
-        vmin, vmax = np.nanmin(elev), np.nanmax(elev)
-        cmap = plt.get_cmap("terrain")
-        norm = plt.Normalize(vmin=vmin, vmax=vmax)
-        sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
-        sm.set_array([])  # Required for colorbar
-        plt.colorbar(sm, ax=self.ax, label="Elevation (m)")
+    def update(self, force: bool = False) -> None:
+        if not self.fps_control.need_render(self.sim.clock.sim_time) and not force:
+            return
+        self.agents.update()
+        self.background.plot()
+        self.fps_control.record_render()
 
-    def _plot_rssi_heatmap(self) -> None:
-        # Generate the grid for the heatmap
-        xs = np.linspace(self.xlim[0], self.xlim[1], 100)
-        ys = np.linspace(self.ylim[0], self.ylim[1], 100)
+    def capture_frame(self) -> np.ndarray:
+        self.fig.canvas.draw()
+        width, height = self.fig.canvas.get_width_height()
+        buf = self.fig.canvas.buffer_rgba()  # type: ignore
+        img = np.frombuffer(buf, dtype=np.uint8).reshape((height, width, 4))
+        return img[..., :3].copy()  # Remove alpha channel
 
-        # Calculate the heatmap using the simulator's tx_power_heatmap method
-        heatmap = signal_strength_map(
-            self.sim.drone_states[:, 0:3], xs, ys, f=2412, n=2.4, mode="max"
-        )
-        heatmap = rssi_to_signal_quality(heatmap, vmin=-80) * 100.0  # %
+    def _calculate_axis_limits(
+        self,
+        limits: tuple[float, float, float, float] | None = None,
+    ) -> tuple[float, float, float, float]:
 
-        # Plot the heatmap
-        if self.background_image is None:
-            cmap = plt.cm.get_cmap("turbo", 11)  # 11 discrete colors
-            cmap.set_under("black")  # Color for values below the first boundary
-            norm = mcolors.BoundaryNorm(
-                boundaries=np.linspace(1e-6, 100, 11), ncolors=10
-            )
-            self.background_image = self.ax.imshow(
-                heatmap,
-                extent=[self.xlim[0], self.xlim[1], self.ylim[0], self.ylim[1]],
-                origin="lower",
-                cmap=cmap,
-                norm=norm,
-                alpha=0.7,
-            )
-            self.fig.colorbar(
-                self.background_image, ax=self.ax, label="Signal Quality (%)"
-            )
-            # self.fig.colorbar(self.background_image, ax=self.ax)
-        else:
-            self.background_image.set_data(heatmap)
+        if limits is not None:
+            return limits
 
-    def _update_agent_points(self) -> None:
-        if self.sim.gcs_states.shape[0] > 0:
-            self.gcs_points.set_data(
-                self.sim.gcs_states[:, 0], self.sim.gcs_states[:, 1]
-            )
-        if self.sim.user_states.shape[0] > 0:
-            self.user_points.set_data(
-                self.sim.user_states[:, 0], self.sim.user_states[:, 1]
-            )
-        if self.sim.drone_states.shape[0] > 0:
-            self.drone_points.set_data(
-                self.sim.drone_states[:, 0], self.sim.drone_states[:, 1]
-            )
+        env = self.sim.environment
+
+        if env.boundary is not None:
+            return (*env.boundary.bounds.xlim, *env.boundary.bounds.ylim)
+
+        if env.elevation_map is not None:
+            bounds = env.elevation_map.bounds
+            south_west = env.geo2enu((bounds.bottom, bounds.left, 0.0))
+            north_east = env.geo2enu((bounds.top, bounds.right, 0.0))
+            return south_west[0], north_east[0], south_west[1], north_east[1]
+
+        raise RuntimeError("Cannot calculate axis limits.")
 
     def _configure_axes(self) -> None:
-        self._calculate_axis_limits()
+        self.ax.set_xlim(*self.limits[0:2])
+        self.ax.set_ylim(*self.limits[2:4])
+
         self.ax.set_title("Multi-agent simulation")
         self.ax.set_xlabel("X (m)")
         self.ax.set_ylabel("Y (m)")
@@ -183,25 +98,4 @@ class SimpleViewer(MultiAgentViewer):
         if self.show_legend:
             self.ax.legend(loc="upper right")
 
-        if self.xlim:
-            self.ax.set_xlim(*self.xlim)
-
-        if self.ylim:
-            self.ax.set_ylim(*self.ylim)
-
         self.fig.tight_layout()
-
-    def _calculate_axis_limits(self) -> None:
-        if self.sim.environment.elevation_map is None:
-            x, y = self.sim.environment.boundary.shape.exterior.xy
-            new_xlim = (min(x) - 0.1 * np.ptp(x), max(x) + 0.1 * np.ptp(x))
-            new_ylim = (min(y) - 0.1 * np.ptp(y), max(y) + 0.1 * np.ptp(y))
-            self.xlim = new_xlim if self.xlim is None else self.xlim
-            self.ylim = new_ylim if self.ylim is None else self.ylim
-            return
-
-        bounds = self.sim.environment.elevation_map.bounds
-        south_west = self.sim.environment.geo2enu((bounds.bottom, bounds.left, 0.0))
-        north_east = self.sim.environment.geo2enu((bounds.top, bounds.right, 0.0))
-        self.xlim = (south_west[0], north_east[0]) if self.xlim is None else self.xlim
-        self.ylim = (south_west[1], north_east[1]) if self.ylim is None else self.ylim

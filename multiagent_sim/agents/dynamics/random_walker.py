@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Optional
 
 from multiagent_sim.environment import Environment
 
@@ -8,7 +9,7 @@ from .base import Dynamics
 class RandomWalkerDynamics(Dynamics):
     def __init__(
         self,
-        env: Environment = None,
+        env: Optional[Environment] = None,
         min_speed: float = 1.0,
         max_speed: float = 3.0,
         climb_rate: float = 0.2,
@@ -25,7 +26,7 @@ class RandomWalkerDynamics(Dynamics):
         self.repulsion_radius = 5.0
         self.repulsion_force = 1.0
 
-    def step(self, dt: float) -> None:
+    def step(self, dt: float, control: np.ndarray) -> None:        
         pos = self.state[0:2]
         vel = self.state[3:5]
 
@@ -62,12 +63,16 @@ class RandomWalkerDynamics(Dynamics):
 
     def _obstacle_avoidance(self, position: np.ndarray) -> np.ndarray:
         """Repulsion force to avoid nearby obstacles."""
+        if self.env is None:
+            return np.zeros(2)
+
         force = np.zeros(2)
-        for obs in self.env.obstacles:
+        for obs in self.env._obstacles:
             d = obs.distance(position)
             if d < self.repulsion_radius:
                 dir_vec = obs.direction(position)
                 force -= (
                     self.repulsion_force * (self.repulsion_radius - d) * dir_vec
                 )  # linear decay repulsion
+
         return force

@@ -1,13 +1,7 @@
-"""
-Copyright (c) 2025 Pablo Ramirez Escudero
-
-This software is released under the MIT License.
-https://opensource.org/licenses/MIT
-"""
-
 import os
 from datetime import datetime
 import time
+from typing import Optional
 
 import numpy as np
 from dqn import DQNAgentPER, EpsilonGreedyPolicy, ExperiencesBatch
@@ -32,22 +26,22 @@ class SDQNWrapper:
         self,
         frame_shape: tuple[int, int, int],
         num_actions: int = 5,
-        model_path: str = None,
         train_mode: bool = True,
+        model_path: Optional[str] = None,
     ):
         self.frame_shape = frame_shape
         self.num_actions = num_actions
-        self.model_path = model_path
         self.train_mode = train_mode
+        self.model_path = model_path
 
         # if len(self.frame_shape) == 2:
         #     self.frame_shape += (1,)
 
         if len(self.frame_shape) != 3:
-            raise ValueError("Frame shape must be (height, width, channels)")
+            raise ValueError("Frame shape must be (height, width, channels).")
 
         if not self.train_mode and self.model_path is None:
-            raise ValueError("Model path shall be provided if not in training mode")
+            raise ValueError("Model path shall be provided if not in training mode.")
 
         # If not model path provided, create new model file with timestamp
         if self.model_path is None:
@@ -61,22 +55,22 @@ class SDQNWrapper:
 
         # Create linear decaying epsilon-greedy policy with initial random exploration
         if self.train_mode:
-            policy = EpsilonGreedyPolicy(
-                epsilon=1.0, epsilon_min=0.1, epsilon_decay=1e-5, decay_type="linear"
+            self.policy = EpsilonGreedyPolicy(
+                epsilon=1.0, epsilon_min=0.01, epsilon_decay=1e-5, decay_type="linear"
             )
         # If not in training mode, use fixed policy with no exploration (epsilon=0)
         else:
-            policy = EpsilonGreedyPolicy(
+            self.policy = EpsilonGreedyPolicy(
                 epsilon=0.0, epsilon_min=0.0, decay_type="fixed"
             )
 
         # Create DQN Agent and set the model
         model = load_model(filepath=self.model_path, compile=True)
         self.dqn_agent = DQNAgentPER(
-            model=model,
+            model=model, # type: ignore
             batch_size=64,
             gamma=0.99,
-            policy=policy,
+            policy=self.policy,
             memory_size=500_000,
             update_freq=5000,
         )
@@ -91,8 +85,8 @@ class SDQNWrapper:
         self.min_train_samples = 50_000
         self.autosave_freq = 1000
 
-        self.train_metrics: dict = None
         self.train_t0 = None
+        self.train_metrics: dict[str, float] = dict()
 
     def add_experiences(
         self,
@@ -129,20 +123,21 @@ class SDQNWrapper:
         )
         self.dqn_agent.add_experiences_batch(batch)
 
-    def train(self) -> dict:
+    def train(self) -> dict[str, float]:
         """Train the agent using the experiences in memory and returns metrics
         dictionary with training performance indicators. Autosave model if needed.
 
         Returns:
-            Training metrics, or None if training is not performed.
+            Dictionary with training metrics, empty if training is not performed.
         """
         if not self.train_mode:
-            return None
+            return {}
 
         if self.dqn_agent.memory.size < self.min_train_samples:
-            return None
+            return {}
 
-        self.train_metrics = self.dqn_agent.train()
+        metrics = self.dqn_agent.train()
+        self.train_metrics = metrics if metrics is not None else {}
 
         if self.train_t0 is None:
             self.train_t0 = time.time()
@@ -188,7 +183,7 @@ class SDQNWrapper:
         model = Model(inputs=inputs, outputs=outputs, name="DQN_model")
 
         model.compile(
-            optimizer=Adam(learning_rate=0.00025),
+            optimizer=Adam(learning_rate=0.00025), # type: ignore
             loss=Huber(delta=1.0),
         )
 
@@ -210,11 +205,13 @@ class SDQNWrapper:
     @property
     def train_elapsed(self) -> float:
         if self.train_t0 is None:
-            return np.nan
-        time.time() - self.train_t0
+            return 0.0
+        return time.time() - self.train_t0
 
     @property
     def train_speed(self) -> float:
+        if self.train_elapsed <= 0:
+            return 0.0
         return self.train_steps / self.train_elapsed
 
     @property
@@ -223,13 +220,12 @@ class SDQNWrapper:
 
     @property
     def epsilon(self) -> float:
-        return self.dqn_agent.policy.epsilon
+        return self.policy.epsilon
 
     @property
     def loss(self) -> float:
-        if self.train_metrics is None:
-            return np.nan
-        return self.train_metrics.get("loss", np.nan)
+        loss = self.train_metrics.get("loss", float("nan"))
+        return loss
 
     def training_status_str(self) -> str:
         return (

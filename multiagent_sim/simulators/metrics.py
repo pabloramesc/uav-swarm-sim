@@ -25,8 +25,8 @@ def area_coverage(
     
     # Sample random points and compute coverage ratio
     rx_positions = np.zeros((num_points, 3))
-    rx_positions[:, 0] = np.random.uniform(*env.boundary_xlim, num_points)
-    rx_positions[:, 1] = np.random.uniform(*env.boundary_ylim, num_points)
+    rx_positions[:, 0] = np.random.uniform(*env.boundary.bounds.xlim, num_points)
+    rx_positions[:, 1] = np.random.uniform(*env.boundary.bounds.ylim, num_points)
     rx_positions[:, 2] = env.get_elevation(rx_positions[:, 0:2])
 
     valid = env.is_inside(rx_positions)

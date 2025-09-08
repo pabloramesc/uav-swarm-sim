@@ -1,5 +1,6 @@
 import numpy as np
 from dataclasses import dataclass
+from typing import Optional
 
 from .network_simulator import NetworkSimulator, SimNode, NodeType
 from .swarm_packets import PositionPacket
@@ -28,7 +29,7 @@ class PositionsProvider:
         """
         Handle an incoming PositionPacket, updating neighbor info.
         """
-        source_id = packet.agent_id
+        source_id = int(packet.agent_id)
         if source_id == self.agent_id:
             return
         node = self.network.get_node(source_id)
@@ -45,7 +46,7 @@ class PositionsProvider:
             if info.valid and now - info.time > self.timeout:
                 info.valid = False
 
-    def get_positions(self, node_type: NodeType = None) -> dict[int, np.ndarray]:
+    def get_positions(self, node_type: Optional[NodeType] = None) -> dict[int, np.ndarray]:
         """
         Return a dict of {node_id: position} for all valid neighbors,
         optionally filtered by node type.
@@ -59,7 +60,7 @@ class PositionsProvider:
             result[node_id] = info.position
         return result
 
-    def is_connected(self, node_id: int = None) -> bool:
+    def is_connected(self, node_id: Optional[int] = None) -> bool:
         """
         Simple connectivity check: any valid neighbor exists.
         """

@@ -20,12 +20,14 @@ from .numba_helpers import (
     rectangle_distances_and_directions_numba,
     rectangle_external_distances_numba,
 )
+from .bounding_box import BoundingBox
 
 
 class Obstacle(ABC):
 
     def __init__(self, shape: Polygon) -> None:
         self.shape = shape
+        self.bounds = BoundingBox(*self.shape.bounds)
         self.centroid = np.array(self.shape.centroid.coords[0])
 
     def is_inside(self, pos: ArrayLike) -> np.ndarray:
@@ -73,27 +75,6 @@ class Obstacle(ABC):
         distances = np.array([line.length for line in lines])
         return closest, distances
 
-    @property
-    def bounds(self) -> np.ndarray:
-        """Returns [left, bottom, right, top] as a NumPy array."""
-        return np.array(self.shape.bounds, dtype=float)
-
-    @property
-    def left(self) -> float:
-        return self.bounds[0]
-
-    @property
-    def bottom(self) -> float:
-        return self.bounds[1]
-
-    @property
-    def right(self) -> float:
-        return self.bounds[2]
-
-    @property
-    def top(self) -> float:
-        return self.bounds[3]
-
 
 class CircularObstacle(Obstacle):
 
@@ -135,24 +116,24 @@ class RectangularObstacle(Obstacle):
     def is_inside(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
         is_inside = is_inside_rectangle_numba(
-            pos, left=self.left, right=self.right, bottom=self.bottom, top=self.top
+            pos, self.bounds.xmin, self.bounds.xmax, self.bounds.ymin, self.bounds.ymax
         )
         return is_inside
 
     def distance(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
         distances = rectangle_external_distances_numba(
-            pos, left=self.left, right=self.right, bottom=self.bottom, top=self.top
+            pos, self.bounds.xmin, self.bounds.xmax, self.bounds.ymin, self.bounds.ymax
         )
         return distances
 
     def direction(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
         _, directions = rectangle_distances_and_directions_numba(
-            pos, left=self.left, right=self.right, bottom=self.bottom, top=self.top
+            pos, self.bounds.xmin, self.bounds.xmax, self.bounds.ymin, self.bounds.ymax
         )
         is_inside = is_inside_rectangle_numba(
-            pos, left=self.left, right=self.right, bottom=self.bottom, top=self.top
+            pos, self.bounds.xmin, self.bounds.xmax, self.bounds.ymin, self.bounds.ymax
         )
         directions[is_inside] *= -1
         return directions
@@ -160,7 +141,7 @@ class RectangularObstacle(Obstacle):
     def closest_point(self, pos: ArrayLike) -> np.ndarray:
         pos = np.asarray(pos)
         closest = rectangle_closest_point_numba(
-            pos, left=self.left, right=self.right, bottom=self.bottom, top=self.top
+            pos, self.bounds.xmin, self.bounds.xmax, self.bounds.ymin, self.bounds.ymax
         )
         return closest
 

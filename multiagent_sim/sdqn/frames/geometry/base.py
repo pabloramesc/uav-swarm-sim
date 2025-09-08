@@ -13,8 +13,15 @@ class FrameGeometry(ABC):
     def __init__(self, height: int, width: int):
         self.height = height
         self.width = width
-        self.shape = (height, width)
         self.cell_positions = self.calculate_cell_positions()
+        
+    @property
+    def shape(self) -> tuple[int, int]:
+        return (self.height, self.width)
+        
+    @property
+    def num_cells(self) -> int:
+        return self.height * self.width
 
     @property
     def flat_cell_positions(self):
@@ -26,7 +33,7 @@ class FrameGeometry(ABC):
         pass
 
     @abstractmethod
-    def positions_to_cell_indices(self) -> np.ndarray:
+    def positions_to_cell_indices(self, positions: np.ndarray) -> np.ndarray:
         """Map positions to corresponding cell indices in the frame."""
         pass
     

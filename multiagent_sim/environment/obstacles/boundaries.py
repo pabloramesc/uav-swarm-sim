@@ -30,7 +30,7 @@ class Boundary(Obstacle):
     def __init__(self, shape: Polygon) -> None:
         super().__init__(shape)
 
-    def distance(self, pos: ArrayLike) -> float:
+    def distance(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
         is_inside = self.is_inside(pos)
         distances = super()._get_distances(pos)
@@ -48,7 +48,7 @@ class CircularBoundary(CircularObstacle, Boundary):
     def __init__(self, center: ArrayLike, radius: float, quad_segs: int = 4) -> None:
         super().__init__(center, radius, quad_segs)
 
-    def distance(self, pos: ArrayLike) -> float:
+    def distance(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
         distances = center_distances_numba(pos, self.center)
         distances = np.maximum(self.radius - distances, 0.0)
@@ -68,10 +68,10 @@ class RectangularBoundary(RectangularObstacle, Boundary):
     def distance(self, pos: ArrayLike) -> np.ndarray:
         pos = np.atleast_2d(pos)
         is_inside = is_inside_rectangle_numba(
-            pos, self.left, self.right, self.bottom, self.top
+            pos, self.bounds.left, self.bounds.right, self.bounds.bottom, self.bounds.top
         )
         distances = rectangle_distances_numba(
-            pos, self.left, self.right, self.bottom, self.top
+            pos, self.bounds.left, self.bounds.right, self.bounds.bottom, self.bounds.top
         )
         distances[~is_inside] = 0.0
         return distances

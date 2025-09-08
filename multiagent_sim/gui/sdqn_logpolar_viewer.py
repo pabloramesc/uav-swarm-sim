@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.collections import QuadMesh
 
-from ..core.sdqn_simulator import SDQNSimulator
+from ..simulators.sdqn_simulator import SDQNSimulator
 from .simple_viewer import BackgroundType, SimpleViewer
 from ..sdqn.frame_generators import FrameGenerator, LogPolarFrameGenerator
 
@@ -27,7 +27,7 @@ from matplotlib.axes import Axes
 from matplotlib.image import AxesImage
 from matplotlib.scale import LogScale
 
-from ..core.sdqn_simulator import SDQNSimulator
+from ..simulators.sdqn_simulator import SDQNSimulator
 from .simple_viewer import BackgroundType, SimpleViewer
 
 

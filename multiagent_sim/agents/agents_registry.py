@@ -1,6 +1,7 @@
 import numpy as np
 from abc import ABC
 from .agent import Agent
+from typing import Optional
 
 
 class AgentsRegistry(ABC):
@@ -16,9 +17,15 @@ class AgentsRegistry(ABC):
         self._index_to_id: dict[int, int] = {}
 
     @property
-    def num_agents(self) -> int:
+    def size(self) -> int:
         """Returns the number of registered agents."""
         return len(self._agents_dict)
+    
+    def clear(self) -> None:
+        self._agents_dict.clear()
+        self._agents_list.clear()
+        self._id_to_index.clear()
+        self._index_to_id.clear()
 
     def _rebuild_index_mapping(self) -> None:
         """Rebuilds the ID-to-index mapping whenever the registry changes."""
@@ -56,7 +63,7 @@ class AgentsRegistry(ABC):
         """Returns the state of the agent with the specified global ID."""
         return self._agents_dict[agent_id].state
 
-    def get_states_array(self, exclude_id: int = None) -> np.ndarray:
+    def get_states_array(self, exclude_id: Optional[int] = None) -> np.ndarray:
         """Returns an array of all agent states.
         If `exclude_id` is provided, excludes the agent with that ID.
         """
@@ -69,7 +76,9 @@ class AgentsRegistry(ABC):
         )
         return states if states.shape[0] > 0 else np.zeros((0, 6))
 
-    def get_states_dict(self, exclude_id: int = None) -> dict[int, np.ndarray]:
+    def get_states_dict(
+        self, exclude_id: Optional[int] = None
+    ) -> dict[int, np.ndarray]:
         """Returns a dictionary mapping agent IDs to their states.
         If `exclude_id` is provided, that agent will be excluded.
         """
@@ -79,7 +88,9 @@ class AgentsRegistry(ABC):
             if agent_id != exclude_id
         }
 
-    def get_positions_dict(self, exclude_id: int = None) -> dict[int, np.ndarray]:
+    def get_positions_dict(
+        self, exclude_id: Optional[int] = None
+    ) -> dict[int, np.ndarray]:
         """Returns a dictionary mapping agent IDs to their positions.
         If `exclude_id` is provided, that agent will be excluded.
         """
@@ -106,8 +117,7 @@ class AgentsRegistry(ABC):
         return self._index_to_id[index]
 
     def get_index(self, agent_id: int) -> int:
-        """Returns the contiguous array index for a given global agent ID.
-        """
+        """Returns the contiguous array index for a given global agent ID."""
         return self._id_to_index[agent_id]
 
     def get_indices(self, agent_ids: list[int]) -> np.ndarray:

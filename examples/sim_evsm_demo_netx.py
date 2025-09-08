@@ -7,7 +7,7 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from multiagent_sim.core.evsm_simulator import EVSMSimulator, EVSMConfig
+from multiagent_sim.simulators.evsm_simulator import EVSMSimulator, EVSMConfig
 from multiagent_sim.gui.evsm_viewer import EVSMViewer
 
 

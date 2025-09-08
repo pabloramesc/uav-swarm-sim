@@ -1,32 +1,26 @@
-"""
-Copyright (c) 2025 Pablo Ramirez Escudero
-
-This software is released under the MIT License.
-https://opensource.org/licenses/MIT
-"""
-
-import os
+import logging
+from typing import cast, NamedTuple
 
 import contextily as ctx
-import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
-from matplotlib.axes import Axes
-from mpl_toolkits.mplot3d import Axes3D
 from PIL import Image
-from rasterio.coords import BoundingBox
-import geopandas as gpd
-from shapely.geometry import box  # Add this import
 from pyproj import Transformer
+from rasterio.coords import BoundingBox
+
+logger = logging.getLogger(__name__)
+
+
+class Bounds(NamedTuple):
+    left: float
+    bottom: float
+    right: float
+    top: float
 
 
 class ElevationMap:
     def __init__(self, dem_path: str):
         self.dem_path = dem_path
-        self.bounds: BoundingBox = None
-        self.resolution: tuple[float, float] = None
-        self.elevation_data: np.ndarray = None
-
         self.load_dem(self.dem_path)
 
         self.elevation_img = self.generate_elevation_image()
@@ -42,10 +36,13 @@ class ElevationMap:
         return self.elevation_data.max()
 
     def load_dem(self, dem_path: str):
-        with rasterio.open(dem_path) as dem:
-            self.bounds = dem.bounds
-            self.resolution = dem.res
-            self.elevation_data = dem.read(1)
+        with rasterio.open(dem_path) as dem:  # TODO: Review DEM obj type
+            bounds = cast(BoundingBox, dem.bounds)
+            self.bounds = Bounds(*bounds)
+            self.resolution = cast(tuple[float, float], dem.res)
+            self.elevation_data = cast(
+                np.ndarray, dem.read(1)
+            )  # TODO: Review NDArray type
 
     def get_elevation(self, lat: np.ndarray, lon: np.ndarray) -> np.ndarray:
         lat = np.atleast_1d(lat)
@@ -72,7 +69,7 @@ class ElevationMap:
 
             elevations[valid_indices] = self.elevation_data[rows, cols]
 
-        return elevations if elevations.size > 1 else elevations.item()
+        return elevations
 
     def _generate_grid(
         self, output_resolution: tuple[int, int]
@@ -80,7 +77,8 @@ class ElevationMap:
         width, height = output_resolution
         lon = np.linspace(self.bounds.left, self.bounds.right, width)
         lat = np.linspace(self.bounds.top, self.bounds.bottom, height)
-        return np.meshgrid(lon, lat)
+        lon_grid, lat_grid = np.meshgrid(lon, lat)
+        return (lon_grid, lat_grid)
 
     def _normalize_elevation(self, elevation_grid: np.ndarray) -> np.ndarray:
         return (elevation_grid - self.min_elevation) / (
@@ -96,18 +94,18 @@ class ElevationMap:
         right, top = transformer.transform(self.bounds.right, self.bounds.top)
         bounds_3857 = (left, bottom, right, top)
 
-        # print("Bounds in WGS84:", self.bounds)
-        # print("Bounds in EPSG:3857:", bounds_3857)
+        logging.debug("Bounds in WGS84:", self.bounds)
+        logging.debug("Bounds in EPSG:3857:", bounds_3857)
 
         try:
             img, ext = ctx.bounds2img(
-                *bounds_3857, zoom=14, source=ctx.providers.Esri.WorldImagery
+                *bounds_3857, zoom=14, source=ctx.providers.Esri.WorldImagery  # type: ignore
             )
-            # print("Satellite image downloaded successfully")
+            logging.debug("Satellite image downloaded successfully")
         except Exception as e:
-            print("Error downloading tiles:", e)
+            raise RuntimeError("Error downloading tiles:", e)
 
-        # print("Returned extent (EPSG:3857):", ext)
+        logging.debug("Returned extent (EPSG:3857):", ext)
 
         x_min, x_max, y_min, y_max = ext
         height, width, _ = img.shape
@@ -130,14 +128,14 @@ class ElevationMap:
 
     def generate_elevation_image(
         self, output_resolution: tuple[int, int] = (1000, 1000)
-    ) -> None:
+    ) -> np.ndarray:
         lon_grid, lat_grid = self._generate_grid(output_resolution)
         elevations = self.get_elevation(lat_grid.ravel(), lon_grid.ravel())
         elevation_grid = elevations.reshape(output_resolution[1], output_resolution[0])
         normalized_data = self._normalize_elevation(elevation_grid)
         return normalized_data
 
-    def generate_satellite_image(self) -> None:
+    def generate_satellite_image(self) -> np.ndarray:
         img = self._fetch_satellite_image()
         return img
 
@@ -145,7 +143,7 @@ class ElevationMap:
         self,
         output_resolution: tuple[int, int] = (1000, 1000),
         alpha: float = 0.5,
-    ) -> None:
+    ) -> np.ndarray:
         if not (0.0 <= alpha <= 1.0):
             raise ValueError("Alpha must be between 0 and 1.")
 
@@ -154,19 +152,22 @@ class ElevationMap:
             if self.satellite_img is not None
             else self.generate_satellite_image()
         )
-        sat_resized = np.array(Image.fromarray(sat_img).resize(output_resolution[::-1]))
+        sat_resized = np.array(Image.fromarray(sat_img).resize(output_resolution))
         elev_norm = self.generate_elevation_image(output_resolution)
-        elev_rgb = plt.cm.terrain(elev_norm)[:, :, :3]
+        elev_rgb = plt.cm.terrain(elev_norm)[:, :, :3]  # type: ignore
 
         elev_uint8 = (elev_rgb * 255).astype(np.uint8)
         sat_uint8 = sat_resized[:, :, :3]
 
         fused = ((1 - alpha) * sat_uint8 + alpha * elev_uint8).astype(np.uint8)
-        self.fused_img = fused
         return fused
 
 
 if __name__ == "__main__":
+    import os
+
+    import matplotlib.pyplot as plt
+
     file_name = "barcelona_dem.tif"
     file_path = os.path.join("data", "elevation", file_name)
 

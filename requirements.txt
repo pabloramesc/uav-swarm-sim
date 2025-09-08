@@ -1,5 +1,7 @@
 numpy
 matplotlib
+scipy
 numba
+tensorflow
 rasterio
 Shapely

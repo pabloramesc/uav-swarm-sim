@@ -30,7 +30,7 @@ def obstacles_binary_map(env: Environment, cell_positions: np.ndarray) -> np.nda
         is_inside = env.boundary.is_inside(flat_cell_positions)
         matrix += ~is_inside.reshape(frame_shape)
 
-    for obs in env.obstacles:
+    for obs in env._obstacles:
         is_inside = obs.is_inside(flat_cell_positions)
         matrix += is_inside.reshape(frame_shape)
 

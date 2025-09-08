@@ -28,7 +28,7 @@ def create_logger(name: str, level: LogLevel = "INFO") -> logging.Logger:
 
     # Create console handler
     ch = logging.StreamHandler()
-    ch.setLevel(level)
+    ch.setLevel(_LEVEL_MAP[level])
 
     # Create formatter
     formatter = logging.Formatter("[%(name)s] %(levelname)s: %(message)s")

@@ -18,8 +18,8 @@ class SDQNInterface:
         self.drones = np.zeros((0, 2))
         self.users = np.zeros((0, 2))
 
-        self.frame: np.ndarray = None
-        self.action: int = None
+        self.frame: np.ndarray | None = None
+        self.action: int | None = None
         self.direction = np.zeros(2)
 
     def update_positions(

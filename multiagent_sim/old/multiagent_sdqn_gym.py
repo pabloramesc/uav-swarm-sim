@@ -121,7 +121,7 @@ class MultiAgentSDQNGym:
         self.sim_time = 0.0
         self.sim_steps = 0
 
-        self.sdqn_agent.step()
+        self.sdqn_agent.train_step()
         self.prev_frames = self.sdqn_agent.frames
         self.prev_actions = self.sdqn_agent.actions
 
@@ -150,7 +150,7 @@ class MultiAgentSDQNGym:
         )
         self.reset_collided_drones(dones)
 
-        self.sdqn_agent.step()
+        self.sdqn_agent.train_step()
 
         self.sdqn_agent.wrapper.add_experiences(
             frames=self.prev_frames,

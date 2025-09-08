@@ -9,10 +9,10 @@ from multiagent_sim.environment.environment import Environment
 @dataclass
 class ControllerContext:
     time: float
-    agent_state: float
-    target_position: np.ndarray = None
-    drone_positions: dict[int, np.ndarray] = None
-    user_positions: dict[int, np.ndarray] = None
+    agent_state: np.ndarray
+    target_position: np.ndarray | None = None
+    drone_positions: dict[int, np.ndarray] | None = None
+    user_positions: dict[int, np.ndarray] | None = None
 
 
 class PositionController(ABC):

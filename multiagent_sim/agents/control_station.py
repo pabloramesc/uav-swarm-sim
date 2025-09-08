@@ -1,15 +1,10 @@
-"""
-Copyright (c) 2025 Pablo Ramirez Escudero
+from typing import Optional
 
-This software is released under the MIT License.
-https://opensource.org/licenses/MIT
-"""
-
-from .agent import Agent
 from ..environment import Environment
 from ..network.swarm_link import SwarmLink
-from ..network.network_simulator import NetworkSimulator
+from .agent import Agent
 from .dynamics import StaticDynamics
+
 
 class ControlStation(Agent):
     """
@@ -28,27 +23,21 @@ class ControlStation(Agent):
         self,
         agent_id: int,
         env: Environment,
-        netsim: NetworkSimulator = None,
+        swarm_link: Optional[SwarmLink] = None,
     ):
         super().__init__(
             agent_id=agent_id,
             agent_type="gcs",
-            dynamics = StaticDynamics(),
+            dynamics=StaticDynamics(),
             environment=env,
         )
 
-        self.swarm_link: SwarmLink = None
-        if netsim is not None:
-            self.swarm_link = SwarmLink(
-                agent_id=self.agent_id,
-                network_sim=netsim,
-                global_bcast_interval=1.0,
-            )
+        self.swarm_link = swarm_link
 
     def initialize(self, state, time=0):
         return super().initialize(state, time)
 
-    def update(self, dt: float = 0.01) -> None:
+    def update(self, dt: float = 0.01, **kwargs) -> None:
         """
         Updates the internal state of the control station.
 
@@ -62,4 +51,4 @@ class ControlStation(Agent):
         super().update(dt)
 
         if self.swarm_link is not None:
-            self.swarm_link.update(self.time, self.state[0:3])
+            self.swarm_link.update(time=self.time, position=self.dynamics.position)

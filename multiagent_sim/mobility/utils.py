@@ -63,14 +63,15 @@ def grid_positions(
     positions[:, 2] = altitude
     positions[:, 3:6] = 0.0
     grid_size = int(np.ceil(np.sqrt(num_points)))
-    drone_id = 0
+    index = 0
     for row in range(grid_size):
         for col in range(grid_size):
-            positions[drone_id, 0] = origin[0] + space * row
-            positions[drone_id, 1] = origin[1] + space * col
-            drone_id += 1
-            if drone_id >= num_points:
+            positions[index, 0] = origin[0] + space * row
+            positions[index, 1] = origin[1] + space * col
+            index += 1
+            if index >= num_points:
                 return positions
+    return positions
 
 
 def environment_random_positions(num_positions: int, env: Environment) -> np.ndarray:
@@ -90,13 +91,21 @@ def environment_random_positions(num_positions: int, env: Environment) -> np.nda
         Array of shape (num_positions, 3) containing random positions in the
         format [x, y, z].
     """
+    if num_positions <= 0:
+        return np.zeros((0, 3))
+
+    if env.boundary is None:
+        raise RuntimeError("Environment boundary not initialized.")
+
     positions = []
     max_iter = num_positions * 100
     for _ in range(max_iter):
-        x = np.random.uniform(env.boundary.left, env.boundary.right)
-        y = np.random.uniform(env.boundary.bottom, env.boundary.top)
-        z = env.get_elevation([x, y])
-        if env.is_collision([x, y, z], check_altitude=False, check_boundary=True):
+        x = np.random.uniform(env.boundary.bounds.xmin, env.boundary.bounds.xmax)
+        y = np.random.uniform(env.boundary.bounds.ymin, env.boundary.bounds.ymax)
+        z = env.get_elevation(pos=np.array([x, y])).item()
+        if env.is_collision(
+            pos=np.array([x, y, z]), check_altitude=False, check_boundary=True
+        ).item():
             continue
         positions.append([x, y, z])
         if len(positions) == num_positions:
@@ -105,4 +114,4 @@ def environment_random_positions(num_positions: int, env: Environment) -> np.nda
     if len(positions) != num_positions:
         raise RuntimeError("Cannot generate random positions inside environment")
 
-    return np.array(positions) if positions else np.zeros((0, 3))
+    return np.array(positions)

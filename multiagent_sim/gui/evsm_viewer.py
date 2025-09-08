@@ -8,7 +8,7 @@ https://opensource.org/licenses/MIT
 import numpy as np
 from numpy.typing import ArrayLike
 
-from ..core.evsm_simulator import EVSMSimulator
+from ..simulators.evsm_simulator import EVSMSimulator
 from .simple_viewer import BackgroundType, SimpleViewer
 
 

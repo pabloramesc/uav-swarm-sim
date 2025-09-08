@@ -1,7 +1,7 @@
 import os
 import imageio.v2 as imageio
 
-from multiagent_sim.core.evsm_simulator import EVSMSimulator, EVSMConfig
+from multiagent_sim.simulators.evsm_simulator import EVSMSimulator, EVSMConfig
 from multiagent_sim.gui.evsm_viewer import EVSMViewer
 
 dt = 0.01

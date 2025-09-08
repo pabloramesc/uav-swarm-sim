@@ -7,7 +7,7 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from multiagent_sim.core.sdqn_trainer import SDQNTrainer, SDQNConfig
+from multiagent_sim.simulators.sdqn_trainer import SDQNTrainer, SDQNConfig
 from multiagent_sim.gui.simple_viewer import SimpleViewer
 from multiagent_sim.gui.sdqn_viewer import SDQNViewer
 from multiagent_sim.gui.sdqn_logpolar_viewer import SDQNLogPolarViewer
@@ -46,7 +46,7 @@ for _ in range(num_obstacles):
 
 sim.initialize()
 
-gui = SimpleViewer(sim, show_legend=False, fig_size=(12, 8))
+gui = SimpleViewer(sim, show_legend=False, figsize=(12, 8))
 # gui = SDQNViewer(sim)
 # gui = SDQNLogPolarViewer(sim)
 

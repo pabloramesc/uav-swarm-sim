@@ -82,5 +82,6 @@
     "cursorpyright.analysis.extraPaths": [
         "./network_sim/ns-3",
         "./libs/dqn-lab"
-    ]
+    ],
+    "python.analysis.typeCheckingMode": "standard"
 }

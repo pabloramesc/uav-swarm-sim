@@ -153,7 +153,7 @@ class MultiDroneViewerEVSM:
                 label="boundary",
             )
 
-        for i, obs in enumerate(self.sim.environment.obstacles):
+        for i, obs in enumerate(self.sim.environment._obstacles):
             self.ax.fill(
                 *obs.shape.exterior.coords.xy,
                 alpha=0.25,

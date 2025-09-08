@@ -22,30 +22,22 @@ from .boundaries import (
 )
 
 
-def plot_limited_region(
-    obstacle: Obstacle, x_range=(-20, 20), y_range=(-20, 20), resolution=100
+def plot_obstacle(
+    obstacle: Obstacle,
+    x_range: tuple[float, float] = (-20.0, +20.0),
+    y_range: tuple[float, float] = (-20.0, +20.0),
+    resolution: int = 100,
 ):
-    """
-    Visualizes the distance and direction to a given region in the simulation environment.
+    """Visualizes the distance and direction to a given region in the simulation environment.
 
     This function generates a contour plot showing the distance to the region and overlays
     a quiver plot to visualize the direction vectors pointing toward or away from the region.
 
-    Parameters
-    ----------
-    region : AvoidRegion
-        The region to visualize (e.g., an obstacle or boundary).
-    x_range : tuple[float, float], optional
-        The range of x-coordinates to visualize (default is (-20, 20)).
-    y_range : tuple[float, float], optional
-        The range of y-coordinates to visualize (default is (-20, 20)).
-    resolution : int, optional
-        The resolution of the dense grid for the contour plot (default is 100).
-
-    Returns
-    -------
-    None
-        Displays the plot directly using matplotlib.
+    Args:
+        obstacle: The region to visualize (e.g., an obstacle or boundary).
+        x_range: The range of x-coordinates to visualize.
+        y_range: The range of y-coordinates to visualize.
+        resolution: The resolution of the dense grid for the contour plot.
     """
     # Generate dense grid for contour plot
     x_dense = np.linspace(*x_range, resolution)
@@ -89,25 +81,25 @@ if __name__ == "__main__":
     """VISUALIZE OBSTACLES"""
     # Create a circular obstacle
     circ_obs = CircularObstacle([0, 0], 10.0, quad_segs=16)
-    plot_limited_region(circ_obs)
+    plot_obstacle(circ_obs)
 
     # Create a rectangular obstacle
     rect_obs = RectangularObstacle([-10, -10], [+10, +10])
-    plot_limited_region(rect_obs)
+    plot_obstacle(rect_obs)
 
     # Create a polygonal obstacle
     poly_obs = PolygonalObstacle([[-10, 0], [-10, -5], [10, -5], [5, 10]])
-    plot_limited_region(poly_obs)
+    plot_obstacle(poly_obs)
 
     """VISUALIZE BOUNDARIES"""
     # Create a circular boundary
     circ_bound = CircularBoundary([0, 0], 10.0, quad_segs=16)
-    plot_limited_region(circ_bound)
+    plot_obstacle(circ_bound)
 
     # Create a rectangular boundary
     rect_bound = RectangularBoundary([-10, -10], [+10, +10])
-    plot_limited_region(rect_bound)
+    plot_obstacle(rect_bound)
 
     # Create a polygonal boundary
     poly_bound = PolygonalBoundary([[-10, 0], [-10, -5], [10, -5], [5, 10]])
-    plot_limited_region(poly_bound)
+    plot_obstacle(poly_bound)

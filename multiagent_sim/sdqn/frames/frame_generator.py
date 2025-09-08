@@ -4,6 +4,7 @@ Supports configurable factory for geometry and layers.
 """
 
 from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 
@@ -46,7 +47,7 @@ class FrameGenerator:
             frame[..., i] = layer.generate_frame(state)
 
         if dtype == "float32":
-            return np.clip(frame)
+            return np.clip(frame, 0.0, 1.0)
 
         elif dtype == "uint8":
             scaled = np.clip(frame, 0.0, 1.0) * 255.0
@@ -62,7 +63,7 @@ class FrameGeneratorFactory:
     layer_factories: list[FrameLayerFactory]
     label: str = "frame"
 
-    def create(self, env: Environment = None) -> FrameGenerator:
+    def create(self, env: Optional[Environment] = None) -> FrameGenerator:
         geometry = self.geometry_factory.create()
         layers = [f.create(geometry, env) for f in self.layer_factories]
         return FrameGenerator(geometry, layers, label=self.label)

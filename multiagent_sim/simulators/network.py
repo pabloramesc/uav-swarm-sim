@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.typing import NDArray
 
 from ..agents import Agent
 from ..network import NetworkSimulator
@@ -17,30 +18,28 @@ class NetworkManager:
         self.update_period = 0.1
         self.checking_period = 1.0
 
-        self._last_update_time: float = None
-        self._last_checking_time: float = None
+        self._last_update_time: float | None = None
+        self._last_checking_time: float | None = None
 
     @property
     def ns3_time(self) -> float:
         return self.netsim.ns3_time
 
-    def initialize(self, positions: dict[int, np.ndarray]) -> None:
+    def initialize(self, positions: dict[int, NDArray[np.float64]]) -> None:
         self.netsim.launch_simulator(max_attempts=2)
         self.netsim.set_node_positions(positions)
         self.netsim.verify_node_positions()
 
-    def update(self, time: float, positions: dict[int, np.ndarray]) -> None:
+    def update(self, time: float, positions: dict[int, NDArray[np.float64]]) -> None:
+        agent_positions = None
         if self._needs_update(time):
             agent_positions = positions
             self._last_update_time = time
-        else:
-            agent_positions = None
-
+            
+        check = False
         if self._needs_cheking(time):
             check = True
             self._last_checking_time = time
-        else:
-            check = False
 
         self.netsim.update(agent_positions, check)
 

@@ -10,7 +10,7 @@ Layer implementations for frame generation, including signal and user layers.
 Each layer transforms ScenarioState into a 2D frame given a geometry.
 """
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Callable, Optional
 
 import numpy as np
 
@@ -53,13 +53,11 @@ class SignalLayerConfig:
 class SignalLayer(FrameLayer):
     def __init__(
         self,
+        config: SignalLayerConfig,
         geometry: FrameGeometry,
-        environment: Environment = None,
-        config: SignalLayerConfig = None,
-        **kwargs,
     ):
-        self.config = config or SignalLayerConfig(**kwargs)
-        super().__init__(geometry, environment, label=self.config.label)
+        self.config = config
+        super().__init__(geometry, environment=None, label=self.config.label)
 
     def build_frame(self, state: ScenarioState) -> np.ndarray:
         frame = np.zeros(self.geometry.shape, dtype=np.float32)
@@ -73,7 +71,7 @@ class SignalLayer(FrameLayer):
         if self.config.plot_rssi:
             rssi = signal_strength(
                 tx_positions=relative_positions,
-                rx_positions=self.geometry.flat_cell_positions,
+                rx_positions=self.cell_ground_positions,
                 f=self.config.radio.freq_mhz,
                 n=self.config.radio.path_loss_exp,
                 tx_power=self.config.radio.tx_power,
@@ -83,7 +81,7 @@ class SignalLayer(FrameLayer):
             ).reshape(self.geometry.shape)
 
         if self.config.plot_tx:
-            self.set_frame_cells(frame, positions=relative_positions, value=1.0)
+            self.set_frame_cells(frame, positions=relative_positions[:, 0:2], value=1.0)
 
         return frame
 
@@ -93,9 +91,9 @@ class SignalLayerFactory(FrameLayerFactory):
     positions_getter: PositionsGetter
     label: str
 
-    def create(self, geo: FrameGeometry, env: Environment = None):
+    def create(self, geo: FrameGeometry, env: Optional[Environment] = None) -> SignalLayer:
         config = SignalLayerConfig(
             positions_getter=self.positions_getter,
             label=self.label,
         )
-        return SignalLayer(geometry=geo, environment=env, config=config)
+        return SignalLayer(geometry=geo, config=config)

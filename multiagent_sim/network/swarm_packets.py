@@ -18,13 +18,13 @@ class SwarmPacket(ABC):
     [ Packet Type (1 byte) | Agent ID (1 byte) | Packet ID (2 bytes) | Timestamp (4 bytes) ]
     """
 
-    HEADER_SIZE = 8  # header size in bytes
+    header_size = 8  # The header size in bytes
 
     def __init__(self, packet_type: PacketType):
         self.packet_type = packet_type
-        self.agent_id: np.uint8 = None
-        self.packet_id: np.uint16 = None
-        self.timestamp: np.float32 = None
+        self.agent_id = np.uint8(0)
+        self.packet_id = np.uint16(0)
+        self.timestamp = np.float32(0.0)
         self.payload: bytes = b""
 
     def set_header_fields(
@@ -36,6 +36,14 @@ class SwarmPacket(ABC):
         self.agent_id = np.uint8(agent_id)
         self.packet_id = np.uint16(int(packet_id) & 0xFFFF)
         self.timestamp = np.float32(timestamp)
+
+    def serialize(self) -> bytes:
+        return self._build_header() + self.payload
+
+    @abstractmethod
+    def deserialize(self, packet: bytes) -> None:
+        """Deserialize the packet from bytes."""
+        pass
 
     def _build_header(self) -> bytes:
         header = b""
@@ -53,14 +61,6 @@ class SwarmPacket(ABC):
         self.agent_id = np.frombuffer(packet[1:2], dtype=np.uint8)[0]
         self.packet_id = np.frombuffer(packet[2:4], dtype=np.uint16)[0]
         self.timestamp = np.frombuffer(packet[4:8], dtype=np.float32)[0]
-
-    def serialize(self) -> bytes:
-        return self._build_header() + self.payload
-
-    @abstractmethod
-    def deserialize(self, packet: bytes) -> None:
-        """Deserialize the packet from bytes."""
-        pass
 
     def _build_description(self) -> list[str]:
         return [
@@ -87,12 +87,12 @@ class DataPacket(SwarmPacket):
         self.payload = data
 
     def deserialize(self, packet: bytes) -> None:
-        if len(packet) < self.HEADER_SIZE:
+        if len(packet) < self.header_size:
             raise ValueError(
-                f"DATA packet must have at least {self.HEADER_SIZE} bytes, got {len(packet)}"
+                f"DATA packet must have at least {self.header_size} bytes, got {len(packet)}"
             )
         self._parse_header(packet)
-        self.payload = packet[self.HEADER_SIZE :]
+        self.payload = packet[self.header_size :]
 
     def __str__(self):
         info = self._build_description()
@@ -103,8 +103,8 @@ class DataPacket(SwarmPacket):
 
 
 class PositionPacket(SwarmPacket):
-    PAYLOAD_SIZE = 3 * 4  # 3 float32s (px, py, pz) in bytes
-    EXPECTED_LENGTH = SwarmPacket.HEADER_SIZE + PAYLOAD_SIZE
+    payload_size = 3 * 4  # 3 float32s (px, py, pz) in bytes
+    expected_size = SwarmPacket.header_size + payload_size
 
     def __init__(self):
         super().__init__(PacketType.POSITION)
@@ -116,19 +116,19 @@ class PositionPacket(SwarmPacket):
         self.payload = arr.tobytes()
 
     def get_position(self) -> np.ndarray:
-        if len(self.payload) != self.PAYLOAD_SIZE:
+        if len(self.payload) != self.payload_size:
             raise Exception(
-                f"Expected payload of {PositionPacket.payload_length} bytes, got {len(self.payload)}"
+                f"Expected payload of {self.payload_size} bytes, got {len(self.payload)}"
             )
         return np.frombuffer(self.payload, dtype=np.float32)
 
     def deserialize(self, packet: bytes) -> None:
-        if len(packet) != self.EXPECTED_LENGTH:
+        if len(packet) != self.expected_size:
             raise ValueError(
-                f"POSITION packet must be exactly {self.EXPECTED_LENGTH} bytes, got {len(packet)}"
+                f"POSITION packet must be exactly {self.expected_size} bytes, got {len(packet)}"
             )
         self._parse_header(packet)
-        self.payload = packet[self.HEADER_SIZE : self.EXPECTED_LENGTH]
+        self.payload = packet[self.header_size : self.expected_size]
 
     def __str__(self):
         info = self._build_description()[:-1]
@@ -148,9 +148,9 @@ class AcknowledgePacket(SwarmPacket):
         self.payload = b""  # No payload
 
     def deserialize(self, packet: bytes) -> None:
-        if len(packet) != self.HEADER_SIZE:
+        if len(packet) != self.header_size:
             raise ValueError(
-                f"ACK packet must be exactly {self.HEADER_SIZE} bytes, got {len(packet)}"
+                f"ACK packet must be exactly {self.header_size} bytes, got {len(packet)}"
             )
         self._parse_header(packet)
         self.payload = b""  # No payload
