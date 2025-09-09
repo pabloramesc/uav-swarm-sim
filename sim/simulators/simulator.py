@@ -75,11 +75,19 @@ class MultiAgentSimulator:
     def gcs(self) -> AgentsRegistry:
         return self.agents.get_registry("gcs")
 
-    def initialize(self, states: np.ndarray) -> None:
-        """Initializes simulation and all agents.
+    def reset(self, states: np.ndarray) -> None:
+        """Reset simulation and set all agents to specified states.
+
+        This method initializes each agent with a given state, resets the
+        simulation clock, updates the network (if any), and refreshes internal
+        state caches and metrics.
 
         Args:
-            states: Initial states array for agents with shape (N, 6).
+            states: Initial states array for agents with shape (N, 6),
+                where N is the number of agents.
+
+        Raises:
+            ValueError: If `states` does not have shape (num_agents, 6).
         """
         expected_shape = (self.num_agents, 6)
         if states.shape != expected_shape:
@@ -97,11 +105,17 @@ class MultiAgentSimulator:
         self._update_states_cache()
         self._update_metrics()
 
-    def update(self, dt: Optional[float] = None, sync: bool = False) -> None:
-        """Advances the simulation by one time step.
+    def step(self, dt: Optional[float] = None, sync: bool = False) -> None:
+        """Advance the simulation by one time step.
+
+        Updates all agents, optionally synchronizes with real time, and
+        refreshes internal states and metrics.
 
         Args:
-            dt: Time step in seconds. If None, use default dt.
+            dt: Time step in seconds. If None, uses the default time step.
+            sync: If True, synchronize simulation time with real time by
+                sleeping until real time reaches simulation time. If the
+                simulation is behind, no sleep occurs.
         """
 
         dt = self.clock.tick(dt)
@@ -120,6 +134,11 @@ class MultiAgentSimulator:
         self._update_metrics()
 
     def sync(self) -> None:
+        """Synchronize simulation time with real-world time.
+
+        This will adjust the simulation clock and perform any necessary synchronization
+        with external components (e.g., NS-3 network simulator).
+        """
         self.clock.sync()
         self._sync_with_ns3()
 

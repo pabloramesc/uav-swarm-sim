@@ -28,7 +28,7 @@ class PositionController(ABC):
 
 
 class DummyPositionController(PositionController):
-    """Dummy position controller that does nothing."""
+    """Dummy position controller that always returns null control force."""
 
     def initialize(self, context: ControllerContext) -> None:
         return None

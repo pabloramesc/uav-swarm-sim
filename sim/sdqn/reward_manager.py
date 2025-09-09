@@ -60,8 +60,8 @@ class RewardManager:
         rewards = np.zeros(num_drones)
         dones = np.zeros(num_drones, dtype=bool)
 
-        rewards += self.difference_area_coverage_rewards(drones)
-        # rewards += self.difference_users_coverage_rewards(drones, users)
+        # rewards += self.difference_area_coverage_rewards(drones)
+        rewards += self.difference_users_coverage_rewards(drones, users)
         # rewards += self.difference_connectivity_rewards(drones)
 
         dist = self.min_separation(drones, check_drones_separation=False)

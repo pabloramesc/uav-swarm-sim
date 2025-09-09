@@ -13,27 +13,45 @@ from sim.simulators import MultiAgentSimulator
 class AgentsPlot:
     """Handles plotting and updating GCS, drones, and users."""
 
-    def __init__(self, ax: Axes, sim: MultiAgentSimulator):
-        self.ax = ax
-        self.sim = sim
-        (self.user_points,) = self.ax.plot([], [], "mo", label="users")
-        (self.drone_points,) = self.ax.plot([], [], "bx", label="drones")
-        (self.gcs_points,) = self.ax.plot([], [], "k*", label="GCS")
+    def __init__(
+        self, ax: Axes, sim: MultiAgentSimulator, marked_drone: int | None = None
+    ):
+        self._ax = ax
+        self._sim = sim
+        self.marked_drone = marked_drone
+        self._init_artists()
+
+    def _init_artists(self) -> None:
+        (self._users_artist,) = self._ax.plot([], [], "mo", label="users")
+        (self._drones_artist,) = self._ax.plot([], [], "bx", label="drones")
+        (self._gcs_artist,) = self._ax.plot([], [], "k*", label="GCS")
+        (self._marked_drone_artist,) = self._ax.plot([], [], "rx", label="marked")
 
     def update(self):
-        if self.sim.gcs_states.shape[0] > 0:
-            self.gcs_points.set_data(
-                self.sim.gcs_states[:, 0], self.sim.gcs_states[:, 1]
+        self._gcs_artist.set_data(
+            self._sim.gcs_states[:, 0], self._sim.gcs_states[:, 1]
+        )
+        self._users_artist.set_data(
+            self._sim.user_states[:, 0], self._sim.user_states[:, 1]
+        )
+        self._drones_artist.set_data(
+            self._sim.drone_states[:, 0], self._sim.drone_states[:, 1]
+        )
+
+        if self.marked_drone is None:
+            self._marked_drone_artist.set_data([], [])
+            return
+
+        num_drones = self._sim.drone_states.shape[0]
+        if not (0 <= self.marked_drone < num_drones):
+            raise RuntimeError(
+                f"Invalid mark drone index: {self.marked_drone}, number of drones: {num_drones}."
             )
-        if self.sim.user_states.shape[0] > 0:
-            self.user_points.set_data(
-                self.sim.user_states[:, 0], self.sim.user_states[:, 1]
-            )
-        if self.sim.drone_states.shape[0] > 0:
-            self.drone_points.set_data(
-                self.sim.drone_states[:, 0], self.sim.drone_states[:, 1]
-            )
-        # TODO: Try without checking states shape
+
+        self._marked_drone_artist.set_data(
+            [self._sim.drone_states[self.marked_drone, 0]],
+            [self._sim.drone_states[self.marked_drone, 1]],
+        )
 
 
 class ObstaclesPlot:

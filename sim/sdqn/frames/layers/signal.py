@@ -84,7 +84,7 @@ class SignalLayerFactory(FrameLayerFactory):
     positions_getter: PositionsGetter
     label: str
 
-    def create(self, geo: FrameGeometry, env: Optional[Environment] = None) -> SignalLayer:
+    def create(self, geo: FrameGeometry, env: Optional[Environment] = None) -> FrameLayer:
         config = SignalLayerConfig(
             positions_getter=self.positions_getter,
             label=self.label,

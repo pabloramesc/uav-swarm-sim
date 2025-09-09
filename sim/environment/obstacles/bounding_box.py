@@ -1,11 +1,12 @@
 from typing import NamedTuple
 
+
 class BoundingBox(NamedTuple):
     xmin: float
     ymin: float
     xmax: float
     ymax: float
-    
+
     @property
     def left(self) -> float:
         return self.xmin
@@ -49,3 +50,8 @@ class BoundingBox(NamedTuple):
     @property
     def size(self) -> tuple[float, float]:
         return (self.width, self.height)
+
+    @property
+    def center(self) -> tuple[float, float]:
+        """The (x, y) coordinates of the bounding box center."""
+        return ((self.xmin + self.xmax) / 2, (self.ymin + self.ymax) / 2)

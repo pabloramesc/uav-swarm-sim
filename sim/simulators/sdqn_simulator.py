@@ -31,6 +31,7 @@ class SDQNSimulator:
         sdqn_config: Optional[SDQNConfig] = None,
         frame_factory: Optional[FrameGeneratorFactory] = None,
         model_path: Optional[str] = None,
+        dt: float = 0.01,
     ) -> None:
         # Configuration
         self.sdqn_config = sdqn_config or SDQNConfig()
@@ -48,7 +49,7 @@ class SDQNSimulator:
 
         # Simulation
         self.sim = MultiAgentSimulator(
-            agents=self.agents, environment=self.environment, dt=0.1, use_network=False
+            agents=self.agents, environment=self.environment, dt=dt, use_network=False
         )
 
         self.displacement = self.sdqn_config.target_velocity * self.sim.dt
@@ -143,10 +144,11 @@ class SDQNSimulator:
 
         # Initialize simulator
         states = np.vstack([drone_states, user_states])
-        self.sim.initialize(states=states)
+        self.sim.reset(states=states)
 
         # Initialize SDQN Brain orchestator
-        self.sdqn_brain.train_step(
+        self.sdqn_brain.reset_experiences()
+        self.sdqn_brain.step(
             drone_positions=drone_states[:, 0:3], user_positions=user_states[:, 0:3]
         )
 
@@ -155,7 +157,7 @@ class SDQNSimulator:
     def update(self, dt: float | None = None) -> None:
         self.update_drone_positions()
 
-        self.sim.update(dt)
+        self.sim.step(dt)
 
         self.sdqn_brain.step(
             drone_positions=self.sim.drone_states[:, 0:2],

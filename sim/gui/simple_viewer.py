@@ -8,6 +8,7 @@ from .fps_control import FPSController
 
 
 class SimpleViewer:
+    background_type: BackgroundType  # annotation for Pylance type checker
 
     def __init__(
         self,
@@ -21,30 +22,33 @@ class SimpleViewer:
     ) -> None:
         self.sim = sim
         self.limits = self._calculate_axis_limits(limits)
+        self.background_type = background_type
         self.show_legend = show_legend
 
         plt.ion()
         self.fig = plt.figure(figsize=figsize)
         self.ax: Axes = self.fig.add_subplot(111)
         self._configure_axes()
+        self._create_plotters()
 
         self.fps_control = FPSController(min_fps=min_fps, max_fps=max_fps)
 
+    @property
+    def fps(self) -> float:
+        return self.fps_control.smooth_fps
+
+    def _create_plotters(self) -> None:
         self.background = BackgroundPlot(
             ax=self.ax,
             sim=self.sim,
             xlim=self.limits[0:2],
             ylim=self.limits[2:4],
-            background_type=background_type,
+            background_type=self.background_type,
             show_colorbar=True,
         )
         self.obstacles = ObstaclesPlot(ax=self.ax, sim=self.sim)
         self.agents = AgentsPlot(ax=self.ax, sim=self.sim)
 
-    @property
-    def fps(self) -> float:
-        return self.fps_control.smooth_fps
-    
     def initialize(self) -> None:
         self.background.plot()
         self.obstacles.plot()
@@ -53,12 +57,12 @@ class SimpleViewer:
     def update(self, force: bool = False) -> None:
         if not self.fps_control.need_render(self.sim.clock.sim_time) and not force:
             return
-        
+
         self.agents.update()
         self.background.plot()
         self.fps_control.record_render()
-        
-          # Redraw without blocking
+
+        # Redraw without blocking
         self.fig.canvas.draw_idle()
         self.fig.canvas.flush_events()
 
@@ -80,7 +84,22 @@ class SimpleViewer:
         env = self.sim.environment
 
         if env.boundary is not None:
-            return (*env.boundary.bounds.xlim, *env.boundary.bounds.ylim)
+            bounds = env.boundary.bounds
+
+            # Increase limits by 10% to appreciate boundary
+            half_width = bounds.width * 0.55  # +10% = 110% -> 110% / 2 = 55%
+            half_height = bounds.height * 0.55
+
+            x_center, y_center = bounds.center
+
+            new_lims = (
+                x_center - half_width,
+                x_center + half_width,
+                y_center - half_height,
+                y_center + half_height,
+            )
+
+            return new_lims
 
         if env.elevation_map is not None:
             bounds = env.elevation_map.bounds

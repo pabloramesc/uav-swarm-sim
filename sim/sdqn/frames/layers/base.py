@@ -12,7 +12,6 @@ from sim.environment import Environment
 from ..geometry.base import FrameGeometry
 from ..state import ScenarioState
 
-
 class FrameLayer(ABC):
     def __init__(
         self,

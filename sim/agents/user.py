@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 import numpy as np
@@ -7,6 +8,7 @@ from ..network.swarm_link import SwarmLink
 from .agent import Agent
 from .dynamics.random_walker import RandomWalkerDynamics
 
+logger = logging.getLogger(__name__)
 
 class User(Agent):
     """Represents a user agent in the simulation environment."""
@@ -38,8 +40,9 @@ class User(Agent):
         """
         self._update_swarm_link()
 
-        # super().update(dt)
-        self.state = self.dynamics.step(dt, control=np.zeros(3))
+        super().update(dt)
+        # self.dynamics.step(dt, control=np.zeros(3))
+        # self.time += dt
 
     def _update_swarm_link(self) -> None:
         if self.swarm_link is None:
@@ -62,11 +65,11 @@ class User(Agent):
         msg = f"Hello from agent {self.agent_id}!"
         self.last_msg_id = self.swarm_link.send_message(msg, dst_addr)
 
-        self.logger.debug(f"Sent msg: {msg}")
+        logger.debug(f"Sent msg: {msg}")
 
     def print_received_messages(self, clear: bool = False) -> None:
         if self.swarm_link is None:
             raise RuntimeError("No swarm link was provided.")
 
         for msg in self.swarm_link.get_messages(clear):
-            self.logger.debug(f"Received from {msg.source_id} msg: {msg.txt}")
+            logger.debug(f"Received from {msg.source_id} msg: {msg.txt}")

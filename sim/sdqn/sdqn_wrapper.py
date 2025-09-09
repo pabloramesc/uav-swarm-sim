@@ -67,7 +67,7 @@ class SDQNWrapper:
         # Create DQN Agent and set the model
         model = load_model(filepath=self.model_path, compile=True)
         self.dqn_agent = DQNAgentPER(
-            model=model, # type: ignore
+            model=model,  # type: ignore
             batch_size=64,
             gamma=0.99,
             policy=self.policy,
@@ -76,11 +76,17 @@ class SDQNWrapper:
         )
         self.dqn_agent.model.summary()
 
-        if self.frame_shape != self.dqn_agent.model.input_shape[1:]:
-            raise ValueError("Frame shape does not match model input shape")
+        input_shape = self.dqn_agent.model.input_shape[1:]
+        if self.frame_shape != input_shape:
+            raise ValueError(
+                f"Frame shape {self.frame_shape} does not match model input shape {input_shape}."
+            )
 
-        if self.num_actions != self.dqn_agent.model.output_shape[1]:
-            raise ValueError("The number of actions does not match the output size")
+        output_size = self.dqn_agent.model.output_shape[1]
+        if self.num_actions != output_size:
+            raise ValueError(
+                f"The number of actions ({self.num_actions}) does not match the output size {output_size}."
+            )
 
         self.min_train_samples = 50_000
         self.autosave_freq = 1000
@@ -183,7 +189,7 @@ class SDQNWrapper:
         model = Model(inputs=inputs, outputs=outputs, name="DQN_model")
 
         model.compile(
-            optimizer=Adam(learning_rate=0.00025), # type: ignore
+            optimizer=Adam(learning_rate=0.00025),  # type: ignore
             loss=Huber(delta=1.0),
         )
 

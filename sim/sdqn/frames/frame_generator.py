@@ -67,3 +67,8 @@ class FrameGeneratorFactory:
         geometry = self.geometry_factory.create()
         layers = [f.create(geometry, env) for f in self.layer_factories]
         return FrameGenerator(geometry, layers, label=self.label)
+    
+    @property
+    def shape(self):
+        geo = self.geometry_factory.create()
+        return (*geo.shape, len(self.layer_factories))

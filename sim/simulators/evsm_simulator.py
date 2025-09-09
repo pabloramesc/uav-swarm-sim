@@ -87,7 +87,7 @@ class EVSMSimulator(MultiAgentSimulator):
         )
         return drone
 
-    def initialize(self, home: ArrayLike = [0.0, 0.0], spacing: float = 5.0, altitude: float = 0.0) -> None:
+    def reset(self, home: ArrayLike = [0.0, 0.0], spacing: float = 5.0, altitude: float = 0.0) -> None:
         self.logger.info("Initializing simulation ...")
 
         if self.num_gcs == 1:
@@ -112,11 +112,11 @@ class EVSMSimulator(MultiAgentSimulator):
             )
             self.users.initialize(states=user_states)
 
-        super().initialize()
+        super().reset()
 
         self.logger.info("✅ Initialization completed.")
 
-    def update(self, dt=None):
-        super().update(dt)
+    def step(self, dt=None):
+        super().step(dt)
         self.evsm_monitor.update()
         self._sync_to_real_time()

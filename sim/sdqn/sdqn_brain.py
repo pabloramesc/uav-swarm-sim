@@ -14,13 +14,8 @@ class SDQNBrain:
         self.ifaces: list[SDQNInterface] = []
 
         self.reward_manager = RewardManager(environment)
-
-        self.frames: NDArray[np.uint8] | None = None
-        self.actions: NDArray[np.int32] | None = None
-        self.rewards: NDArray[np.float32] | None = None
-        self.dones: NDArray[np.bool_] | None = None
-        self.prev_frames: NDArray[np.uint8] | None = None
-        self.prev_actions: NDArray[np.int32] | None = None
+        
+        self.reset_experiences()
 
     @property
     def num_ifaces(self) -> int:
@@ -32,6 +27,15 @@ class SDQNBrain:
         if any(a.iface_id == iface.iface_id for a in self.ifaces):
             raise ValueError(f"Interface {iface.iface_id} already registered.")
         self.ifaces.append(iface)
+
+    def reset_experiences(self) -> None:
+        """Clear all experiences cache. Run this at the beggining of a new episode."""
+        self.frames: NDArray[np.uint8] | None = None
+        self.actions: NDArray[np.int32] | None = None
+        self.rewards: NDArray[np.float32] | None = None
+        self.dones: NDArray[np.bool_] | None = None
+        self.prev_frames: NDArray[np.uint8] | None = None
+        self.prev_actions: NDArray[np.int32] | None = None
 
     def step(
         self, drone_positions: NDArray[np.float64], user_positions: NDArray[np.float64]
@@ -54,7 +58,7 @@ class SDQNBrain:
             self.wrapper.add_experiences(
                 frames=self.prev_frames,
                 actions=self.prev_actions,
-                next_frames=self.frames, # type: ignore
+                next_frames=self.frames,  # type: ignore
                 rewards=self.rewards,
                 dones=self.dones,
             )

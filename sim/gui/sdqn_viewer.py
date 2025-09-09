@@ -28,6 +28,12 @@ class SDQNViewer(SimpleViewer):
         self.fig.tight_layout()
 
     def initialize(self) -> None:
+        # Reconfigure axes limits to adapt to environment changes
+        self.limits = self._calculate_axis_limits(limits=None)
+        self._create_axes()
+        self._init_frame_images()
+        self.fig.tight_layout()
+        
         super().initialize()
 
     def update(self, force: bool = False):
@@ -48,19 +54,17 @@ class SDQNViewer(SimpleViewer):
         # Rewrite parent main axis
         self.ax = self.axes[0]
         self._configure_axes()  # Need to be configured again
-        self.agents.ax = self.ax  # Update plotters with new axes
-        self.obstacles.ax = self.ax
-        self.background.ax = self.ax
+        self._create_plotters()  # Create plotters again with new axes
+        self.agents.marked_drone = 0
         self.background.show_colorbar = False
-        self.initialize()
 
         # Store frame axes
         self.frame_axes = self.axes[1:]
 
     def _init_frame_images(self) -> None:
         # Remove old images
-        for im in self.frame_images:
-            im.remove()
+        for ax in self.frame_axes:
+            ax.clear()
         self.frame_images = []
 
         shape = self._get_frame_shape()
