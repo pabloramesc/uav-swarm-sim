@@ -2,12 +2,12 @@ import logging
 import random
 import numpy as np
 
-from multiagent_sim.mobility.sdqn_position_controller import SDQNConfig
-from multiagent_sim.sdqn.frames.frame_generator import FrameGeneratorFactory
+from sim.mobility.sdqn_position_controller import SDQNConfig
+from sim.sdqn.frames.frame_generator import FrameGeneratorFactory
 
-from ..mobility.utils import environment_random_positions
-from ..sdqn import SDQNBrain, SDQNWrapper
-from .sdqn_simulator import SDQNSimulator
+from sim.mobility.utils import environment_random_positions
+from sim.sdqn import SDQNBrain, SDQNWrapper
+from sim.simulators import SDQNSimulator
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,15 @@ class SDQNTrainer(SDQNSimulator):
 
     @property
     def training_status_str(self) -> str:
-        return self.sdqn_brain.wrapper.training_status_str()
+        if self.sim.metrics is None:
+            raise RuntimeError("No metrics snapshot. Simulation not initiated.")
+        return (
+            f"Sim steps: {self.sim.clock.sim_step}, "
+            f"Sim time: {self.sim.clock.sim_time:.2f} s, "
+            f"Area cov: {self.sim.metrics.area_coverage*100:.2f} %, "
+            f"Users cov: {self.sim.metrics.users_coverage*100:.2f} %, "
+            + self.sdqn_brain.wrapper.training_status_str
+        )
 
     def train(
         self,
@@ -100,7 +108,29 @@ class SDQNTrainer(SDQNSimulator):
                 ):
                     terminated = True
 
-    def create_random_environment(self, num_obstacles: int = 0) -> None:
+    def create_random_environment(
+        self,
+        num_obstacles: int = 0,
+        boundary_size: float | tuple[float, float] | None = None,
+    ) -> None:
+        # Determine environment size
+        if boundary_size is None:
+            size = None
+        elif isinstance(boundary_size, float):
+            size = boundary_size
+        elif isinstance(boundary_size, tuple) and len(boundary_size) == 2:
+            size = np.random.uniform(*boundary_size)
+        else:
+            raise ValueError("boundary_size must be None, float or (min, max) tuple")
+
+        # Set new boundary if needed
+        if size is not None:
+            self.sim.environment.set_rectangular_boundary(
+                [-size, -size], [+size, +size]
+            )
+            logger.info(f"Environment boundary set to square of {size} m")
+
+        # Clear and add obstacles
         self.environment.clear_obstacles()
         for _ in range(num_obstacles):
             if np.random.rand() > 0.5:

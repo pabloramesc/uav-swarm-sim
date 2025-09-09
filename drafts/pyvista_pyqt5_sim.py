@@ -3,7 +3,7 @@ import sys
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication
 
-from multiagent_sim.math.geo import enu2geo, geo2enu
+from sim.math.geo import enu2geo, geo2enu
 from pyvista_terrain_sim import TerrainVisualizer
 
 

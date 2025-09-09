@@ -7,8 +7,8 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from multiagent_sim.simulators.evsm_simulator import EVSMSimulator, EVSMConfig
-from multiagent_sim.gui.simple_viewer import SimpleViewer
+from sim.simulators.evsm_simulator import EVSMSimulator, EVSMConfig
+from sim.gui.simple_viewer import SimpleViewer
 
 
 dt = 0.01

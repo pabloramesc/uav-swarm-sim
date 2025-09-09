@@ -121,7 +121,7 @@ class SDQNSimulator:
             positions_getter=get_user_positions, label="Users Signal"
         )
         frame_factory = FrameGeneratorFactory(
-            geometry_factory=SquareGeometryFactory(num_cells=64, radius=1000.0),
+            geometry_factory=SquareGeometryFactory(side_size=64, radius=1000.0),
             layer_factories=[neighbors_layer, users_layer],
         )
         return frame_factory
@@ -164,8 +164,8 @@ class SDQNSimulator:
 
     def update_drone_positions(self) -> None:
         for drone, iface in zip(self.sim.drones, self.sdqn_brain.ifaces):
-            drone.state[0:2] += self.displacement * iface.direction
-            drone.state[2] = self.sdqn_config.target_height
+            drone.dynamics.state[0:2] += self.displacement * iface.direction
+            drone.dynamics.state[2] = self.sdqn_config.target_height
 
     @property
     def simulation_status_str(self) -> str:

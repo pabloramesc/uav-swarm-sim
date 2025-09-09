@@ -1,5 +1,5 @@
 import numpy as np
-from multiagent_sim.math.connectivity import (
+from sim.math.connectivity import (
     pairwise_connectivity_matrix,
     connected_clusters,
     globally_connected

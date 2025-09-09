@@ -10,10 +10,10 @@ import imageio.v2 as imageio
 
 import numpy as np
 
-from multiagent_sim.simulators.sdqn_trainer import SDQNTrainer, SDQNConfig
-from multiagent_sim.gui.sdqn_viewer import SDQNViewer
-from multiagent_sim.gui.sdqn_logpolar_viewer import SDQNLogPolarViewer
-from multiagent_sim.utils.data_logger import DataLogger
+from sim.simulators.sdqn_trainer import SDQNTrainer, SDQNConfig
+from sim.gui.sdqn_viewer import SDQNViewer
+from sim.gui.sdqn_logpolar_viewer import SDQNLogPolarViewer
+from sim.utils.data_logger import DataLogger
 
 dt = 0.1
 num_drones = 16

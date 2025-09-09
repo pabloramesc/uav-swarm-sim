@@ -7,9 +7,9 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from multiagent_sim.simulators.evsm_simulator import EVSMSimulator, EVSMConfig
-from multiagent_sim.gui.evsm_viewer import EVSMViewer
-from multiagent_sim.utils.data_logger import DataLogger
+from sim.simulators.evsm_simulator import EVSMSimulator, EVSMConfig
+from sim.gui.evsm_viewer import EVSMViewer
+from sim.utils.data_logger import DataLogger
 
 dt = 0.01
 num_drones = 25

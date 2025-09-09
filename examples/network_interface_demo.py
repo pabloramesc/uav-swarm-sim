@@ -1,7 +1,7 @@
 import time
 
-from multiagent_sim.network.network_interface import NetworkInterface
-from multiagent_sim.network.network_simulator import NetworkSimulator, SimPacket
+from sim.network.network_interface import NetworkInterface
+from sim.network.network_simulator import NetworkSimulator, SimPacket
 
 net_sim = NetworkSimulator(num_gcs=0, num_drones=2, num_users=0, verbose=True)
 

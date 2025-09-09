@@ -5,9 +5,9 @@ This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
 
-from multiagent_sim.gui.evsm_viewer import EVSMViewer
-from multiagent_sim.simulators.evsm_simulator import EVSMSimulator
-from multiagent_sim.mobility.evsm_position_controller import EVSMConfig
+from sim.gui.evsm_viewer import EVSMViewer
+from sim.simulators.evsm_simulator import EVSMSimulator
+from sim.mobility.evsm_position_controller import EVSMConfig
 
 dt = 0.1
 num_drones = 25

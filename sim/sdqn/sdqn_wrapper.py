@@ -227,6 +227,7 @@ class SDQNWrapper:
         loss = self.train_metrics.get("loss", float("nan"))
         return loss
 
+    @property
     def training_status_str(self) -> str:
         return (
             f"Train steps: {self.train_steps}, "

@@ -1,6 +1,6 @@
 import subprocess
 import time
-from multiagent_sim.network.sim_bridge import SimBridge, SimPacket
+from sim.network.sim_bridge import SimBridge, SimPacket
 
 import numpy as np
 

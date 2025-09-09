@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from multiagent_sim.environment.environment import Environment
+from sim.environment.environment import Environment
 
 
 @dataclass

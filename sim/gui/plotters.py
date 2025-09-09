@@ -3,11 +3,11 @@ from typing import Literal
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
+from matplotlib.colors import BoundaryNorm, Normalize
 from matplotlib.image import AxesImage
-from matplotlib.colors import BoundaryNorm
 
-from ..simulators import MultiAgentSimulator
-from ..math.path_loss_model import rssi_to_signal_quality, signal_strength_map
+from sim.math.path_loss_model import rssi_to_signal_quality, signal_strength_map
+from sim.simulators import MultiAgentSimulator
 
 
 class AgentsPlot:
@@ -115,22 +115,22 @@ class BackgroundPlot:
             alpha=0.7,
             cmap=cmap,
         )
-        
+
         if cmap and self.show_colorbar:
             plt.colorbar(self.background_image, ax=self.ax, label="Elevation (m)")
 
     def _plot_fused(self):
         if self.sim.environment.elevation_map is None:
             raise RuntimeError("Elvation map not configured.")
-        
+
         self._plot_image(self.sim.environment.elevation_map.fused_img)
         elev = self.sim.environment.elevation_map.elevation_data
         sm = plt.cm.ScalarMappable(
-            norm=plt.Normalize(vmin=np.nanmin(elev), vmax=np.nanmax(elev)),
+            norm=Normalize(vmin=np.nanmin(elev), vmax=np.nanmax(elev)),
             cmap="terrain",
         )
         sm.set_array([])
-        
+
         if self.show_colorbar:
             plt.colorbar(sm, ax=self.ax, label="Elevation (m)")
 
@@ -145,7 +145,7 @@ class BackgroundPlot:
         if self.background_image is not None:
             self.background_image.set_data(heatmap)
             return
-        
+
         cmap = plt.cm.get_cmap("turbo", 11)
         cmap.set_under("black")
         norm = BoundaryNorm(boundaries=np.linspace(1e-6, 100, 11), ncolors=10)
@@ -157,6 +157,6 @@ class BackgroundPlot:
             norm=norm,
             alpha=0.7,
         )
-        
+
         if self.show_colorbar:
             plt.colorbar(self.background_image, ax=self.ax, label="Signal Quality (%)")

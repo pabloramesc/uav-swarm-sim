@@ -5,10 +5,10 @@ This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
 
-from multiagent_sim.multidrone_evsm_viewer import MultiDroneViewerEVSM
-from multiagent_sim.old.multidrone_evsm_simulator import MultiDroneEVSMSimulator
-from multiagent_sim.mobility.evsm_position_controller import EVSMConfig
-from multiagent_sim.mobility.utils import grid_positions
+from sim.multidrone_evsm_viewer import MultiDroneViewerEVSM
+from sim.old.multidrone_evsm_simulator import MultiDroneEVSMSimulator
+from sim.mobility.evsm_position_controller import EVSMConfig
+from sim.mobility.utils import grid_positions
 
 dt = 0.01
 num_drones = 16

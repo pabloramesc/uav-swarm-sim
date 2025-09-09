@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Optional
 
-from multiagent_sim.environment import Environment
+from sim.environment import Environment
 
 from .base import Dynamics
 

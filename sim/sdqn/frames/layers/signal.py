@@ -1,11 +1,4 @@
 """
-Copyright (c) 2025 Pablo Ramirez Escudero
-
-This software is released under the MIT License.
-https://opensource.org/licenses/MIT
-"""
-
-"""
 Layer implementations for frame generation, including signal and user layers.
 Each layer transforms ScenarioState into a 2D frame given a geometry.
 """
@@ -14,8 +7,8 @@ from typing import Callable, Optional
 
 import numpy as np
 
-from multiagent_sim.environment import Environment
-from multiagent_sim.math.path_loss_model import rssi_to_signal_quality, signal_strength
+from sim.environment import Environment
+from sim.math.path_loss_model import rssi_to_signal_quality, signal_strength
 
 from ..geometry import FrameGeometry
 from ..state import ScenarioState

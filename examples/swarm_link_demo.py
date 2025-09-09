@@ -1,5 +1,5 @@
-from multiagent_sim.network.swarm_link import SwarmLink
-from multiagent_sim.network.network_simulator import NetworkSimulator, SimPacket
+from sim.network.swarm_link import SwarmLink
+from sim.network.network_simulator import NetworkSimulator, SimPacket
 import time
 import numpy as np
 

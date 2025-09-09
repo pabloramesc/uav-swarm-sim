@@ -7,9 +7,9 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from multiagent_sim.simulators.sdqn_trainer import SDQNTrainer, SDQNConfig
-from multiagent_sim.gui.sdqn_viewer import SDQNViewer
-from multiagent_sim.gui.sdqn_logpolar_viewer import SDQNLogPolarViewer
+from sim.simulators.sdqn_trainer import SDQNTrainer, SDQNConfig
+from sim.gui.sdqn_viewer import SDQNViewer
+from sim.gui.sdqn_logpolar_viewer import SDQNLogPolarViewer
 
 dt = 0.1
 num_drones = 16

@@ -8,7 +8,7 @@ from typing import Optional
 
 import numpy as np
 
-from multiagent_sim.environment import Environment
+from sim.environment import Environment
 
 from .geometry import FrameGeometry, FrameGeometryFactory
 from .layers import FrameLayer, FrameLayerFactory

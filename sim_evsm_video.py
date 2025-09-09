@@ -1,8 +1,8 @@
 import os
 import imageio.v2 as imageio
 
-from multiagent_sim.simulators.evsm_simulator import EVSMSimulator, EVSMConfig
-from multiagent_sim.gui.evsm_viewer import EVSMViewer
+from sim.simulators.evsm_simulator import EVSMSimulator, EVSMConfig
+from sim.gui.evsm_viewer import EVSMViewer
 
 dt = 0.01
 num_drones = 25

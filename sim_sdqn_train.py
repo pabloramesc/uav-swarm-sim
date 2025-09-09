@@ -1,10 +1,10 @@
 import numpy as np
 
-from multiagent_sim.simulators.sdqn_trainer import SDQNTrainer, SDQNConfig
-from multiagent_sim.gui.sdqn_viewer import SDQNViewer
-from multiagent_sim.gui.sdqn_logpolar_viewer import SDQNLogPolarViewer
-from multiagent_sim.utils.csv_logger import CSVLogger
-from multiagent_sim.sdqn.frames import (
+from sim.simulators import SDQNTrainer, SDQNConfig
+from sim.gui.sdqn_viewer import SDQNViewer
+from sim.gui.sdqn_logpolar_viewer import SDQNLogPolarViewer
+from sim.utils.csv_logger import CSVLogger
+from sim.sdqn.frames import (
     FrameGeneratorFactory,
     SquareGeometryFactory,
     SignalLayerFactory,
@@ -16,7 +16,7 @@ from multiagent_sim.sdqn.frames import (
 num_drones = 16
 num_users = 0
 size = 1e3
-num_obstacles = 0
+num_obstacles = 2
 num_episodes = 1000
 max_episode_time = 5 * 60
 
@@ -56,11 +56,8 @@ for episode in range(1, num_episodes + 1):
         sim.update()
         gui.update(force=False)
 
-        print("Episode:", episode)
-        print(sim.simulation_status_str)
-        print(sim.training_status_str)
-        print()
-        
+        print(f"Episode: {episode}, " + sim.training_status_str, end="\r")
+
         if sim.sim_time > max_episode_time:
             break
 

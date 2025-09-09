@@ -40,8 +40,6 @@ class Agent:
         self.dynamics = dynamics
         self.environment = environment
 
-        self.logger = create_logger(f"Agent{agent_id}", level="DEBUG")
-
         self.time = 0.0
 
     @classmethod

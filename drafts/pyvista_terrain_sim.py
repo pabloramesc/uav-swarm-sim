@@ -3,7 +3,7 @@ import pyvista as pv
 import pyvistaqt as pvqt
 import rasterio
 
-from multiagent_sim.math.geo import geo2enu, enu2geo
+from sim.math.geo import geo2enu, enu2geo
 
 
 class TerrainVisualizer:

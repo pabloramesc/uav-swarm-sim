@@ -53,9 +53,14 @@ class SimpleViewer:
     def update(self, force: bool = False) -> None:
         if not self.fps_control.need_render(self.sim.clock.sim_time) and not force:
             return
+        
         self.agents.update()
         self.background.plot()
         self.fps_control.record_render()
+        
+          # Redraw without blocking
+        self.fig.canvas.draw_idle()
+        self.fig.canvas.flush_events()
 
     def capture_frame(self) -> np.ndarray:
         self.fig.canvas.draw()
