@@ -2,6 +2,6 @@
 	path = libs/dqn-lab
 	url = https://github.com/pabloramesc/dqn-lab.git
 
-[submodule "network_sim/ns-3"]
-    path = network_sim/ns-3
+[submodule "ns3/ns-3"]
+    path = ns3/ns-3
     url = https://gitlab.com/nsnam/ns-3-dev.git
