@@ -11,7 +11,6 @@ def rssi_to_signal_quality(
     quality = (rssi - vmin) / (vmax - vmin)
     return np.clip(quality, 0.0, 1.0)
 
-
 def signal_strength(
     tx_positions: np.ndarray,
     rx_positions: np.ndarray,

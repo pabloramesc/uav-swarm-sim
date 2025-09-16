@@ -18,7 +18,19 @@ class AgentsManager:
     @property
     def size(self) -> int:
         return self.all_agents.size
-    
+
+    @property
+    def gcs(self) -> AgentsRegistry:
+        return self.registries["gcs"]
+
+    @property
+    def users(self) -> AgentsRegistry:
+        return self.registries["user"]
+
+    @property
+    def drones(self) -> AgentsRegistry:
+        return self.registries["drone"]
+
     def clear_registries(self) -> None:
         self.all_agents.clear()
         for reg in self.registries.values():

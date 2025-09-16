@@ -1,6 +1,7 @@
+import logging
 import os
-from datetime import datetime
 import time
+from datetime import datetime
 from typing import Optional
 
 import numpy as np
@@ -10,17 +11,20 @@ from keras.layers import (
     Dense,
     Dropout,
     Flatten,
-    InputLayer,
-    Rescaling,
     Input,
+    InputLayer,
     MaxPooling2D,
+    Rescaling,
 )
 from keras.losses import Huber
-from keras.models import Model, Sequential, save_model, load_model
+from keras.models import Model, Sequential, load_model, save_model
 from keras.optimizers import Adam
 
 
 class SDQNWrapper:
+
+    logger = logging.getLogger("SDQNWrapper")
+    logger.setLevel(logging.INFO)
 
     def __init__(
         self,
@@ -28,14 +32,15 @@ class SDQNWrapper:
         num_actions: int = 5,
         train_mode: bool = True,
         model_path: Optional[str] = None,
+        min_memory_size: int = 10_000,
+        autosave_freq: int = 1000,
     ):
         self.frame_shape = frame_shape
-        self.num_actions = num_actions
-        self.train_mode = train_mode
+        self.num_actions = int(num_actions)
+        self.train_mode = bool(train_mode)
         self.model_path = model_path
-
-        # if len(self.frame_shape) == 2:
-        #     self.frame_shape += (1,)
+        self.min_memory_size = int(min_memory_size)
+        self.autosave_freq = int(autosave_freq)
 
         if len(self.frame_shape) != 3:
             raise ValueError("Frame shape must be (height, width, channels).")
@@ -47,11 +52,17 @@ class SDQNWrapper:
         if self.model_path is None:
             timestamp = datetime.now().strftime("%y%m%d-%H%M%S")
             self.model_path = f"sdqn-model-{timestamp}.keras"
+            self.logger.info(f"New model path created: {self.model_path}")
 
-        # If model doesn't exist, create new model and save it
-        if not os.path.exists(self.model_path):
+        # If model exists, load it
+        if os.path.exists(self.model_path):
+            model = load_model(filepath=self.model_path, compile=True)
+            self.logger.info(f"Model loaded from '{self.model_path}'.")
+        # If not, build model and save it
+        else:
             model = self.build_keras_model()
             save_model(model=model, filepath=self.model_path)
+            self.logger.info(f"Model saved to '{self.model_path}'.")
 
         # Create linear decaying epsilon-greedy policy with initial random exploration
         if self.train_mode:
@@ -65,17 +76,17 @@ class SDQNWrapper:
             )
 
         # Create DQN Agent and set the model
-        model = load_model(filepath=self.model_path, compile=True)
         self.dqn_agent = DQNAgentPER(
             model=model,  # type: ignore
-            batch_size=64,
+            batch_size=32,
             gamma=0.99,
             policy=self.policy,
-            memory_size=500_000,
+            memory_size=100_000,
             update_freq=5000,
         )
         self.dqn_agent.model.summary()
 
+        # Check model input and output shapes
         input_shape = self.dqn_agent.model.input_shape[1:]
         if self.frame_shape != input_shape:
             raise ValueError(
@@ -88,11 +99,13 @@ class SDQNWrapper:
                 f"The number of actions ({self.num_actions}) does not match the output size {output_size}."
             )
 
-        self.min_train_samples = 50_000
-        self.autosave_freq = 1000
-
         self.train_t0 = None
         self.train_metrics: dict[str, float] = dict()
+
+    def act(self, frames: np.ndarray) -> np.ndarray:
+        self.check_frames(frames)
+        actions = self.dqn_agent.act_on_batch(frames)
+        return actions
 
     def add_experiences(
         self,
@@ -137,9 +150,11 @@ class SDQNWrapper:
             Dictionary with training metrics, empty if training is not performed.
         """
         if not self.train_mode:
-            return {}
+            raise RuntimeError(
+                "Cannot call train method. Model not configured for training."
+            )
 
-        if self.dqn_agent.memory.size < self.min_train_samples:
+        if self.dqn_agent.memory.size < self.min_memory_size:
             return {}
 
         metrics = self.dqn_agent.train()
@@ -148,15 +163,14 @@ class SDQNWrapper:
         if self.train_t0 is None:
             self.train_t0 = time.time()
 
-        if self.dqn_agent.train_steps % self.autosave_freq:
-            self.dqn_agent.model.save(filepath=self.model_path, overwrite=True)
+        if (
+            self.dqn_agent.train_steps > 0
+            and self.dqn_agent.train_steps % self.autosave_freq == 0
+        ):
+            save_model(model=self.dqn_agent.model, filepath=self.model_path)
+            self.logger.info(f"Model saved to '{self.model_path}'.")
 
         return self.train_metrics
-
-    def act(self, frames: np.ndarray) -> np.ndarray:
-        self.check_frames(frames)
-        actions = self.dqn_agent.act_on_batch(frames)
-        return actions
 
     def build_keras_model(self) -> Model:
         inputs = Input(shape=self.frame_shape, dtype="uint8")
@@ -202,7 +216,11 @@ class SDQNWrapper:
             raise ValueError(f"Frame shape must be {self.frame_shape}")
 
     def check_frames(self, frames: np.ndarray) -> None:
-        self.check_frame(frames[0])
+        if frames.dtype != np.uint8:
+            raise ValueError("Frame must be an uint8 numpy array.")
+        expected_shape = (None, *self.frame_shape)
+        if frames.shape[1:] != expected_shape[1:]:
+            raise ValueError(f"Frame shape must be {expected_shape}")
 
     @property
     def train_steps(self) -> int:

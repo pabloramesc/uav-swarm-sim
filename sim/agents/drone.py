@@ -18,7 +18,7 @@ class Drone(Agent):
         agent_id: int,
         env: Environment,
         controller: PositionController,
-        provider: NeighborProvider,
+        provider: Optional[NeighborProvider] = None,
         swarm_link: Optional[SwarmLink] = None,
     ):
         self.dynamics = PointMassDynamics(

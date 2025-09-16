@@ -24,13 +24,13 @@ class ObstaclesLayer(FrameLayer):
     def build_frame(self, state: ScenarioState) -> NDArray[np.float32]:
         frame = np.zeros(self.geometry.shape, dtype=np.float32)
 
-        mask = self.environment.is_collision(
-            pos=self.cell_ground_positions, check_boundary=True, check_altitude=False
-        )
+        # mask = self.environment.is_collision(
+        #     pos=self.cell_ground_positions, check_boundary=True, check_altitude=False
+        # )
 
-        self.set_frame_cells(
-            frame, positions=self.cell_ground_positions[mask, 0:2], value=1.0
-        )
+        # self.set_frame_cells(
+        #     frame, positions=self.cell_ground_positions[mask, 0:2], value=1.0
+        # )
 
         return frame
 

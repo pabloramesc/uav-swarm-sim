@@ -15,6 +15,14 @@ class NeighborProvider(ABC):
         pass
 
 
+class DummyNeighborProvider(NeighborProvider):
+    def get_user_positions(self) -> dict[int, np.ndarray]:
+        return {}
+
+    def get_drone_positions(self) -> dict[int, np.ndarray]:
+        return {}
+
+
 class RegistryNeighborProvider(NeighborProvider):
     def __init__(
         self,

@@ -23,7 +23,7 @@ class SimulationClock:
         """Real elapsed time since the simulation started"""
         return time.time() - self.init_time if self.init_time else 0.0
 
-    def start(self) -> None:
+    def reset(self) -> None:
         """Reset the simulation clock to initial values."""
         self.init_time = time.time()
         self.sim_time = 0.0

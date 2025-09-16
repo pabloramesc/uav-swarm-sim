@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.typing import NDArray
 
 from ..environment import Environment
 from ..simulators.metrics import area_coverage
@@ -34,11 +35,11 @@ class RewardManager:
         """
         self.env = env
         self.d_obstacles = 10.0
-        self.d_collision = 1.0
+        self.d_collision = 0.0
 
     def update(
         self, drones: np.ndarray, users: np.ndarray, **kwargs
-    ) -> tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[NDArray[np.float32], NDArray[np.bool_]]:
         """
         Compute per-drone rewards and done flags for the current state.
 
@@ -57,18 +58,19 @@ class RewardManager:
             Boolean array of length N indicating if the episode ends for each drone.
         """
         num_drones = drones.shape[0]
-        rewards = np.zeros(num_drones)
-        dones = np.zeros(num_drones, dtype=bool)
+        rewards = np.zeros(num_drones, dtype=np.float32)
+        dones = np.zeros(num_drones, dtype=np.bool_)
 
         # rewards += self.difference_area_coverage_rewards(drones)
         rewards += self.difference_users_coverage_rewards(drones, users)
         # rewards += self.difference_connectivity_rewards(drones)
 
         dist = self.min_separation(drones, check_drones_separation=False)
-        rewards[dist < self.d_obstacles] = -1.0
-        rewards[dist <= self.d_collision] = -10.0
+        rewards[dist <= self.d_obstacles] = -1.0
 
-        dones[dist <= self.d_collision] = True
+        collided = (dist <= self.d_collision)
+        dones[collided] = True
+        rewards[collided] = -10.0
 
         return rewards, dones
 
@@ -80,10 +82,10 @@ class RewardManager:
         optionally, to other drones.
         """
         nearest_obs = distances_to_obstacles(self.env, drones[:, 0:2])
-        
+
         if not check_drones_separation:
             return nearest_obs
-        
+
         pairwise = pairwise_self_distances(drones)
         pairwise[pairwise <= 0.0] = np.inf
         nearest_drone = np.min(pairwise, axis=-1)

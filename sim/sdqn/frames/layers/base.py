@@ -12,6 +12,7 @@ from sim.environment import Environment
 from ..geometry.base import FrameGeometry
 from ..state import ScenarioState
 
+
 class FrameLayer(ABC):
     def __init__(
         self,
@@ -24,7 +25,7 @@ class FrameLayer(ABC):
         self.environment = environment
         self.label = label
         self.plot_center = plot_center
-        
+
     @property
     def cell_ground_positions(self):
         ground_positions = np.zeros((self.geometry.num_cells, 3))
@@ -40,12 +41,13 @@ class FrameLayer(ABC):
     def generate_frame(self, state: ScenarioState) -> np.ndarray:
         frame = self.build_frame(state)
 
-        absolute_positions = self.cell_ground_positions + state.agent_position
+        absolute_positions = self.cell_ground_positions
+        absolute_positions[:, 0:2] += state.agent_position[0:2]
 
         # Plot environment mask (boundary + obstacles)
         if self.environment is not None:
             mask = self.environment.is_collision(
-                pos=absolute_positions, check_boundary=True
+                pos=absolute_positions, check_boundary=True, check_altitude=False
             )
             self.set_frame_cells(
                 frame, positions=self.geometry.flat_cell_positions[mask], value=1.0

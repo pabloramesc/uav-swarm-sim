@@ -58,6 +58,14 @@ class MultiAgentSimulator:
     @property
     def dt(self) -> float:
         return self.clock.dt
+    
+    @property
+    def sim_time(self) -> float:
+        return self.clock.sim_time
+    
+    @property
+    def sim_step(self) -> int:
+        return self.clock.sim_step
 
     @property
     def num_agents(self) -> int:
@@ -65,15 +73,15 @@ class MultiAgentSimulator:
 
     @property
     def drones(self) -> AgentsRegistry:
-        return self.agents.get_registry("drone")
+        return self.agents.drones
 
     @property
     def users(self) -> AgentsRegistry:
-        return self.agents.get_registry("user")
+        return self.agents.users
 
     @property
     def gcs(self) -> AgentsRegistry:
-        return self.agents.get_registry("gcs")
+        return self.agents.gcs
 
     def reset(self, states: np.ndarray) -> None:
         """Reset simulation and set all agents to specified states.
@@ -93,7 +101,7 @@ class MultiAgentSimulator:
         if states.shape != expected_shape:
             raise ValueError(f"States array shape must be {expected_shape}.")
 
-        self.clock.start()
+        self.clock.reset()
 
         for i, agent in enumerate(self.agents.all_agents):
             agent.initialize(state=states[i, :], time=self.clock.sim_time)

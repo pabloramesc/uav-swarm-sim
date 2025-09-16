@@ -16,13 +16,13 @@ from ..sdqn.frames import (
     get_neighbor_positions,
     get_user_positions,
 )
-from .simulator import MultiAgentSimulator
 from .metrics import MetricsSnapshot
-
-logger = logging.getLogger(__name__)
+from .simulator import MultiAgentSimulator
 
 
 class SDQNSimulator:
+
+    logger = logging.getLogger("SDQNSimulator")
 
     def __init__(
         self,
@@ -128,7 +128,7 @@ class SDQNSimulator:
         return frame_factory
 
     def initialize(self) -> None:
-        logger.info("Initializing simulation ...")
+        self.logger.info("Initializing simulation ...")
 
         # Set drones random positions inside the environment boundaries
         drone_states = np.zeros((self.sim.drones.size, 6))
@@ -152,7 +152,7 @@ class SDQNSimulator:
             drone_positions=drone_states[:, 0:3], user_positions=user_states[:, 0:3]
         )
 
-        logger.info("✅ Initialization completed.")
+        self.logger.info("✅ Initialization completed.")
 
     def update(self, dt: float | None = None) -> None:
         self.update_drone_positions()

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
+from numpy.typing import NDArray
 
 from sim.environment import Environment
 
@@ -29,7 +30,9 @@ class FrameGenerator:
         self.channels = len(self.layers)
         self.shape = (self.geometry.height, self.geometry.width, self.channels)
 
-    def generate(self, state: ScenarioState, dtype: str = "uint8") -> np.ndarray:
+    def generate(
+        self, state: ScenarioState, dtype: str = "uint8"
+    ) -> NDArray[np.float32 | np.uint8]:
         """Generate the full multi-channel frame for a given scenario state.
 
         Args:
@@ -67,7 +70,7 @@ class FrameGeneratorFactory:
         geometry = self.geometry_factory.create()
         layers = [f.create(geometry, env) for f in self.layer_factories]
         return FrameGenerator(geometry, layers, label=self.label)
-    
+
     @property
     def shape(self):
         geo = self.geometry_factory.create()

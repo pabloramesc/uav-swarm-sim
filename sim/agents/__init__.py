@@ -5,6 +5,7 @@ from .control_station import ControlStation
 from .drone import Drone, NeighborProvider
 from .neighbor_provider import (
     NeighborProvider,
+    DummyNeighborProvider,
     RegistryNeighborProvider,
     SwarmLinkNeighborProvider,
 )

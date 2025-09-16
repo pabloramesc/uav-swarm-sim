@@ -1,24 +1,40 @@
 import numpy as np
+from numpy.typing import NDArray
 from matplotlib.axes import Axes
 from matplotlib.image import AxesImage
 from mpl_toolkits.axes_grid1 import ImageGrid
 
+from ..simulators import MultiAgentSimulator
 from ..simulators.sdqn_simulator import SDQNSimulator
 from .simple_viewer import BackgroundType, SimpleViewer
+from ..sdqn.frames import FrameGenerator
+from typing import Protocol
+
+
+class SDQNSimEnv(Protocol):
+
+    @property
+    def sim(self) -> MultiAgentSimulator: ...
+
+    @property
+    def last_frames(self) -> NDArray[np.uint8] | None: ...
+
+    @property
+    def frame_generators(self) -> list[FrameGenerator]: ...
 
 
 class SDQNViewer(SimpleViewer):
 
     def __init__(
         self,
-        sim: SDQNSimulator,
+        sdqn: SDQNSimEnv,
         fps: float = 10.0,
         background_type: BackgroundType = "rssi",
     ):
         super().__init__(
-            sim=sim.sim, min_fps=fps, max_fps=fps, background_type=background_type
+            sim=sdqn.sim, min_fps=fps, max_fps=fps, background_type=background_type
         )
-        self.sdqn = sim
+        self.sdqn = sdqn
 
         self.frame_axes: list[Axes] = []
         self.frame_images: list[AxesImage] = []
@@ -33,12 +49,12 @@ class SDQNViewer(SimpleViewer):
         self._create_axes()
         self._init_frame_images()
         self.fig.tight_layout()
-        
+
         super().initialize()
 
     def update(self, force: bool = False):
-        super().update(force)
         self._update_frame_images()
+        super().update(force)
 
     def _create_axes(self):
         num_channels = self._get_frame_channels()
@@ -89,25 +105,25 @@ class SDQNViewer(SimpleViewer):
             im.set_data(frames[..., i] / 255.0)
 
     def _get_drone_frames(self, drone_idx: int = 0) -> np.ndarray:
-        if self.sdqn.sdqn_brain.frames is None:
-            raise RuntimeError("SDQN Brain not initialized.")
-        return self.sdqn.sdqn_brain.frames[drone_idx]
+        if self.sdqn.last_frames is None:
+            raise RuntimeError("SDQN frames not initialized.")
+        return self.sdqn.last_frames[drone_idx]
 
     def _get_frame_shape(self, iface_idx: int = 0) -> tuple[int, ...]:
-        iface = self.sdqn.sdqn_brain.ifaces[iface_idx]
-        return iface.frame_generator.shape
+        frame_generator = self.sdqn.frame_generators[iface_idx]
+        return frame_generator.shape
 
     def _get_frame_channels(self, iface_idx: int = 0) -> int:
-        iface = self.sdqn.sdqn_brain.ifaces[iface_idx]
-        return iface.frame_generator.channels
+        frame_generator = self.sdqn.frame_generators[iface_idx]
+        return frame_generator.channels
 
     def _get_frame_labels(self, iface_idx: int = 0) -> list[str]:
-        iface = self.sdqn.sdqn_brain.ifaces[iface_idx]
-        return [layer.label for layer in iface.frame_generator.layers]
+        frame_generator = self.sdqn.frame_generators[iface_idx]
+        return [layer.label for layer in frame_generator.layers]
 
     def _get_frame_radius(self, iface_idx: int = 0) -> float | None:
-        iface = self.sdqn.sdqn_brain.ifaces[iface_idx]
-        radius = getattr(iface.frame_generator.geometry, "radius", None)
+        frame_generator = self.sdqn.frame_generators[iface_idx]
+        radius = getattr(frame_generator.geometry, "radius", None)
         return radius
 
     def _init_frame(

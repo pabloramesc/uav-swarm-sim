@@ -2,6 +2,7 @@
 Layer implementations for frame generation, including signal and user layers.
 Each layer transforms ScenarioState into a 2D frame given a geometry.
 """
+
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
@@ -26,7 +27,9 @@ def get_user_positions(state: ScenarioState) -> np.ndarray:
 
 
 @dataclass
-class RadioModelConfig:
+class SignalLayerConfig:
+    plot_rssi: bool = True
+    plot_tx: bool = True
     tx_power: float = 20.0
     rssi_min: float = -80.0
     rssi_max: float = -30.0
@@ -34,27 +37,22 @@ class RadioModelConfig:
     path_loss_exp: float = 2.4
 
 
-@dataclass
-class SignalLayerConfig:
-    positions_getter: PositionsGetter
-    label: str = "signal"
-    plot_rssi: bool = True
-    plot_tx: bool = True
-    radio: RadioModelConfig = field(default_factory=RadioModelConfig)
-
-
 class SignalLayer(FrameLayer):
     def __init__(
         self,
-        config: SignalLayerConfig,
         geometry: FrameGeometry,
+        positions_getter: PositionsGetter,
+        config: Optional[SignalLayerConfig] = None,
+        label: str = "signal",
+        **kwargs
     ):
-        self.config = config
-        super().__init__(geometry, environment=None, label=self.config.label)
+        self.positions_getter = positions_getter
+        self.config = config or SignalLayerConfig(**kwargs)
+        super().__init__(geometry, environment=None, label=label)
 
     def build_frame(self, state: ScenarioState) -> np.ndarray:
         frame = np.zeros(self.geometry.shape, dtype=np.float32)
-        positions = self.config.positions_getter(state)
+        positions = self.positions_getter(state)
 
         if positions.shape[0] == 0:
             return frame
@@ -65,12 +63,12 @@ class SignalLayer(FrameLayer):
             rssi = signal_strength(
                 tx_positions=relative_positions,
                 rx_positions=self.cell_ground_positions,
-                f=self.config.radio.freq_mhz,
-                n=self.config.radio.path_loss_exp,
-                tx_power=self.config.radio.tx_power,
+                f=self.config.freq_mhz,
+                n=self.config.path_loss_exp,
+                tx_power=self.config.tx_power,
             )
             frame = rssi_to_signal_quality(
-                rssi, vmin=self.config.radio.rssi_min, vmax=self.config.radio.rssi_max
+                rssi, vmin=self.config.rssi_min, vmax=self.config.rssi_max
             ).reshape(self.geometry.shape)
 
         if self.config.plot_tx:
@@ -83,10 +81,16 @@ class SignalLayer(FrameLayer):
 class SignalLayerFactory(FrameLayerFactory):
     positions_getter: PositionsGetter
     label: str
+    plot_rssi: bool = True
+    plot_tx: bool = True
 
-    def create(self, geo: FrameGeometry, env: Optional[Environment] = None) -> FrameLayer:
-        config = SignalLayerConfig(
+    def create(
+        self, geo: FrameGeometry, env: Optional[Environment] = None
+    ) -> FrameLayer:
+        config = SignalLayerConfig(plot_rssi=self.plot_rssi, plot_tx=self.plot_tx)
+        return SignalLayer(
+            geometry=geo,
             positions_getter=self.positions_getter,
+            config=config,
             label=self.label,
         )
-        return SignalLayer(geometry=geo, config=config)
