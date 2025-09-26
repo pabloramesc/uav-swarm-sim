@@ -2,11 +2,11 @@ import numpy as np
 
 from ..environment import Environment
 from ..math.connectivity import (
-    covered_positions,
     directly_connected,
     globally_connected,
     pairwise_connectivity_matrix,
 )
+from ..math.coverage import covered_positions
 from ..math.path_loss_model import signal_strength
 
 
@@ -22,7 +22,7 @@ def area_coverage(
 ):
     if tx_positions.shape[1] != 3:
         raise ValueError("Tx positions must be (N, 3) numpy array.")
-    
+
     # Sample random points and compute coverage ratio
     rx_positions = np.zeros((num_points, 3))
     rx_positions[:, 0] = np.random.uniform(*env.boundary.bounds.xlim, num_points)
@@ -94,7 +94,7 @@ class MetricsSnapshot:
             freq_mhz=freq_mhz,
             path_loss_exp=path_loss_exp,
         )
-        self.covered_users = covered_positions(
+        covered_mask = covered_positions(
             tx_positions=self.drone_states[:, 0:3],
             rx_positions=self.user_states[:, 0:3],
             tx_power=tx_power,
@@ -102,6 +102,7 @@ class MetricsSnapshot:
             freq_mhz=freq_mhz,
             path_loss_exp=path_loss_exp,
         )
+        self.covered_users = np.where(covered_mask)[0]
         self.users_coverage = len(self.covered_users) / max(len(self.user_states), 1)
 
         # Connectivity

@@ -9,7 +9,7 @@ from ..mobility.sdqn_position_controller import (
     SDQNConfig,
     SDQNPositionController,
 )
-from ..sdqn.sdqn_wrapper import SDQNWrapper
+from ..sdqn.dqn_wrapper import DQNWrapper
 from ..sdqn.reward_manager import RewardManager
 from ..sdqn.frame_generators import GridFrameGenerator
 from ..sdqn.actions import Action
@@ -57,7 +57,7 @@ class MultiAgentSDQNGym:
     def _create_sdqn_central_agent(self) -> SDQNBrain:
         frame_shape = GridFrameGenerator.calculate_frame_shape()
         num_actions = 5  # len(Action)
-        wrapper = SDQNWrapper(
+        wrapper = DQNWrapper(
             frame_shape, num_actions, model_path=self.model_path, train_mode=True
         )
         return SDQNBrain(wrapper)
@@ -143,7 +143,7 @@ class MultiAgentSDQNGym:
         self.drone_states = self.drones.get_states_array()
         self.user_states = self.users.get_states_array()
 
-        self.rewards, dones = self.reward_manager.update(
+        self.rewards, dones = self.reward_manager.compute_rewards(
             drones=self.drone_states[:, 0:2],
             users=self.user_states[:, 0:2],
             time=self.sim_time,

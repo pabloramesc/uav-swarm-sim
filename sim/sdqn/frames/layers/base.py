@@ -4,6 +4,7 @@ Base abstract class for frame layers single-channel generators.
 
 from abc import ABC, abstractmethod
 from typing import Optional
+from collections import deque
 
 import numpy as np
 
@@ -25,6 +26,7 @@ class FrameLayer(ABC):
         self.environment = environment
         self.label = label
         self.plot_center = plot_center
+        self.position_history = deque(maxlen=10)
 
     @property
     def cell_ground_positions(self):
@@ -41,6 +43,8 @@ class FrameLayer(ABC):
     def generate_frame(self, state: ScenarioState) -> np.ndarray:
         frame = self.build_frame(state)
 
+        frame += np.random.normal(0.0, 0.03, size=self.geometry.shape)
+
         absolute_positions = self.cell_ground_positions
         absolute_positions[:, 0:2] += state.agent_position[0:2]
 
@@ -50,18 +54,31 @@ class FrameLayer(ABC):
                 pos=absolute_positions, check_boundary=True, check_altitude=False
             )
             self.set_frame_cells(
-                frame, positions=self.geometry.flat_cell_positions[mask], value=1.0
+                frame, positions=self.geometry.flat_cell_positions[mask], value=0.9
             )
 
         if self.plot_center:
             self.set_frame_cells(frame, positions=np.zeros(2), value=1.0)
 
+        decay_value = 1.0
+        self.position_history.append(state.agent_position.copy())
+        for pos in reversed(self.position_history):
+            indices = self.geometry.positions_to_cell_indices(
+                (pos - state.agent_position)[0:2]
+            )
+            frame[indices[:, 0], indices[:, 1]] += decay_value
+            decay_value -= 0.1
+
         return frame
 
     def set_frame_cells(
-        self, frame: np.ndarray, positions: np.ndarray, value: float = 1.0
+        self,
+        frame: np.ndarray,
+        positions: np.ndarray,
+        value: float = 1.0,
+        clip: bool = False,
     ) -> None:
-        indices = self.geometry.positions_to_cell_indices(positions)
+        indices = self.geometry.positions_to_cell_indices(positions, clip)
         frame[indices[:, 0], indices[:, 1]] = value
 
 

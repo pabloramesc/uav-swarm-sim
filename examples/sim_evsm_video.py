@@ -45,7 +45,7 @@ last_capture_time = -1.0
 
 while sim.sim_time <= 120.0:
     sim.step()
-    fps = gui.update()
+    fps = gui.render()
     if sim.sim_time - last_capture_time >= 1.0:
         frame = gui.capture_frame()
         frames.append(frame)

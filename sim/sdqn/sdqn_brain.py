@@ -5,11 +5,11 @@ from ..environment import Environment
 from .actions import Action
 from .reward_manager import RewardManager
 from .sdqn_interface import SDQNInterface
-from .sdqn_wrapper import SDQNWrapper
+from .dqn_wrapper import DQNWrapper
 
 
 class SDQNBrain:
-    def __init__(self, wrapper: SDQNWrapper, environment: Environment) -> None:
+    def __init__(self, wrapper: DQNWrapper, environment: Environment) -> None:
         self.wrapper = wrapper
         self.ifaces: list[SDQNInterface] = []
 
@@ -50,7 +50,7 @@ class SDQNBrain:
     ) -> None:
         self.step(drone_positions, user_positions)
 
-        self.rewards, self.dones = self.reward_manager.update(
+        self.rewards, self.dones = self.reward_manager.compute_rewards(
             drone_positions, user_positions
         )
 

@@ -61,7 +61,7 @@ log = DataLogger(
 
 while sim.sim_time <= 120.0:
     sim.step()
-    fps = gui.update()
+    fps = gui.render()
     
     
     send_packets = sum(user.swarm_link.send_counter for user in sim.users) if sim.network else 0

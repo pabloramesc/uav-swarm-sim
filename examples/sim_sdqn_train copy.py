@@ -7,7 +7,7 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from sim.simulators.sdqn_trainer import SDQNTrainer, SDQNConfig
+from sim.simulators.sdqn_trainer import SDQNTrainer, DQNConfig
 from sim.gui.sdqn_viewer import SDQNViewer
 from sim.gui.sdqn_logpolar_viewer import SDQNLogPolarViewer
 from sim.utils.csv_logger import CSVLogger
@@ -22,7 +22,7 @@ num_obstacles = 0
 num_episodes = 1000
 max_steps = int(5 * 60 / dt)
 
-config = SDQNConfig(displacement=2.0, target_height=0.0)
+config = DQNConfig(displacement=2.0, target_height=0.0)
 
 frame_factory = SignalFrameFactory(num_cells=64, frame_radius=100.0)
 
@@ -90,7 +90,7 @@ for episode in range(num_episodes + 1):
     episode_losses = []
     for step in range(max_steps):
         sim.update()
-        fps = gui.update(force=False) if gui else np.nan
+        fps = gui.render(force=False) if gui else np.nan
 
         cumulative_reward += np.mean(sim.rewards)
         if sim.sdqn_brain.wrapper.train_steps > 0:

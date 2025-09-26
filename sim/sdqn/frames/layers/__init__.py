@@ -8,6 +8,4 @@ from .signal import (
     SignalLayer,
     SignalLayerConfig,
     SignalLayerFactory,
-    get_neighbor_positions,
-    get_user_positions,
 )

@@ -9,16 +9,16 @@ import numpy as np
 
 class FrameGeometry(ABC):
     """Abstract base class for frame geometries."""
-        
+
     def __init__(self, height: int, width: int):
         self.height = height
         self.width = width
         self.cell_positions = self.calculate_cell_positions()
-        
+
     @property
     def shape(self) -> tuple[int, int]:
         return (self.height, self.width)
-        
+
     @property
     def num_cells(self) -> int:
         return self.height * self.width
@@ -33,14 +33,25 @@ class FrameGeometry(ABC):
         pass
 
     @abstractmethod
-    def positions_to_cell_indices(self, positions: np.ndarray) -> np.ndarray:
-        """Map positions to corresponding cell indices in the frame."""
+    def positions_to_cell_indices(
+        self, positions: np.ndarray, clip: bool = False
+    ) -> np.ndarray:
+        """Map positions to corresponding cell indices in the frame.
+        
+        Args:
+            positions (np.ndarray): (N, 2) array of (x, y) positions.
+            clip (bool): If True, clip indices to grid boundaries;
+                otherwise discard out-of-bounds positions.
+
+        Returns:
+            np.ndarray: (row, col) cell indices.
+        """
         pass
-    
+
 
 class FrameGeometryFactory(ABC):
     """Abstract base class for geometry factories."""
-    
+
     @abstractmethod
     def create(self) -> FrameGeometry:
         pass

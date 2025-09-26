@@ -6,7 +6,7 @@ from sim.mobility.sdqn_position_controller import SDQNConfig
 from sim.sdqn.frames.frame_generator import FrameGeneratorFactory
 
 from sim.mobility.utils import environment_random_positions
-from sim.sdqn import SDQNBrain, SDQNWrapper
+from sim.sdqn import SDQNBrain, DQNWrapper
 from sim.simulators import SDQNSimulator
 
 
@@ -28,7 +28,7 @@ class SDQNTrainer(SDQNSimulator):
 
     def _create_sdqn_brain(self) -> SDQNBrain:
         frame_shape = self.frame_factory.shape
-        wrapper = SDQNWrapper(
+        wrapper = DQNWrapper(
             frame_shape=frame_shape,
             model_path=self.model_path,
             train_mode=True,

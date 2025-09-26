@@ -51,7 +51,7 @@ gui = SimpleViewer(sim, background_type="fused")
 
 while True:
     sim.step()
-    fps = gui.update(force=False)
+    fps = gui.render(force=False)
 
     print(f"Real time: {sim.real_time:.2f} s, Sim time: {sim.sim_time:.2f} s, ", end="")
     if sim.network:

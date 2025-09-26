@@ -8,7 +8,7 @@ from ..environment import Environment
 from ..mobility.position_controller import DummyPositionController
 from ..mobility.sdqn_position_controller import SDQNConfig
 from ..mobility.utils import environment_random_positions
-from ..sdqn import SDQNBrain, SDQNInterface, SDQNWrapper
+from ..sdqn import SDQNBrain, SDQNInterface, DQNWrapper
 from ..sdqn.frames import (
     FrameGeneratorFactory,
     SignalLayerFactory,
@@ -70,7 +70,7 @@ class SDQNSimulator:
 
     def _create_sdqn_brain(self) -> SDQNBrain:
         frame_shape = self.frame_factory.create(env=None).shape
-        wrapper = SDQNWrapper(
+        wrapper = DQNWrapper(
             frame_shape=frame_shape,
             model_path=self.model_path,
             train_mode=False,

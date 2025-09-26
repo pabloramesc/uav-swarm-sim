@@ -10,7 +10,7 @@ import imageio.v2 as imageio
 
 import numpy as np
 
-from sim.simulators.sdqn_trainer import SDQNTrainer, SDQNConfig
+from sim.simulators.sdqn_trainer import SDQNTrainer, DQNConfig
 from sim.gui.sdqn_viewer import SDQNViewer
 from sim.gui.sdqn_logpolar_viewer import SDQNLogPolarViewer
 from sim.utils.data_logger import DataLogger
@@ -21,7 +21,7 @@ num_users = 20
 size = 1e3
 num_obstacles = 5
 
-config = SDQNConfig(target_velocity=20.0, target_height=10.0)
+config = DQNConfig(target_velocity=20.0, target_height=10.0)
 sim = SDQNTrainer(
     num_drones,
     num_users,
@@ -61,7 +61,7 @@ fps = 10.0
 
 while sim.sim_time <= 10.0:
     sim.update()
-    fps = gui.update(force=False)
+    fps = gui.render(force=False)
     if sim.sim_time - last_capture_time >= 1 / fps:
         frame = gui.capture_frame()
         frames.append(frame)

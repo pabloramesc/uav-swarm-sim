@@ -49,12 +49,12 @@ class SimpleViewer:
         self.obstacles = ObstaclesPlot(ax=self.ax, sim=self.sim)
         self.agents = AgentsPlot(ax=self.ax, sim=self.sim)
 
-    def initialize(self) -> None:
+    def reset(self) -> None:
         self.background.plot()
         self.obstacles.plot()
         self.agents.update()
 
-    def update(self, force: bool = False) -> None:
+    def render(self, force: bool = False) -> None:
         if not self.fps_control.need_render(self.sim.clock.sim_time) and not force:
             return
 

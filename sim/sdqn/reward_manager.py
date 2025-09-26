@@ -4,41 +4,37 @@ from numpy.typing import NDArray
 from ..environment import Environment
 from ..simulators.metrics import area_coverage
 from ..math.distances import pairwise_self_distances
-from ..math.connectivity import covered_positions, globally_connected
+from ..math.coverage import covered_positions, coverage_matrix
+from ..math.connectivity import globally_connected
 from .utils import distances_to_obstacles
 
 
 class RewardManager:
     """
-    RewardManager computes reward signals and episode termination flags for
-    Swarm DQN (SDQN) multi-agent reinforcement learning controlling UAV placement.
+    Computes reward signals and episode termination flags for Swarm DQN (SDQN)
+    multi-agent reinforcement learning controlling UAV placement.
 
-    Rewards consider user coverage, drone connectivity, and penalties for
+    Rewards consider user coverage, network connectivity, and penalties for
     proximity to obstacles or collisions.
     """
 
-    def __init__(self, env: Environment) -> None:
+    def __init__(
+        self, env: Environment, obstacle_dist: float = 10.0, collision_dist: float = 0.0
+    ) -> None:
         """
         Initialize RewardManager with environment and distance thresholds.
 
-        Parameters
-        ----------
-        env : Environment
-            The simulation environment providing boundary, obstacles, and elevation.
-
-        Attributes
-        ----------
-        d_obstacles : float
-            Minimum safe distance to obstacles; below this, a small penalty applies.
-        d_collision : float
-            Distance threshold for collisions; below this, heavy penalty and done flag.
+        Args:
+            env (Environment): Simulation environment with boundaries, obstacles, and elevation.
+            obstacle_dist (float): Minimum safe distance to obstacles; small penalty below this.
+            collision_dist (float): Distance threshold for collisions; heavy penalty and episode termination.
         """
         self.env = env
-        self.d_obstacles = 10.0
-        self.d_collision = 0.0
+        self.d_obstacles = obstacle_dist
+        self.d_collision = collision_dist
 
-    def update(
-        self, drones: np.ndarray, users: np.ndarray, **kwargs
+    def compute_rewards(
+        self, drones: NDArray[np.floating], users: NDArray[np.floating], **kwargs
     ) -> tuple[NDArray[np.float32], NDArray[np.bool_]]:
         """
         Compute per-drone rewards and done flags for the current state.
@@ -62,13 +58,14 @@ class RewardManager:
         dones = np.zeros(num_drones, dtype=np.bool_)
 
         # rewards += self.difference_area_coverage_rewards(drones)
-        rewards += self.difference_users_coverage_rewards(drones, users)
+        rewards += self.users_coverage_difference_rewards(drones, users)
+        # rewards += self.users_coverage_fractional_reward(drones, users)
         # rewards += self.difference_connectivity_rewards(drones)
 
-        dist = self.min_separation(drones, check_drones_separation=False)
+        dist = self.min_separation(drones, check_drones_separation=True)
         rewards[dist <= self.d_obstacles] = -1.0
 
-        collided = (dist <= self.d_collision)
+        collided = dist <= self.d_collision
         dones[collided] = True
         rewards[collided] = -10.0
 
@@ -77,9 +74,8 @@ class RewardManager:
     def min_separation(
         self, drones: np.ndarray, check_drones_separation: bool = True
     ) -> np.ndarray:
-        """
-        Compute the minimum separation distance for each drone to the nearest obstacle, and,
-        optionally, to other drones.
+        """Compute the minimum separation distance for each drone to the nearest
+        obstacle, and, optionally, to other drones.
         """
         nearest_obs = distances_to_obstacles(self.env, drones[:, 0:2])
 
@@ -92,10 +88,44 @@ class RewardManager:
 
         return np.minimum(nearest_drone, nearest_obs)
 
-    def difference_area_coverage_rewards(self, drones: np.ndarray) -> np.ndarray:
+    def users_coverage_difference_rewards(
+        self, drones: np.ndarray, users: np.ndarray
+    ) -> NDArray[np.float32]:
+        """Compute difference rewards for user coverage.
+
+        The marginal contribution of each drone to user coverage calculated as
+        the difference between the total coverage with all drones and the
+        coverage ratio if that drone were removed.
         """
-        Compute area coverage difference rewards: the marginal contribution of each drone to
-        environment area coverage.
+        num_drones = drones.shape[0]
+        rewards = np.zeros(num_drones, dtype=np.float32)
+        global_reward = self._coverage_ratio(tx_positions=drones, rx_positions=users)
+        for i in range(num_drones):
+            no_drone_reward = self._coverage_ratio(
+                tx_positions=np.delete(drones, i, axis=0), rx_positions=users
+            )
+            rewards[i] = global_reward - no_drone_reward
+        return rewards
+
+    def users_coverage_fractional_rewards(
+        self, drones: np.ndarray, users: np.ndarray
+    ) -> NDArray[np.float32]:
+        """Compute fractional rewards for user coverage.
+
+        Each drone gets fractional credit for users it covers,
+        divided by number of drones covering the same user.
+        """
+        coverage = coverage_matrix(drones, users)  # (N, M) boolean
+        users_covered_count = np.sum(coverage, axis=0)  # (M,)
+        users_covered_count[users_covered_count == 0] = 1  # avoid division by zero
+        fractional_credit = coverage / users_covered_count  # broadcasting
+        rewards = np.sum(fractional_credit, axis=1)  # sum over users for each drone
+        rewards = rewards / users.shape[0]  # normalize to the number of users ratio
+        return rewards
+
+    def area_coverage_difference_rewards(self, drones: np.ndarray) -> np.ndarray:
+        """Compute area coverage difference rewards: the marginal contribution
+        of each drone to environment area coverage.
         """
         num_drones = drones.shape[0]
         rewards = np.zeros(num_drones)
@@ -107,25 +137,9 @@ class RewardManager:
             rewards[i] = global_reward - no_drone_reward
         return rewards
 
-    def difference_users_coverage_rewards(
-        self, drones: np.ndarray, users: np.ndarray
-    ) -> np.ndarray:
-        """
-        Compute coverage-based difference rewards: the marginal contribution of each drone to user coverage.
-        """
-        num_drones = drones.shape[0]
-        rewards = np.zeros(num_drones)
-        global_reward = self._coverage_ratio(tx_positions=drones, rx_positions=users)
-        for i in range(num_drones):
-            no_drone_reward = self._coverage_ratio(
-                tx_positions=np.delete(drones, i, axis=0), rx_positions=users
-            )
-            rewards[i] = global_reward - no_drone_reward
-        return rewards
-
-    def difference_connectivity_rewards(self, drones: np.ndarray) -> np.ndarray:
-        """
-        Compute connectivity-based difference rewards: the marginal contribution of each drone to network connectivity.
+    def connectivity_difference_rewards(self, drones: np.ndarray) -> np.ndarray:
+        """Compute difference rewards: the marginal
+        contribution of each drone to network connectivity.
         """
         num_drones = drones.shape[0]
         rewards = np.zeros(num_drones)
@@ -138,9 +152,9 @@ class RewardManager:
         return rewards
 
     def _coverage_ratio(self, tx_positions: np.ndarray, rx_positions: np.ndarray):
-        covered = covered_positions(tx_positions, rx_positions)
-        return len(covered) / max(len(rx_positions), 1)
+        covered_mask = covered_positions(tx_positions, rx_positions)
+        return np.sum(covered_mask) / max(len(rx_positions), 1)
 
     def _global_connections(self, positions: np.ndarray):
-        connected = globally_connected(positions)
-        return len(connected) / max(len(positions), 1)
+        connected_idx = globally_connected(positions)
+        return len(connected_idx) / max(len(positions), 1)

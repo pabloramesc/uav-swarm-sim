@@ -31,4 +31,4 @@ gui = EVSMViewer(sim, background_type="fused")
 
 while True:
     sim.step()
-    gui.update(force_render=False, verbose=True)
+    gui.render(force_render=False, verbose=True)

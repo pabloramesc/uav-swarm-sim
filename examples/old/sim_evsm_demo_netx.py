@@ -55,7 +55,7 @@ gui2 = ConnectionGraphPlotter(num_nodes=num_drones)
 
 while True:
     sim.step()
-    fps = gui.update(force=False)
+    fps = gui.render(force=False)
     gui2.update(adjacency_matrix=sim.metrics.drones_conn_matrix, positions={i: sim.drone_states[i, 0:2] for i in range(num_drones)})
     
     print(f"Real time: {sim.real_time:.2f} s, Sim time: {sim.sim_time:.2f} s, ", end="")

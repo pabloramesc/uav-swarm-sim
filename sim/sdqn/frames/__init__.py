@@ -9,8 +9,6 @@ from .layers import (
     ObstaclesLayerFactory,
     SignalLayer,
     SignalLayerConfig,
-    SignalLayerFactory,
-    get_neighbor_positions,
-    get_user_positions,
+    SignalLayerFactory
 )
-from .state import ScenarioState
+from .state import ScenarioState, get_neighbor_positions, get_user_positions, get_agent_position

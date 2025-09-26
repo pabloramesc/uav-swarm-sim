@@ -33,7 +33,7 @@ class LogPolarGeometry(FrameGeometry):
         cell_positions = np.stack((x_grid, y_grid), axis=-1)
         return cell_positions
 
-    def positions_to_cell_indices(self, positions: np.ndarray) -> np.ndarray:
+    def positions_to_cell_indices(self, positions: np.ndarray, clip: bool = False) -> np.ndarray:
         rel = np.atleast_2d(positions)
         r = np.linalg.norm(rel, axis=1)
         theta = np.arctan2(rel[:, 1], rel[:, 0])
@@ -47,8 +47,16 @@ class LogPolarGeometry(FrameGeometry):
         ).astype(int)
         angular_indices = ((theta + np.pi) / (2 * np.pi) * self.num_angular).astype(int)
 
-        radial_indices = np.clip(radial_indices, 0, self.num_radial - 1)
-        angular_indices = np.mod(angular_indices, self.num_angular)
+        if clip:
+            # Clip indices into valid range
+            radial_indices = np.clip(radial_indices, 0, self.num_radial - 1)
+            angular_indices = np.mod(angular_indices, self.num_angular)
+        else:
+            # Mask out-of-bounds radial indices (or optionally angular too)
+            valid_mask = (r >= self.min_radius) & (r <= self.max_radius)
+            radial_indices = radial_indices[valid_mask]
+            angular_indices = angular_indices[valid_mask]
+            
         return np.stack([radial_indices, angular_indices], axis=1)
 
 

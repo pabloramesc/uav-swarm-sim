@@ -38,13 +38,13 @@ class SquareGeometry(FrameGeometry):
 
         # Filter out indices that are outside the frame
         else:
-            mask = (
+            valid_mask = (
                 (indices[:, 0] >= 0)
                 & (indices[:, 0] < self.side_size)
                 & (indices[:, 1] >= 0)
                 & (indices[:, 1] < self.side_size)
             )
-            indices = indices[mask]
+            indices = indices[valid_mask]
 
         indices = indices[:, [1, 0]]  # Swap x and y to row, col order
         return indices

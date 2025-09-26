@@ -43,18 +43,18 @@ class SDQNViewer(SimpleViewer):
         self._init_frame_images()
         self.fig.tight_layout()
 
-    def initialize(self) -> None:
+    def reset(self) -> None:
         # Reconfigure axes limits to adapt to environment changes
         self.limits = self._calculate_axis_limits(limits=None)
         self._create_axes()
         self._init_frame_images()
         self.fig.tight_layout()
 
-        super().initialize()
+        super().reset()
 
-    def update(self, force: bool = False):
+    def render(self, force: bool = False):
         self._update_frame_images()
-        super().update(force)
+        super().render(force)
 
     def _create_axes(self):
         num_channels = self._get_frame_channels()

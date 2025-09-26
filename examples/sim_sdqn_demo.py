@@ -7,7 +7,7 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from sim.simulators.sdqn_trainer import SDQNTrainer, SDQNConfig
+from sim.simulators.sdqn_trainer import SDQNTrainer, DQNConfig
 from sim.gui.simple_viewer import SimpleViewer
 from sim.gui.sdqn_viewer import SDQNViewer
 from sim.gui.sdqn_logpolar_viewer import SDQNLogPolarViewer
@@ -19,7 +19,7 @@ num_users = 20
 size = 1e3
 num_obstacles = 0
 
-config = SDQNConfig(target_velocity=20.0, target_height=10.0)
+config = DQNConfig(target_velocity=20.0, target_height=10.0)
 sim = SDQNTrainer(
     num_drones,
     num_users,
@@ -52,7 +52,7 @@ gui = SimpleViewer(sim, show_legend=False, figsize=(12, 8))
 
 while True:
     sim.update()
-    fps = gui.update(force=False)
+    fps = gui.render(force=False)
 
     print(
         f"Real time: {sim.real_time:.2f} s, Sim time: {sim.sim_time:.2f} s, FPS: {gui.fps:.2f}",

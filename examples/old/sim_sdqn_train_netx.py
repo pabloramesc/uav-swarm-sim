@@ -7,7 +7,7 @@ https://opensource.org/licenses/MIT
 
 import numpy as np
 
-from sim.simulators.sdqn_trainer import SDQNTrainer, SDQNConfig
+from sim.simulators.sdqn_trainer import SDQNTrainer, DQNConfig
 from sim.gui.sdqn_viewer import SDQNViewer
 from sim.gui.sdqn_logpolar_viewer import SDQNLogPolarViewer
 
@@ -18,7 +18,7 @@ size = 500
 change_interval = 10_000
 num_obstacles = 0
 
-config = SDQNConfig(target_velocity=20.0, target_height=0.0)
+config = DQNConfig(target_velocity=20.0, target_height=0.0)
 sim = SDQNTrainer(
     num_drones,
     num_users,
@@ -64,7 +64,7 @@ while True:
         print("Changing environment...")
         change_environment()
 
-    fps = gui.update(force=False)
+    fps = gui.render(force=False)
     netx.update(adjacency_matrix=sim.metrics.drones_conn_matrix, positions={i: sim.drone_states[i, 0:2] for i in range(num_drones)})
     
 
