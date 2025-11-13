@@ -4,4 +4,6 @@ scipy
 numba
 tensorflow
 rasterio
-Shapely
+shapely
+contextily
+pyproj

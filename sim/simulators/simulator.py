@@ -20,8 +20,8 @@ class MultiAgentSimulator:
         self,
         agents: AgentsManager,
         environment: Environment,
-        dt: float = 0.01,
         use_network: bool = False,
+        dt: float = 0.01,
     ) -> None:
         """Initializes the multi-agent simulator.
 
@@ -46,23 +46,27 @@ class MultiAgentSimulator:
             else None
         )
 
-        self.metrics: MetricsSnapshot | None = None
-
         # States caches [px, py, pz, vx, vy, vz]
         self.gcs_states = np.zeros((self.gcs.size, 6))
         self.user_states = np.zeros((self.users.size, 6))
         self.drone_states = np.zeros((self.drones.size, 6))
+
+        self.metrics = MetricsSnapshot(
+            env=self.environment,
+            drone_states=self.drone_states,
+            user_states=self.user_states,
+        )
 
         register_exit_signal()
 
     @property
     def dt(self) -> float:
         return self.clock.dt
-    
+
     @property
     def sim_time(self) -> float:
         return self.clock.sim_time
-    
+
     @property
     def sim_step(self) -> int:
         return self.clock.sim_step

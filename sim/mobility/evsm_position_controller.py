@@ -67,11 +67,10 @@ class EVSMPositionController(PositionController):
         self._last_springs_update_time: float = None
 
     def initialize(self, context: ControllerContext) -> None:
-        if context.drone_positions is None:
-            raise ValueError("Drone positions is required for initialization.")
+        if context.drone_positions is not None:
+            self.drone_positions = context.drone_positions
 
         self.control_force = np.zeros(3)
-        self.drone_positions = context.drone_positions
         self._last_control_update_time: float = None
         self._last_springs_update_time: float = None
 

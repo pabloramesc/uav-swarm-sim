@@ -1,122 +1,153 @@
-import numpy as np
-from numpy.typing import ArrayLike
+import logging
+from typing import Optional
 
-from ..agents import AgentsRegistry, Drone, Agent, ControlStation, User
-from ..mobility.evsm_position_controller import EVSMPositionController, EVSMConfig
-from ..mobility.utils import grid_positions, environment_random_positions
+import numpy as np
+from numpy.typing import NDArray
+
+from ..agents import (
+    AgentsManager,
+    ControlStation,
+    Drone,
+    RegistryNeighborProvider,
+    SwarmLinkNeighborProvider,
+    User,
+)
+from ..environment import Environment
+from ..mobility.evsm_position_controller import EVSMConfig, EVSMPositionController
+from ..mobility.utils import environment_random_positions, grid_positions
+from ..network import SwarmLink
+from .evsm_monitor import EVSMMonitor
 from .simulator import MultiAgentSimulator
 
 
-class EVSMMonitor:
-    def __init__(self, drones: AgentsRegistry):
-        self.registry = drones
-        self.edge_mask = np.zeros(drones.size, dtype=bool)
-        self.springs_matrix = np.zeros(
-            (drones.size, drones.size), dtype=bool
-        )
+class EVSMSimulator:
 
-    def update(self):
-        for i, agent in enumerate(self.registry):
-            drone: Drone = agent
-            controller: EVSMPositionController = drone.position_controller
-
-            if controller is None:
-                raise Exception(f"Drone {drone.id} has no position controller")
-
-            if not isinstance(controller, EVSMPositionController):
-                raise Exception(f"Drone {drone.id} position controller is not EVSM")
-
-            self.edge_mask[i] = controller.evsm.is_edge_robot()
-            self.springs_matrix[i] = self._drone_springs_mask(controller)
-
-    def _drone_springs_mask(self, controller: EVSMPositionController) -> np.ndarray:
-        drone_springs = np.zeros(self.registry.size, dtype=bool)
-
-        neighbor_ids = np.array(list(controller.drone_positions.keys()))
-        neighbor_indices = self.registry.get_indices(neighbor_ids)
-
-        if neighbor_indices.size == 0:
-            return drone_springs
-
-        springs_mask = controller.evsm.springs_mask
-        if neighbor_indices.shape != springs_mask.shape:
-            raise ValueError("Springs mask shape do not match neighbor indices")
-
-        drone_springs[neighbor_indices] = springs_mask
-        return drone_springs
-
-
-class EVSMSimulator(MultiAgentSimulator):
+    logger = logging.getLogger("EVSMSimulator")
 
     def __init__(
         self,
+        environment: Environment,
         num_drones: int,
         num_users: int = 0,
         num_gcs: int = 1,
-        dt: float = 0.01,
-        dem_path: str = None,
         use_network: bool = False,
-        evsm_config: EVSMConfig = None,
-        **kwargs
+        evsm_config: Optional[EVSMConfig] = None,
+        dt: float = 0.01,
     ) -> None:
-        self.evsm_config = evsm_config or EVSMConfig(kwargs)
+        # Configuration
+        self.evsm_config = evsm_config or EVSMConfig()
+        self.use_network = use_network
 
-        super().__init__(
-            num_drones,
-            num_users,
-            num_gcs,
-            dt,
-            dem_path,
-            use_network
+        # Core components
+        self.agents = AgentsManager()
+        self.environment = environment
+
+        # Agents
+        self._create_gcs(num_gcs)
+        self._create_drones(num_drones)
+        self._create_users(num_users)
+
+        # Simulation
+        self.sim = MultiAgentSimulator(
+            agents=self.agents,
+            environment=self.environment,
+            use_network=use_network,
+            dt=dt,
         )
 
-        self.evsm_monitor = EVSMMonitor(drones=self.drones)
+        self.evsm_monitor = EVSMMonitor(drones=self.sim.drones)
 
-    def create_drone(self, evsm_config: EVSMConfig = None) -> Drone:
-        evsm = EVSMPositionController(
-            config=evsm_config, env=self.environment
-        )
-        drone = Drone(
-            agent_id=len(self.agents),
-            env=self.environment,
-            controller=evsm,
-            network_sim=self.netsim,
-            drones_registry=self.drones,
-            users_registry=self.users,
-            neighbor_provider="network" if self.network else "registry",
-        )
-        return drone
+    def _create_gcs(self, num_gcs: int) -> None:
+        for _ in range(num_gcs):
+            station_id = self.agents.size + 1
 
-    def reset(self, home: ArrayLike = [0.0, 0.0], spacing: float = 5.0, altitude: float = 0.0) -> None:
+            if self.use_network and self.sim.network is not None:
+                link = SwarmLink(
+                    agent_id=station_id,
+                    network_sim=self.sim.network.netsim,
+                    position_timeout=5.0,
+                )
+            else:
+                link = None
+
+            gcs = ControlStation(
+                agent_id=station_id, env=self.environment, swarm_link=link
+            )
+            self.agents.register_agent(gcs)
+        return
+
+    def _create_drones(self, num_drones: int) -> None:
+        for _ in range(num_drones):
+            drone_id = self.agents.size + 1
+
+            if self.use_network and self.sim.network is not None:
+                link = SwarmLink(
+                    agent_id=drone_id,
+                    network_sim=self.sim.network.netsim,
+                    local_bcast_interval=0.1,
+                    global_bcast_interval=1.0,
+                    position_timeout=5.0,
+                )
+                provider = SwarmLinkNeighborProvider(swarm_link=link)
+
+            else:
+                link = None
+                provider = RegistryNeighborProvider(
+                    agent_id=drone_id,
+                    drones_registry=self.agents.drones,
+                    users_registry=self.agents.users,
+                )
+
+            evsm = EVSMPositionController(
+                config=self.evsm_config, environment=self.environment
+            )
+
+            drone = Drone(
+                agent_id=drone_id,
+                env=self.environment,
+                controller=evsm,
+                provider=provider,
+                swarm_link=link,
+            )
+
+            self.agents.register_agent(drone)
+        return
+
+    def _create_users(self, num_users: int) -> None:
+        for _ in range(num_users):
+            user = User(
+                agent_id=self.agents.size + 1, env=self.environment, swarm_link=None
+            )
+            self.agents.register_agent(user)
+        return
+
+    def reset(
+        self, home: NDArray = np.zeros(2), spacing: float = 5.0, altitude: float = 0.0
+    ) -> None:
         self.logger.info("Initializing simulation ...")
 
-        if self.num_gcs == 1:
-            gcs_state = np.zeros(6)
-            gcs_state[0:2] = np.asarray(home[0:2])
-            gcs_state[2] = self.environment.get_elevation(home[0:2])
-            self.gcs[0].initialize(state=gcs_state)
+        gcs_states = np.zeros((self.sim.gcs.size, 6))
+        gcs_states[:, 0:2] = home[0:2]
+        gcs_states[:, 2] = self.environment.get_elevation(home[0:2])
 
-        drone_states = np.zeros((self.num_drones, 6))
+        drone_states = np.zeros((self.sim.drones.size, 6))
         drone_states[:, 0:3] = grid_positions(
-            num_points=self.num_drones,
+            num_points=self.sim.drones.size,
             origin=home,
             space=spacing,
             altitude=altitude,
         )
-        self.drones.initialize(states=drone_states)
 
-        if self.num_users > 0:
-            user_states = np.zeros((self.num_users, 6))
-            user_states[:, 0:3] = environment_random_positions(
-                num_positions=self.num_users, env=self.environment
-            )
-            self.users.initialize(states=user_states)
+        user_states = np.zeros((self.sim.users.size, 6))
+        user_states[:, 0:3] = environment_random_positions(
+            num_positions=self.sim.users.size, env=self.environment
+        )
 
-        super().reset()
+        states = np.vstack([gcs_states, drone_states, user_states])
+        self.sim.reset(states=states)
 
         self.logger.info("✅ Initialization completed.")
 
     def step(self, dt=None):
-        super().step(dt)
+        self.sim.step(dt)
         self.evsm_monitor.update()
-        self._sync_to_real_time()
