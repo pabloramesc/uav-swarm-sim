@@ -23,6 +23,7 @@ from keras.layers import (
 from keras.losses import Huber
 from keras.models import Model, Sequential, load_model, save_model
 from keras.optimizers import Adam
+from numpy.typing import NDArray
 
 
 @dataclass
@@ -41,6 +42,7 @@ class DQNConfig:
     per_beta: float = 0.4
     per_beta_annealing: float = 1e-6
     autosave_freq: int = 1000
+    learning_rate: float = 2.5e-4
 
 
 class DQNWrapper:
@@ -110,6 +112,8 @@ class DQNWrapper:
             save_model(model=model, filepath=self.model_path)
             self.logger.info(f"Model saved to '{self.model_path}'. ")
 
+        model.optimizer.learning_rate.assign(self.config.learning_rate) # type: ignore
+
         # Create linear decaying epsilon-greedy policy with initial random exploration
         if self.train_mode:
             self.policy = EpsilonGreedyPolicy(
@@ -171,11 +175,12 @@ class DQNWrapper:
 
     def add_experiences(
         self,
-        frames: np.ndarray,
-        actions: np.ndarray,
-        next_frames: np.ndarray,
-        rewards: np.ndarray,
-        dones: np.ndarray,
+        frames: NDArray,
+        actions: NDArray[np.int32],
+        next_frames: NDArray,
+        rewards: NDArray[np.float32],
+        dones: NDArray[np.bool_],
+        truncated: Optional[NDArray[np.bool_]] = None,
     ) -> None:
         """Add a batch of experiences to the agent's memory.
 
@@ -185,6 +190,7 @@ class DQNWrapper:
             next_frames: Array of next frames.
             rewards: Array of rewards received.
             dones: Array of done flags indicating episode termination.
+            truncated: Array of done flags indicating episode truncation.
 
         Raises:
             ValueError: If the frames or next frames are not valid.
@@ -201,6 +207,7 @@ class DQNWrapper:
             actions=actions,
             rewards=rewards,
             dones=dones,
+            truncated=truncated,
         )
         self.dqn_agent.add_experiences_batch(batch)
 
@@ -261,7 +268,7 @@ class DQNWrapper:
         q = DuelingHead(dtype="float32")([v, a])
 
         model = Model(inputs=inputs, outputs=q)
-        model.compile(optimizer=Adam(learning_rate=0.00025), loss=Huber(delta=1.0))  # type: ignore
+        model.compile(optimizer=Adam(learning_rate=self.config.learning_rate), loss=Huber(delta=1.0))  # type: ignore
         return model
 
     def check_frame(self, frame: np.ndarray) -> None:

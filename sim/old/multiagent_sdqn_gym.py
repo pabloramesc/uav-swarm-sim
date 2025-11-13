@@ -10,7 +10,7 @@ from ..mobility.sdqn_position_controller import (
     SDQNPositionController,
 )
 from ..sdqn.dqn_wrapper import DQNWrapper
-from ..sdqn.reward_manager import RewardManager
+from ..sdqn.rewards import RewardManager
 from ..sdqn.frame_generators import GridFrameGenerator
 from ..sdqn.actions import Action
 from ..sdqn.sdqn_brain import SDQNBrain

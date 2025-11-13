@@ -20,8 +20,9 @@ from .base import FrameLayer, FrameLayerFactory
 @dataclass
 class SignalLayerConfig:
     coverage_mode: Literal["none", "rssi", "binary"] = "none"
-    plot_tx_positions: bool = True
-    plot_rx_positions: bool = True
+    plot_tx_points: bool = False
+    plot_rx_points: bool = False
+    plot_center: bool = False
 
     tx_power: float = 20.0
     rssi_min: float = -80.0
@@ -37,13 +38,15 @@ class SignalLayer(FrameLayer):
         tx_positions_getter: Optional[PositionsGetter] = None,
         rx_positions_getter: Optional[PositionsGetter] = None,
         config: Optional[SignalLayerConfig] = None,
-        label: str = "signal",
+        label: str = "signal layer",
         **kwargs,
     ):
         self.tx_positions_getter = tx_positions_getter or get_dummy_position
         self.rx_positions_getter = rx_positions_getter or get_dummy_position
         self.config = config or SignalLayerConfig(**kwargs)
-        super().__init__(geometry, environment=None, label=label)
+        super().__init__(
+            geometry, environment=None, label=label, plot_center=self.config.plot_center
+        )
 
     def build_frame(self, state: ScenarioState) -> np.ndarray:
         frame = np.zeros(self.geometry.shape, dtype=np.float32)
@@ -78,16 +81,31 @@ class SignalLayer(FrameLayer):
                 freq_mhz=self.config.freq_mhz,
                 path_loss_exp=self.config.path_loss_exp,
             ).reshape(self.geometry.shape)
-            frame[covered_mask] = 0.4
+            frame[covered_mask] = 0.5
 
         else:
             raise ValueError(f"Invalid converage mode '{self.config.coverage_mode}'")
 
-        if self.config.plot_tx_positions:
-            self.set_frame_cells(frame, positions=tx_positions[:, 0:2], value=0.9, clip=True)
+        if self.config.plot_tx_points:
+            self.set_frame_cells(
+                frame, positions=tx_positions[:, 0:2], value=1.0, clip=True
+            )
 
-        if self.config.plot_rx_positions:
-            self.set_frame_cells(frame, positions=rx_positions[:, 0:2], value=0.8, clip=True)
+        if self.config.plot_rx_points:            
+            covered_mask = covered_positions(
+                tx_positions=np.vstack([tx_positions, np.zeros(3)]),
+                rx_positions=rx_positions,
+                tx_power=self.config.tx_power,
+                min_rssi=self.config.rssi_min,
+                freq_mhz=self.config.freq_mhz,
+                path_loss_exp=self.config.path_loss_exp,
+            )
+            self.set_frame_cells(
+                frame, positions=rx_positions[covered_mask, 0:2], value=0.5, clip=True
+            )
+            self.set_frame_cells(
+                frame, positions=rx_positions[~covered_mask, 0:2], value=1.0, clip=True
+            )
 
         return frame
 
@@ -98,18 +116,20 @@ class SignalLayerFactory(FrameLayerFactory):
     rx_positions_getter: Optional[PositionsGetter] = None
 
     coverage_mode: Literal["none", "rssi", "binary"] = "none"
-    plot_tx_positions: bool = True
-    plot_rx_positions: bool = True
+    plot_tx_points: bool = True
+    plot_rx_points: bool = True
 
-    label: str = "Signal Layer"
+    label: str = "signal layer"
+    plot_center: bool = True
 
     def create(
         self, geo: FrameGeometry, env: Optional[Environment] = None
     ) -> FrameLayer:
         config = SignalLayerConfig(
             coverage_mode=self.coverage_mode,
-            plot_tx_positions=self.plot_tx_positions,
-            plot_rx_positions=self.plot_rx_positions,
+            plot_tx_points=self.plot_tx_points,
+            plot_rx_points=self.plot_rx_points,
+            plot_center=self.plot_center,
         )
         return SignalLayer(
             geometry=geo,

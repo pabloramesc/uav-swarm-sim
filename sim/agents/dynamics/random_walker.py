@@ -23,56 +23,42 @@ class RandomWalkerDynamics(Dynamics):
         self.climb_rate = float(climb_rate)
         self.turning_rate = float(turning_rate)
 
-        self.repulsion_radius = 5.0
-        self.repulsion_force = 1.0
+    def step(self, dt: float, control: np.ndarray) -> None:
+        # Random horizontal target velocity
+        direction = np.random.uniform(-1, 1, 2)
+        direction /= np.linalg.norm(direction)
+        target_vxy = direction * np.random.uniform(self.min_speed, self.max_speed)
 
-    def step(self, dt: float, control: np.ndarray) -> None:        
-        pos = self.state[0:2]
-        vel = self.state[3:5]
+        # Smooth turning
+        vxy = self.state[3:5]
+        vxy = (1 - self.turning_rate) * vxy + self.turning_rate * target_vxy
 
-        # Random velocity change
-        random_direction = np.random.uniform(-1, 1, size=2)
-        random_direction /= np.linalg.norm(random_direction)
-        target_vel = random_direction * np.random.uniform(0.0, self.max_speed)
-
-        # Smooth turn
-        vel = (1 - self.turning_rate) * vel + self.turning_rate * target_vel
-
-        # Obstacle avoidance
-        # vel += self._obstacle_avoidance(pos)
-
-        # Speed limiting
-        speed = np.linalg.norm(vel)
+        # Speed limit
+        speed = np.linalg.norm(vxy)
         if speed > self.max_speed:
-            vel *= self.max_speed / speed
+            vxy *= self.max_speed / speed
+
+        # Position update with simple collision check
+        pxy = self.state[0:2]
+        new_pxy = pxy + vxy * dt
+        if self.env is not None and self.env.is_collision(
+            new_pxy, check_altitude=False, check_boundary=True
+        ):
+            new_pxy = pxy
 
         # Update horizontal motion
-        self.state[3:5] = vel
-        self.state[0:2] += vel * dt
+        self.state[0:2] = new_pxy
+        self.state[3:5] = vxy
 
-        # If not environment was provided, skip surface following
+        # Skip altitude tracking if no environment
         if self.env is None:
             return
 
-        # Altitude tracking (surface-following)
+        # Altitude following
         current_z = self.state[2]
         target_z = self.env.get_elevation(self.state[0:2])
-        climb = np.clip(target_z - current_z, -self.climb_rate, self.climb_rate)
+        climb = np.clip(target_z - current_z, -self.climb_rate, +self.climb_rate)
+
+        # Update vertical motion
         self.state[5] = climb
         self.state[2] += climb * dt
-
-    def _obstacle_avoidance(self, position: np.ndarray) -> np.ndarray:
-        """Repulsion force to avoid nearby obstacles."""
-        if self.env is None:
-            return np.zeros(2)
-
-        force = np.zeros(2)
-        for obs in self.env._obstacles:
-            d = obs.distance(position)
-            if d < self.repulsion_radius:
-                dir_vec = obs.direction(position)
-                force -= (
-                    self.repulsion_force * (self.repulsion_radius - d) * dir_vec
-                )  # linear decay repulsion
-
-        return force

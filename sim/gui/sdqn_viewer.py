@@ -7,7 +7,7 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 from ..simulators import MultiAgentSimulator
 from ..simulators.sdqn_simulator import SDQNSimulator
 from .simple_viewer import BackgroundType, SimpleViewer
-from ..sdqn.frames import FrameGenerator
+from ..sdqn.frames import FrameGenerator, FrameLayer
 from typing import Protocol
 
 
@@ -57,8 +57,8 @@ class SDQNViewer(SimpleViewer):
         super().render(force)
 
     def _create_axes(self):
-        num_channels = self._get_frame_channels()
-        total_axes = 1 + num_channels  # Main sim plot + frame channels
+        frame_generator = self._get_frame_generator()
+        total_axes = 1 + frame_generator.channels  # Main sim plot + frame channels
 
         # Rewrite parent figure with new axes (main + frames)
         self.fig.clear()
@@ -83,19 +83,16 @@ class SDQNViewer(SimpleViewer):
             ax.clear()
         self.frame_images = []
 
-        shape = self._get_frame_shape()
-        frames = np.zeros(shape)
-        labels = self._get_frame_labels()
+        frame_generator = self._get_frame_generator()
+        frames = np.zeros(frame_generator.shape)
         cmaps = ["gray", "viridis", "plasma", "magma", "cividis"]
-        radius = self._get_frame_radius()
 
         for i, ax in enumerate(self.frame_axes):
             im = self._init_frame(
                 frame=frames[..., i],
                 ax=ax,
                 cmap=cmaps[i % len(cmaps)],
-                label=labels[i] if i < len(labels) else "Channel {i}",
-                radius=radius,
+                layer=frame_generator.layers[i],
             )
             self.frame_images.append(im)
 
@@ -109,44 +106,49 @@ class SDQNViewer(SimpleViewer):
             raise RuntimeError("SDQN frames not initialized.")
         return self.sdqn.last_frames[drone_idx]
 
-    def _get_frame_shape(self, iface_idx: int = 0) -> tuple[int, ...]:
-        frame_generator = self.sdqn.frame_generators[iface_idx]
-        return frame_generator.shape
-
-    def _get_frame_channels(self, iface_idx: int = 0) -> int:
-        frame_generator = self.sdqn.frame_generators[iface_idx]
-        return frame_generator.channels
-
-    def _get_frame_labels(self, iface_idx: int = 0) -> list[str]:
-        frame_generator = self.sdqn.frame_generators[iface_idx]
-        return [layer.label for layer in frame_generator.layers]
-
-    def _get_frame_radius(self, iface_idx: int = 0) -> float | None:
-        frame_generator = self.sdqn.frame_generators[iface_idx]
-        radius = getattr(frame_generator.geometry, "radius", None)
-        return radius
+    def _get_frame_generator(self, drone_idx: int = 0) -> FrameGenerator:
+        return self.sdqn.frame_generators[drone_idx]
 
     def _init_frame(
         self,
         frame: np.ndarray,
         ax: Axes,
         cmap: str | None = None,
-        label: str | None = None,
-        radius: float | None = None,
+        layer: FrameLayer | None = None,
     ) -> AxesImage:
         im = ax.imshow(frame / 255.0, origin="lower", cmap=cmap, vmin=0.0, vmax=1.0)
 
-        if label is not None:
-            ax.set_title(label)
+        if layer is None:
+            return im
+
+        geom = layer.geometry
+
+        ax.set_title(layer.label)
+        ax.set_xlabel(geom.xlabel or "")
+        ax.set_ylabel(geom.ylabel or "")
+
+        xlim, ylim = geom.xlim, geom.ylim
+        if xlim:
+            ax.set_xlim(xlim)
+        if ylim:
+            ax.set_ylim(ylim)
+        if xlim and ylim:
+            im.set_extent((xlim[0], xlim[1], ylim[0], ylim[1]))
+
+        xticks, yticks = geom.xticks, geom.yticks
+        xtick_labels, ytick_labels = geom.xtick_labels, geom.ytick_labels
+        if xticks:
+            ax.set_xticks(xticks)
+        if yticks:
+            ax.set_yticks(yticks)
+        if xticks and xtick_labels:
+            ax.set_xticklabels(xtick_labels)
+        if yticks and ytick_labels:
+            ax.set_yticklabels(ytick_labels)
+
+        ax.grid(True)
+        ax.set_aspect("auto")
 
         # self.fig.colorbar(im, ax=ax, use_gridspec=False)
-
-        if radius is not None:
-            ax.set_xlabel("X (m)")
-            ax.set_ylabel("Y (m)")
-            ax.grid(True)
-            im.set_extent((-radius, +radius, -radius, +radius))
-            im.axes.set_xlim((-radius, +radius))
-            im.axes.set_ylim((-radius, +radius))
 
         return im

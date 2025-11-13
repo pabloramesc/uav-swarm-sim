@@ -37,7 +37,6 @@ class SDQNTrainer:
                     "episode",
                     "sim_time",
                     "sim_steps",
-                    "area_coverage",
                     "user_coverage",
                     "mean_reward",
                     "memory_size",
@@ -62,24 +61,42 @@ class SDQNTrainer:
 
     def reset(self) -> None:
         self.frames = self.env.reset()
+        self._cum_users_coverage = 0.0
+        self._episode_steps = 0
         if self.gui is not None:
             self.gui.reset()
 
-    def step(self, terminate: bool = False) -> bool:
+    def step(
+        self, max_steps: Optional[int] = None, max_time: Optional[float] = None
+    ) -> bool:
         actions = self.dqn.act(self.frames)
 
         next_frames, rewards, dones = self.env.step(actions)
-        
-        if terminate:
-            dones[:] = True
 
-        self.dqn.add_experiences(self.frames, actions, next_frames, rewards, dones)
+        terminated = False
+
+        if max_steps and self.env.sim_step >= max_steps:
+            terminated = True
+
+        elif max_time and self.env.sim_time >= max_time:
+            terminated = True
+
+        if terminated:
+            truncs = np.ones_like(rewards, dtype=bool)
+        else:
+            truncs = np.zeros_like(rewards, dtype=bool)
+
+        self.dqn.add_experiences(
+            self.frames, actions, next_frames, rewards, dones, truncs
+        )
 
         self.frames = next_frames
         self.cum_rewards += rewards
         self.cum_rewards[dones] = 0.0
 
-        terminated = False
+        self._cum_users_coverage += self.env.metrics.users_coverage
+        self._episode_steps += 1
+
         return terminated
 
     def train_step(self) -> dict:
@@ -99,26 +116,25 @@ class SDQNTrainer:
         verbose: bool = True,
         render: bool = False,
     ) -> None:
+        total_steps = 0
         for episode in range(1, max_episodes + 1):
             self.reset()
 
             step, terminated = 0, False
             while not terminated:
                 step += 1
+                total_steps += 1
 
-                if max_episode_steps is not None and step >= max_episode_steps:
-                    terminated = True
+                terminated = self.step(
+                    max_steps=max_episode_steps, max_time=max_episode_steps
+                )
 
-                _ = self.step(terminated)
-
-                if step % train_freq == 0:
+                if total_steps % train_freq == 0:
                     self.train_step()
 
-                if (
-                    max_episode_time is not None
-                    and self.env.sim_time >= max_episode_time
-                ):
-                    terminated = True
+                # If episode is terminated flush all n-step buffers
+                if terminated:
+                    self.dqn.dqn_agent.memory.flush()
 
                 # Print each 10 steps or if terminated
                 if verbose and (terminated or step % 10 == 0):
@@ -134,8 +150,7 @@ class SDQNTrainer:
                     episode=episode,
                     sim_time=self.env.sim_time,
                     sim_steps=self.env.sim_step,
-                    area_coverage=self.env.metrics.area_coverage,
-                    user_coverage=self.env.metrics.users_coverage,
+                    user_coverage=self.avg_users_coverage,
                     mean_reward=self.cum_rewards.mean(),
                     epsilon=self.dqn.epsilon,
                     loss=self.dqn.loss,
@@ -148,12 +163,19 @@ class SDQNTrainer:
             self.cum_rewards = np.zeros(self.gym_config.num_drones)
 
     @property
+    def avg_users_coverage(self) -> float:
+        if self._episode_steps > 0:
+            return self._cum_users_coverage / self._episode_steps
+        else:
+            return 0.0
+
+    @property
     def training_status_str(self) -> str:
         return (
             f"Sim steps: {self.env.sim_step}, "
             f"Sim time: {self.env.sim_time:.2f} s, "
-            f"Area cov: {self.env.metrics.area_coverage*100:.2f} %, "
-            f"Users cov: {self.env.metrics.users_coverage*100:.2f} %, "
+            f"Coverage: {self.env.metrics.users_coverage*100:.2f} %, "
+            f"Avg Cov: {self.avg_users_coverage*100:.2f} %, "
             f"Mean reward: {self.cum_rewards.mean():.2f}, "
             + self.dqn.training_status_str
         )

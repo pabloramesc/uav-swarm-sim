@@ -49,6 +49,8 @@ class FrameGenerator:
         for i, layer in enumerate(self.layers):
             frame[..., i] = layer.generate_frame(state)
 
+        # frame += np.random.normal(0.0, 0.03, size=self.shape)
+
         if dtype == "float32":
             return np.clip(frame, 0.0, 1.0)
 

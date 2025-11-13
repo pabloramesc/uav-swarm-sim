@@ -3,7 +3,7 @@ from numpy.typing import NDArray
 
 from ..environment import Environment
 from .actions import Action
-from .reward_manager import RewardManager
+from .rewards import RewardManager
 from .sdqn_interface import SDQNInterface
 from .dqn_wrapper import DQNWrapper
 

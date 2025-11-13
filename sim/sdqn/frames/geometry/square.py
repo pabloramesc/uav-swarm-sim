@@ -16,6 +16,22 @@ class SquareGeometry(FrameGeometry):
         self.cell_size = 2 * radius / side_size
 
         super().__init__(height=side_size, width=side_size)
+        
+    @property
+    def xlim(self) -> tuple[float, float]:
+        return (-self.radius, +self.radius)
+
+    @property
+    def ylim(self) -> tuple[float, float]:
+        return (-self.radius, +self.radius)
+    
+    @property
+    def xlabel(self) -> str:
+        return "X (m)"
+    
+    @property
+    def ylabel(self) -> str:
+        return "Y (m)"
 
     def calculate_cell_positions(self):
         dx = (
@@ -30,7 +46,7 @@ class SquareGeometry(FrameGeometry):
     def positions_to_cell_indices(self, positions: np.ndarray, clip: bool = False):
         pos_2d = np.atleast_2d(positions)
         indices = (pos_2d - self.cell_positions[0, 0]) / self.cell_size
-        indices = np.floor(indices).astype(int)
+        indices = np.round(indices).astype(int)
 
         # Clip indices to valid range
         if clip:

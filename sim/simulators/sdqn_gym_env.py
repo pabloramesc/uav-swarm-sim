@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, Tuple, Union
 
 import numpy as np
@@ -8,7 +8,7 @@ from ..agents import AgentsManager, Drone, DummyNeighborProvider, User
 from ..environment import Environment
 from ..mobility.position_controller import DummyPositionController
 from ..mobility.utils import environment_random_positions
-from ..sdqn import RewardManager
+from ..sdqn.rewards import RewardManager, RewardConfig
 from ..sdqn.actions import action_to_displacement
 from ..sdqn.frames import (
     FrameGenerator,
@@ -17,6 +17,7 @@ from ..sdqn.frames import (
     ScenarioState,
     SignalLayerFactory,
     SquareGeometryFactory,
+    LogPolarGeometryFactory,
     get_agent_position,
     get_neighbor_positions,
     get_user_positions,
@@ -38,26 +39,38 @@ class GymConfig:
     # num_obstacles can be an int (fixed) or a tuple (min, max)
     num_obstacles: Union[int, Tuple[int, int]] = 0
 
+    reward_config: RewardConfig = field(default_factory=RewardConfig)
+
 
 class GymEnvironment:
 
-    obstacles_map = ObstaclesLayerFactory(label="Obstacles Map")
+    obstacles_map = ObstaclesLayerFactory(label="Obstacles Map", plot_center=False)
+
     drones_signal = SignalLayerFactory(
         tx_positions_getter=get_neighbor_positions,
-        rx_positions_getter=None,
-        coverage_mode="binary",
+        plot_tx_points=True,
+        plot_center=False,
+        coverage_mode="none",
         label="Drones Signal",
     )
+
     users_signal = SignalLayerFactory(
-        tx_positions_getter=get_agent_position,
+        tx_positions_getter=get_neighbor_positions,
         rx_positions_getter=get_user_positions,
-        coverage_mode="binary",
+        plot_tx_points=False,
+        plot_rx_points=True,
+        plot_center=False,
+        coverage_mode="none",
         label="Users Coverage",
     )
 
     frame_factory = FrameGeneratorFactory(
-        geometry_factory=SquareGeometryFactory(side_size=100, radius=500),
-        layer_factories=[obstacles_map, drones_signal, users_signal],
+        # geometry_factory=SquareGeometryFactory(side_size=84, radius=500),
+        geometry_factory=LogPolarGeometryFactory(
+            num_radial=84, num_angular=84, min_radius=10.0, max_radius=2e3
+        ),
+        # layer_factories=[obstacles_map, drones_signal, users_signal],
+        layer_factories=[obstacles_map, users_signal],
     )
 
     def __init__(self, config: Optional[GymConfig] = None) -> None:
@@ -70,7 +83,9 @@ class GymEnvironment:
         self.sim = MultiAgentSimulator(
             agents=self.agents, environment=self.environment, dt=self.config.dt
         )
-        self.rewards_manager = RewardManager(env=self.environment)
+        self.rewards_manager = RewardManager(
+            env=self.environment, config=self.config.reward_config
+        )
 
         self.step_displacement = self.config.drones_speed * self.config.dt
         self.drones_height = self.config.drones_height
@@ -124,10 +139,8 @@ class GymEnvironment:
 
         # Calculate new drone positions
         displacements = self._actions_to_displacement(actions)
-        new_positions = np.zeros_like(self.drone_positions)
-        new_positions[:, 0:2] = (
-            self.sim.drone_states[:, 0:2] + self.step_displacement * displacements
-        )
+        new_positions = self.sim.drone_states[:, 0:3].copy()
+        new_positions[:, 0:2] += self.step_displacement * displacements
         new_positions[:, 2] = self.config.drones_height
 
         # Compute rewards based on new positions
@@ -136,8 +149,8 @@ class GymEnvironment:
         )
 
         # Reset positions with collisions to previous states
-        # new_positions[dones] = self.sim.drone_states[dones, 0:3]
-        dones[:] = False
+        new_positions[dones] = self.sim.drone_states[dones, 0:3]
+        # dones[:] = False
 
         # Compute frames with updated positions
         frames = self._generate_drone_frames(new_positions, self.user_positions)
@@ -187,6 +200,7 @@ class GymEnvironment:
         drone_states[:, 0:3] = environment_random_positions(
             num_positions=self.agents.drones.size, env=self.environment
         )
+        drone_states[:, 2] = self.drones_height
 
         # Set users random positions
         user_states = np.zeros((self.agents.users.size, 6))

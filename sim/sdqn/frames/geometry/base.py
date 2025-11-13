@@ -27,6 +27,39 @@ class FrameGeometry(ABC):
     def flat_cell_positions(self):
         return self.cell_positions.reshape(-1, 2)
 
+    @property
+    def xlim(self) -> tuple[float, float] | None:
+        return None
+
+    @property
+    def ylim(self) -> tuple[float, float] | None:
+        return None
+
+    @property
+    def xlabel(self) -> str | None:
+        return None
+
+    @property
+    def ylabel(self) -> str | None:
+        return None
+
+    @property
+    def xticks(self) -> list[float] | None:
+        return None
+    
+    @property
+    def yticks(self) -> list[float] | None:
+        return None
+    
+    @property
+    def xtick_labels(self) -> list[str] | None:
+        return None
+    
+    @property
+    def ytick_labels(self) -> list[str] | None:
+        return None
+    
+
     @abstractmethod
     def calculate_cell_positions(self) -> np.ndarray:
         """Compute the coordinates of each cell in the frame."""
@@ -37,7 +70,7 @@ class FrameGeometry(ABC):
         self, positions: np.ndarray, clip: bool = False
     ) -> np.ndarray:
         """Map positions to corresponding cell indices in the frame.
-        
+
         Args:
             positions (np.ndarray): (N, 2) array of (x, y) positions.
             clip (bool): If True, clip indices to grid boundaries;

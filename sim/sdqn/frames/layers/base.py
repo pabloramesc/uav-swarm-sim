@@ -43,31 +43,8 @@ class FrameLayer(ABC):
     def generate_frame(self, state: ScenarioState) -> np.ndarray:
         frame = self.build_frame(state)
 
-        frame += np.random.normal(0.0, 0.03, size=self.geometry.shape)
-
-        absolute_positions = self.cell_ground_positions
-        absolute_positions[:, 0:2] += state.agent_position[0:2]
-
-        # Plot environment mask (boundary + obstacles)
-        if self.environment is not None:
-            mask = self.environment.is_collision(
-                pos=absolute_positions, check_boundary=True, check_altitude=False
-            )
-            self.set_frame_cells(
-                frame, positions=self.geometry.flat_cell_positions[mask], value=0.9
-            )
-
         if self.plot_center:
-            self.set_frame_cells(frame, positions=np.zeros(2), value=1.0)
-
-        decay_value = 1.0
-        self.position_history.append(state.agent_position.copy())
-        for pos in reversed(self.position_history):
-            indices = self.geometry.positions_to_cell_indices(
-                (pos - state.agent_position)[0:2]
-            )
-            frame[indices[:, 0], indices[:, 1]] += decay_value
-            decay_value -= 0.1
+            self.set_frame_cells(frame, positions=np.zeros(2), value=1.0, clip=True)
 
         return frame
 
