@@ -1,4 +1,4 @@
-set -e
+set -e  # Stop if any command fails
 
 # Install required packages
 sudo apt update
@@ -19,4 +19,4 @@ git checkout -b ns-3.46-release ns-3.46
 
 # Copy simulation code
 cd ..
-cp -r ./swarm-net-sim ./ns-3/scratch/swarm-net-sim
+cp -r ./swarm-net-sim ./ns-3/scratch/

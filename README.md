@@ -6,7 +6,7 @@ This repository contains the code developed for the Master's final project:
 [UAV Swarm Network Simulator](docs/UAV_Swarm_Network_Simulator_for_Emergency_Communications.pdf)
 
 > **⚠️ Notice:** This code is currently being refactored and is not functional.  
-> For a working version, check the release: [MSc thesis 2025](https://github.com/pabloramesc/uav-swarm-sim/releases/tag/thesis-2025)
+> For a working version, check the last release: [MSc thesis 2025](https://github.com/pabloramesc/uav-swarm-sim/releases/tag/thesis-2025)
 
 ## Overview
 
@@ -65,7 +65,7 @@ The two components communicate via IPC sockets using the **SimBridge** protocol,
 
 ## Installation
 
-1. Clone the main repository
+1. Clone the main repository:
 ```bash
 git clone https://github.com/pabloramesc/uav-swarm-sim.git
 cd uav-swarm-sim
@@ -73,17 +73,17 @@ cd uav-swarm-sim
 
 2. Optional: create a virtual environment for Python 3.12 (recommended version)
 
-3. Install requirements
+3. Install requirements:
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Update submodules (dqn-lab and ns-3)
+4. Update submodules (dqn-lab and ns-3):
 ```bash
 git submodule update --init --recursive
 ```
 
-5. Install dqn-lab as package
+5. Install dqn-lab as package:
 ```bash
 pip install -e libs/dqn-lab
 pip install -r libs/dqn-lab/requirements.txt
@@ -92,9 +92,14 @@ pip install -r libs/dqn-lab/requirements.txt
 
 **Optional:** NS-3 Installation (required for network simulation)
 
-1. Install NS-3 (check the [installation guide](https://www.nsnam.org/docs/installation/html/index.html) for more details)
+Run NS-3 setup bash script to install dependencies, clone repository, and build NS-3:
 ```bash
-cd ns3/ns-3
-./ns3 configure --enable-examples --enable-tests
-./ns3 build
+sh setup.sh
 ```
+If errors occur during installation run `setup.sh` commands step by step
+and check the [installation guide](https://www.nsnam.org/docs/installation/html/index.html) for more details.
+
+
+## License
+
+This project is licensed under the MIT - see the [LICENSE](LICENSE) file for details.
