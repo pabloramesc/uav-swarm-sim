@@ -7,6 +7,7 @@ sudo apt install -y build-essential cmake clang ninja-build cmake-format libgsl-
 # Clone ns-3
 git clone https://gitlab.com/nsnam/ns-3-dev.git ns-3
 cd ns-3
+git checkout -b ns-3.46-release ns-3.46
 
 # Configure and build ns-3 with additional features
 ./ns3 clean
