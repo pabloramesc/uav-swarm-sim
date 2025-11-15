@@ -72,6 +72,10 @@ cd uav-swarm-sim
 ```
 
 2. Optional: create a virtual environment for Python 3.12 (recommended version)
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
 
 3. Install requirements:
 ```bash
