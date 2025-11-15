@@ -94,6 +94,7 @@ The two components communicate via IPC sockets using the **SimBridge** protocol,
 
     Run NS-3 setup bash script to install dependencies, clone repository, and build NS-3:
     ```bash
+    cd ns3
     sh setup.sh
     ```
     If errors occur during installation run `setup.sh` commands step by step
