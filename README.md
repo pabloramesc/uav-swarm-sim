@@ -66,42 +66,38 @@ The two components communicate via IPC sockets using the **SimBridge** protocol,
 ## Installation
 
 1. Clone the main repository:
-```bash
-git clone https://github.com/pabloramesc/uav-swarm-sim.git
-cd uav-swarm-sim
-```
 
-2. Optional: create a virtual environment for Python 3.12 (recommended version)
-```bash
-python -m venv .venv
-source .venv/bin/activate
-```
+    ```bash
+    git clone https://github.com/pabloramesc/uav-swarm-sim.git
+    cd uav-swarm-sim
+    ```
+
+2. **Optional:** create a virtual environment for Python 3.12 (recommended version)
+    ```bash
+    python -m venv .venv
+    source .venv/bin/activate
+    ```
 
 3. Install requirements:
-```bash
-pip install -r requirements.txt
-```
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-4. Update submodules (dqn-lab and ns-3):
-```bash
-git submodule update --init --recursive
-```
+4. Install dqn-lab:
+    ```bash
+    git submodule update --init --recursive libs/dqn-lab
+    pip install -e libs/dqn-lab
+    pip install -r libs/dqn-lab/requirements.txt
+    ```
 
-5. Install dqn-lab as package:
-```bash
-pip install -e libs/dqn-lab
-pip install -r libs/dqn-lab/requirements.txt
-```
----
+5. **Optional:** Install NS-3 (required for network simulation)
 
-**Optional:** NS-3 Installation (required for network simulation)
-
-Run NS-3 setup bash script to install dependencies, clone repository, and build NS-3:
-```bash
-sh setup.sh
-```
-If errors occur during installation run `setup.sh` commands step by step
-and check the [installation guide](https://www.nsnam.org/docs/installation/html/index.html) for more details.
+    Run NS-3 setup bash script to install dependencies, clone repository, and build NS-3:
+    ```bash
+    sh setup.sh
+    ```
+    If errors occur during installation run `setup.sh` commands step by step
+    and check the [installation guide](https://www.nsnam.org/docs/installation/html/index.html) for more details.
 
 
 ## License
