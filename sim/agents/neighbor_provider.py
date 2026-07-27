@@ -1,8 +1,14 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
 import numpy as np
 
-from ..network.swarm_link import SwarmLink
 from .agents_registry import AgentsRegistry
+
+if TYPE_CHECKING:
+    from ..network.swarm_link import SwarmLink
 
 
 class NeighborProvider(ABC):
@@ -46,7 +52,11 @@ class SwarmLinkNeighborProvider(NeighborProvider):
         self.swarm_link = swarm_link
 
     def get_user_positions(self) -> dict[int, np.ndarray]:
-        return self.swarm_link.get_positions(node_type="user")
+        from ..network.network_simulator import NodeType
+
+        return self.swarm_link.get_positions(node_type=NodeType.USER)
 
     def get_drone_positions(self) -> dict[int, np.ndarray]:
-        return self.swarm_link.get_positions(node_type="drone")
+        from ..network.network_simulator import NodeType
+
+        return self.swarm_link.get_positions(node_type=NodeType.DRONE)

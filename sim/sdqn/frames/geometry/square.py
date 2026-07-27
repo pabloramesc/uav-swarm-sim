@@ -16,7 +16,7 @@ class SquareGeometry(FrameGeometry):
         self.cell_size = 2 * radius / side_size
 
         super().__init__(height=side_size, width=side_size)
-        
+
     @property
     def xlim(self) -> tuple[float, float]:
         return (-self.radius, +self.radius)
@@ -24,11 +24,11 @@ class SquareGeometry(FrameGeometry):
     @property
     def ylim(self) -> tuple[float, float]:
         return (-self.radius, +self.radius)
-    
+
     @property
     def xlabel(self) -> str:
         return "X (m)"
-    
+
     @property
     def ylabel(self) -> str:
         return "Y (m)"

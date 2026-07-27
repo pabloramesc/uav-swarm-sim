@@ -1,15 +1,14 @@
+import logging
 from collections import deque
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
-import logging
 
 from .broadcast_service import BroadcastService
 from .network_interface import NetworkInterface, SimPacket
 from .network_simulator import NetworkSimulator, NodeType
 from .positions_provider import PositionsProvider
-from .swarm_packets import DataPacket, PacketType, parse_packet, PositionPacket
+from .swarm_packets import DataPacket, PositionPacket, parse_packet
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +25,10 @@ class SwarmLink:
         self,
         agent_id: int,
         network_sim: NetworkSimulator,
-        local_bcast_interval: Optional[float] = None,
-        global_bcast_interval: Optional[float] = None,
+        local_bcast_interval: float | None = None,
+        global_bcast_interval: float | None = None,
         position_timeout: float = 5.0,
+        rng: np.random.Generator | None = None,
     ):
         self.agent_id = agent_id
         self.network = network_sim
@@ -47,12 +47,31 @@ class SwarmLink:
         self.broadcasters: dict[str, BroadcastService] = {}
         if local_bcast_interval is not None:
             self.broadcasters["local"] = BroadcastService(
-                interface=self.iface, interval=local_bcast_interval, mode="local"
+                interface=self.iface,
+                interval=local_bcast_interval,
+                mode="local",
+                rng=rng,
             )
         if global_bcast_interval is not None:
             self.broadcasters["global"] = BroadcastService(
-                interface=self.iface, interval=global_bcast_interval, mode="global"
+                interface=self.iface,
+                interval=global_bcast_interval,
+                mode="global",
+                rng=rng,
             )
+
+    def reset(self) -> None:
+        """Clear all episode-local packets, counters, neighbors, and schedules."""
+
+        self.time = 0.0
+        self.position = np.zeros(3)
+        self.data_packets.clear()
+        self.send_counter = 0
+        self.recv_counter = 0
+        self.iface.reset()
+        self.position_provider.reset()
+        for service in self.broadcasters.values():
+            service.reset()
 
     def update(self, time: float, position: np.ndarray) -> None:
         self.time = time
@@ -68,6 +87,7 @@ class SwarmLink:
 
             if isinstance(pkt, DataPacket):
                 self.data_packets.append(pkt)
+                self.recv_counter += 1
 
             elif isinstance(pkt, PositionPacket):
                 self.position_provider.process(pkt, time)
@@ -79,11 +99,12 @@ class SwarmLink:
         for svc in self.broadcasters.values():
             svc.update(time, self.position)
 
-    def send_message(self, msg: str, dst_addr: str) -> None:
+    def send_message(self, msg: str, dst_addr: str) -> int:
+        packet_id = self.iface.tx_packet_counter & 0xFFFF
         pkt = DataPacket()
         pkt.set_header_fields(
             agent_id=self.agent_id,
-            packet_id=self.iface.tx_packet_counter,
+            packet_id=packet_id,
             timestamp=self.time,
         )
         pkt.set_payload(msg.encode())
@@ -96,6 +117,7 @@ class SwarmLink:
         )
         self.iface.send(sim_pkt)
         self.send_counter += 1
+        return packet_id
 
     def get_messages(self, clear: bool = False) -> list[SwarmMessage]:
         messages: list[SwarmMessage] = []
@@ -103,20 +125,17 @@ class SwarmLink:
             msg = SwarmMessage(
                 source_id=int(pkt.agent_id),
                 timestamp=float(pkt.timestamp),
-                txt=pkt.payload.decode(),
+                txt=pkt.payload.decode(errors="replace"),
             )
             messages.append(msg)
-            self.recv_counter += 1
 
         if clear:
             self.data_packets.clear()
 
         return messages
 
-    def get_positions(
-        self, node_type: Optional[NodeType] = None
-    ) -> dict[int, np.ndarray]:
+    def get_positions(self, node_type: NodeType | None = None) -> dict[int, np.ndarray]:
         return self.position_provider.get_positions(node_type)
 
-    def is_connected(self, node_id: Optional[int] = None) -> bool:
+    def is_connected(self, node_id: int | None = None) -> bool:
         return self.position_provider.is_connected(node_id)

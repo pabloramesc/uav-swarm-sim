@@ -1,4 +1,4 @@
-from .network_simulator import NetworkSimulator, SimPacket, NodeType
+from .network_simulator import NetworkSimulator, SimPacket
 
 
 class NetworkInterface:
@@ -32,8 +32,13 @@ class NetworkInterface:
         self.rx_packet_counter += len(packets)
         return packets
 
+    def reset(self) -> None:
+        self.tx_packet_counter = 0
+        self.rx_packet_counter = 0
+
     def __repr__(self) -> str:
+        node = self.network_simulator.get_node(self.node_id)
         return (
-            f"NetworkInterface(node_id={self.node_id}, type={self.node_type}, "
-            f"type_id={self.type_id}, addr='{self.node_address}')"
+            f"NetworkInterface(node_id={self.node_id}, "
+            f"type='{node.node_type.value}', addr='{self.node_address}')"
         )

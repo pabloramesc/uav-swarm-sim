@@ -6,16 +6,14 @@ from matplotlib.axes import Axes
 from matplotlib.colors import BoundaryNorm, Normalize
 from matplotlib.image import AxesImage
 
-from sim.math.path_loss_model import rssi_to_signal_quality, signal_strength_map
-from sim.simulators import MultiAgentSimulator
+from ..core import Simulator
+from ..math.path_loss_model import rssi_to_signal_quality, signal_strength_map
 
 
 class AgentsPlot:
     """Handles plotting and updating GCS, drones, and users."""
 
-    def __init__(
-        self, ax: Axes, sim: MultiAgentSimulator, marked_drone: int | None = None
-    ):
+    def __init__(self, ax: Axes, sim: Simulator, marked_drone: int | None = None):
         self._ax = ax
         self._sim = sim
         self.marked_drone = marked_drone
@@ -57,22 +55,31 @@ class AgentsPlot:
 class ObstaclesPlot:
     """Handles boundary and obstacle plotting."""
 
-    def __init__(self, ax: Axes, sim: MultiAgentSimulator):
+    def __init__(self, ax: Axes, sim: Simulator):
         self.ax = ax
         self.sim = sim
+        self._artists = []
 
     def plot(self):
+        for artist in self._artists:
+            artist.remove()
+        self._artists.clear()
+
         env = self.sim.environment
         if env.boundary is not None:
-            self.ax.plot(*env.boundary.shape.exterior.xy, "r-", label="boundary")
-        for i, obs in enumerate(env._obstacles):
-            self.ax.fill(
-                *obs.shape.exterior.xy,
-                alpha=0.25,
-                facecolor="red",
-                edgecolor="red",
-                hatch="///",
-                label="obstacles" if i == 0 else None,
+            self._artists.extend(
+                self.ax.plot(*env.boundary.shape.exterior.xy, "r-", label="boundary")
+            )
+        for i, obs in enumerate(env.obstacles):
+            self._artists.extend(
+                self.ax.fill(
+                    *obs.shape.exterior.xy,
+                    alpha=0.25,
+                    facecolor="red",
+                    edgecolor="red",
+                    hatch="///",
+                    label="obstacles" if i == 0 else None,
+                )
             )
 
 
@@ -85,7 +92,7 @@ class BackgroundPlot:
     def __init__(
         self,
         ax: Axes,
-        sim: MultiAgentSimulator,
+        sim: Simulator,
         xlim: tuple[float, float],
         ylim: tuple[float, float],
         background_type: BackgroundType,
@@ -97,6 +104,7 @@ class BackgroundPlot:
         self.xlim = xlim
         self.ylim = ylim
         self.background_image: AxesImage | None = None
+        self._colorbar = None
         self.show_colorbar = show_colorbar
 
     @property
@@ -116,7 +124,13 @@ class BackgroundPlot:
             self._plot_image(self.elevation_map.elevation_img, cmap="terrain")
 
         elif self.background_type == "satellite":
-            self._plot_image(self.elevation_map.satellite_img, cmap=None)
+            image = self.elevation_map.satellite_img
+            if image is None:
+                raise RuntimeError(
+                    "Satellite background was not loaded. "
+                    "Create the environment with fetch_satellite=True."
+                )
+            self._plot_image(image, cmap=None)
 
         elif self.background_type == "fused":
             self._plot_fused()
@@ -126,31 +140,41 @@ class BackgroundPlot:
 
     def _plot_image(self, img: np.ndarray, cmap=None):
         extent = (self.xlim[0], self.xlim[1], self.ylim[1], self.ylim[0])
-        self.background_image = self.ax.imshow(
-            img,
-            extent=extent,
-            origin="lower",
-            alpha=0.7,
-            cmap=cmap,
-        )
+        if self.background_image is None:
+            self.background_image = self.ax.imshow(
+                img,
+                extent=extent,
+                origin="lower",
+                alpha=0.7,
+                cmap=cmap,
+            )
+        else:
+            self.background_image.set_data(img)
 
-        if cmap and self.show_colorbar:
-            plt.colorbar(self.background_image, ax=self.ax, label="Elevation (m)")
+        if cmap and self.show_colorbar and self._colorbar is None:
+            self._colorbar = self.ax.figure.colorbar(
+                self.background_image,
+                ax=self.ax,
+                label="Elevation (m)",
+            )
 
     def _plot_fused(self):
         if self.sim.environment.elevation_map is None:
-            raise RuntimeError("Elvation map not configured.")
+            raise RuntimeError("Elevation map not configured.")
 
         self._plot_image(self.sim.environment.elevation_map.fused_img)
-        elev = self.sim.environment.elevation_map.elevation_data
-        sm = plt.cm.ScalarMappable(
-            norm=Normalize(vmin=np.nanmin(elev), vmax=np.nanmax(elev)),
-            cmap="terrain",
-        )
-        sm.set_array([])
-
-        if self.show_colorbar:
-            plt.colorbar(sm, ax=self.ax, label="Elevation (m)")
+        if self.show_colorbar and self._colorbar is None:
+            elev = self.sim.environment.elevation_map.elevation_data
+            scalar_map = plt.cm.ScalarMappable(
+                norm=Normalize(vmin=np.nanmin(elev), vmax=np.nanmax(elev)),
+                cmap="terrain",
+            )
+            scalar_map.set_array([])
+            self._colorbar = self.ax.figure.colorbar(
+                scalar_map,
+                ax=self.ax,
+                label="Elevation (m)",
+            )
 
     def _plot_rssi(self):
         xs = np.linspace(self.xlim[0], self.xlim[1], 100)
@@ -176,5 +200,9 @@ class BackgroundPlot:
             alpha=0.7,
         )
 
-        if self.show_colorbar:
-            plt.colorbar(self.background_image, ax=self.ax, label="Signal Quality (%)")
+        if self.show_colorbar and self._colorbar is None:
+            self._colorbar = self.ax.figure.colorbar(
+                self.background_image,
+                ax=self.ax,
+                label="Signal Quality (%)",
+            )

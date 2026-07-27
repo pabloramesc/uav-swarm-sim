@@ -14,6 +14,7 @@ _LEVEL_MAP: dict[str, int] = {
     "CRITICAL": logging.CRITICAL,
 }
 
+
 def create_logger(name: str, level: LogLevel = "INFO") -> logging.Logger:
     """
     Create a logger with the specified name and level.
@@ -22,7 +23,7 @@ def create_logger(name: str, level: LogLevel = "INFO") -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(_LEVEL_MAP[level])
     logger.propagate = False
-    
+
     if logger.handlers:
         return logger
 

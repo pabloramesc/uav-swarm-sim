@@ -1,4 +1,7 @@
+import math
+
 import numpy as np
+from numpy.typing import ArrayLike, NDArray
 
 
 class PIDController:
@@ -18,7 +21,7 @@ class PIDController:
         kd: float = 0.0,
         dt: float = 0.01,
         tau: float = 0.1,
-        limit: float = None,
+        limit: float | None = None,
     ) -> None:
         """Initializes the PD controller with proportional and derivative gains.
 
@@ -30,22 +33,38 @@ class PIDController:
             tau: Time constant for derivative low-pass filter.
             limit: Max absolute value for control output saturation.
         """
-        self.kp = kp
-        self.ki = ki
-        self.kd = kd
-        self.dt = dt
-        self.limit = limit
-        self.alpha = (2 * tau - dt) / (2 * tau + dt)
+        self.kp = float(kp)
+        self.ki = float(ki)
+        self.kd = float(kd)
+        self.dt = float(dt)
+        self.tau = float(tau)
+        self.limit = float(limit) if limit is not None else None
+        values = (self.kp, self.ki, self.kd, self.dt, self.tau)
+        if not all(math.isfinite(value) for value in values):
+            raise ValueError("PID parameters must be finite.")
+        if min(self.kp, self.ki, self.kd) < 0.0:
+            raise ValueError("PID gains cannot be negative.")
+        if self.dt <= 0.0 or self.tau <= 0.0:
+            raise ValueError("dt and tau must be positive.")
+        if self.limit is not None and (
+            not math.isfinite(self.limit) or self.limit <= 0.0
+        ):
+            raise ValueError("limit must be positive and finite.")
+        self.alpha = (2 * self.tau - self.dt) / (2 * self.tau + self.dt)
 
         self.reset()
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset internal error states."""
-        self.prev_error = 0.0
-        self.integral = 0.0
-        self.derivative = 0.0
+        self.prev_error: NDArray[np.float64] | None = None
+        self.integral: NDArray[np.float64] | None = None
+        self.derivative: NDArray[np.float64] | None = None
 
-    def control(self, error: np.ndarray, derivative: np.ndarray = None) -> np.ndarray:
+    def control(
+        self,
+        error: ArrayLike,
+        derivative: ArrayLike | None = None,
+    ) -> NDArray[np.float64]:
         """Computes the PID control output.
 
         Args:
@@ -55,31 +74,48 @@ class PIDController:
         Returns:
             Control output.
         """
-        error = np.array(error)
+        error_array = np.asarray(error, dtype=np.float64)
+        if self.prev_error is None:
+            self.prev_error = np.zeros_like(error_array)
+            self.integral = np.zeros_like(error_array)
+            self.derivative = np.zeros_like(error_array)
+        elif error_array.shape != self.prev_error.shape:
+            raise ValueError(
+                f"error shape changed from {self.prev_error.shape} "
+                f"to {error_array.shape}; call reset() first."
+            )
+
+        assert self.integral is not None
+        assert self.derivative is not None
 
         # If no derivative is provided, calculate from error using LPF
         if derivative is None:
-            raw_derivative = (error - self.prev_error) / self.dt
+            raw_derivative = (error_array - self.prev_error) / self.dt
             self.derivative = (
                 self.alpha * raw_derivative + (1 - self.alpha) * self.derivative
             )
         else:
-            self.derivative = np.array(derivative)
+            derivative_array = np.asarray(derivative, dtype=np.float64)
+            if derivative_array.shape != error_array.shape:
+                raise ValueError("derivative must have the same shape as error.")
+            self.derivative = derivative_array
 
-        output_unsat = self.kp * error + self.ki * self.integral + self.kd * self.derivative
-        
+        output_unsat = (
+            self.kp * error_array + self.ki * self.integral + self.kd * self.derivative
+        )
+
         # Apply output saturation
         if self.limit is not None:
             output = np.clip(output_unsat, -self.limit, +self.limit)
         else:
             output = output_unsat
-            
-        self.integral += error * self.dt 
-        
+
+        self.integral += error_array * self.dt
+
         # Anti-windup with back-calculation
         if self.ki != 0:
             self.integral += (self.dt / self.ki) * (output - output_unsat)
-        
-        self.prev_error = error
-        
-        return output
+
+        self.prev_error = error_array
+
+        return np.asarray(output, dtype=np.float64)

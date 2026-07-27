@@ -1,15 +1,19 @@
-import numpy as np
-from numba import njit
 from typing import Literal
 
-SignalCalculationMode = Literal["sum", "max"]  # Updated to "sum" or "max"
+import numpy as np
+from numba import njit
+
+SignalCalculationMode = Literal["sum", "max"]
 
 
 def rssi_to_signal_quality(
     rssi: np.ndarray, vmin: float = -80.0, vmax: float = -30.0
 ) -> np.ndarray:
+    if not np.isfinite(vmin) or not np.isfinite(vmax) or vmax <= vmin:
+        raise ValueError("RSSI bounds must be finite and satisfy vmin < vmax.")
     quality = (rssi - vmin) / (vmax - vmin)
     return np.clip(quality, 0.0, 1.0)
+
 
 def signal_strength(
     tx_positions: np.ndarray,
@@ -17,7 +21,7 @@ def signal_strength(
     f: float = 10.0,
     n: float = 3.0,
     tx_power: float = 20.0,
-    mode: SignalCalculationMode = "sum",  # Updated default and type
+    mode: SignalCalculationMode = "sum",
 ) -> np.ndarray:
     """
     Calculate the transmitted power at receiver positions from transmitter positions.
@@ -47,7 +51,7 @@ def signal_strength(
         - "max": Maximum received power from a single transmitter.
     """
     if tx_positions.shape[0] == 0:
-        return np.zeros(rx_positions.shape[0])
+        return np.full(rx_positions.shape[0], -np.inf)
 
     tx_positions = np.atleast_2d(tx_positions)
     rx_positions = np.atleast_2d(rx_positions)
@@ -81,7 +85,7 @@ def signal_strength_map(
     f: float = 10.0,
     n: float = 3.0,
     tx_power: float = 20.0,
-    mode: SignalCalculationMode = "sum",  # Updated default and type
+    mode: SignalCalculationMode = "sum",
 ) -> np.ndarray:
     """
     Generate a heatmap of received power over a grid of points.
@@ -149,44 +153,3 @@ def _signal_strength_numba(
     # Compute received power (num_tx x num_rx)
     rx_power = tx_power - path_loss
     return rx_power
-
-
-if __name__ == "__main__":
-    num_tx = 10
-    space = 100.0
-
-    # Generate random transmitter positions
-    tx_positions = np.zeros((num_tx, 3))
-    tx_positions[:, 0:2] = np.random.uniform(-space, +space, (num_tx, 2))
-    tx_positions[:, 2] = np.random.uniform(0.0, 0.0, (num_tx,))
-    xs = np.linspace(-space, +space, 100)
-    ys = np.linspace(-space, +space, 100)
-
-    # Generate the heatmap
-    heatmap = signal_strength_map(tx_positions, xs, ys, f=10.0, n=3.0, mode="max")
-
-    # Plot the heatmap
-    from matplotlib import pyplot as plt
-
-    fig = plt.figure()
-    ax = fig.add_subplot()
-    im = ax.imshow(
-        heatmap, extent=[-space, space, -space, space], origin="lower", cmap="plasma"
-    )
-    plt.colorbar(im, ax=ax, label="Received Power (dBm)")
-
-    # Overlay transmitter positions
-    ax.scatter(
-        tx_positions[:, 0],
-        tx_positions[:, 1],
-        color="red",
-        label="Transmitters",
-        marker="x",
-    )
-
-    # Add labels and legend
-    ax.set_xlabel("X Coordinate")
-    ax.set_ylabel("Y Coordinate")
-    ax.legend()
-
-    plt.show()

@@ -1,14 +1,14 @@
 import csv
 import os
-from typing import List, Literal
+from typing import Literal
 
 
 class CSVLogger:
     def __init__(
         self,
         filepath: str,
-        columns: List[str],
-        header_lines: List[str] | None = None,
+        columns: list[str],
+        header_lines: list[str] | None = None,
         if_exists: Literal["error", "overwrite", "version"] = "version",
     ):
         """
@@ -54,7 +54,9 @@ class CSVLogger:
             new_filepath = f"{base}_{version}{ext}"
         return new_filepath
 
-    def _initialize_file(self, header_lines: List[str]):
+    def _initialize_file(self, header_lines: list[str]):
+        parent = os.path.dirname(os.path.abspath(self.filepath))
+        os.makedirs(parent, exist_ok=True)
         with open(self.filepath, "w", newline="") as f:
             for line in header_lines:
                 f.write(f"# {line}\n")

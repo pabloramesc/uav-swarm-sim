@@ -4,13 +4,11 @@ Supports configurable factory for geometry and layers.
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 from numpy.typing import NDArray
 
-from sim.environment import Environment
-
+from ...environment import Environment
 from .geometry import FrameGeometry, FrameGeometryFactory
 from .layers import FrameLayer, FrameLayerFactory
 from .state import ScenarioState
@@ -68,7 +66,7 @@ class FrameGeneratorFactory:
     layer_factories: list[FrameLayerFactory]
     label: str = "frame"
 
-    def create(self, env: Optional[Environment] = None) -> FrameGenerator:
+    def create(self, env: Environment | None = None) -> FrameGenerator:
         geometry = self.geometry_factory.create()
         layers = [f.create(geometry, env) for f in self.layer_factories]
         return FrameGenerator(geometry, layers, label=self.label)

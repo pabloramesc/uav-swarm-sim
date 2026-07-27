@@ -1,18 +1,28 @@
-from .base import Dynamics
+from __future__ import annotations
+
+import math
+
 import numpy as np
-from typing import Optional
+
+from .base import Dynamics
 
 
 class PointMassDynamics(Dynamics):
     """Point mass 6-DOF dynamics model with acceleration limit."""
 
-    def __init__(self, mass: float = 1.0, max_acc: Optional[float] = None) -> None:
+    def __init__(self, mass: float = 1.0, max_acc: float | None = None) -> None:
         super().__init__()
 
         self.mass = float(mass)
         self.max_acc = float(max_acc) if max_acc is not None else None
+        if not math.isfinite(self.mass) or self.mass <= 0.0:
+            raise ValueError("mass must be positive and finite.")
+        if self.max_acc is not None and (
+            not math.isfinite(self.max_acc) or self.max_acc < 0.0
+        ):
+            raise ValueError("max_acc must be non-negative and finite.")
 
-    def step(self, dt: float, control: np.ndarray) -> None:        
+    def step(self, dt: float, control: np.ndarray) -> None:
         self.check_input(control)
 
         acc = control / self.mass

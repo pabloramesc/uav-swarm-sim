@@ -1,13 +1,16 @@
 from abc import ABC, abstractmethod
+
 import numpy as np
 
+
 class Dynamics(ABC):
-    """Abstrac base class for agent dynamics model."""
+    """Abstract base class for agent dynamics models."""
 
-    state_shape: tuple[int] = (6,)  # default value for [px, py, pz, vx, vy, vz] state
-    input_shape: tuple[int] = (3,)  # default value for [fx, fy, fz] input
+    # Defaults represent [px, py, pz, vx, vy, vz] and [fx, fy, fz].
+    state_shape: tuple[int, ...] = (6,)
+    input_shape: tuple[int, ...] = (3,)
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._state: np.ndarray | None = None
 
     @property
@@ -22,8 +25,12 @@ class Dynamics(ABC):
 
     @state.setter
     def state(self, value: np.ndarray) -> None:
-        self.check_state(value)
-        self._state = value
+        try:
+            normalized = np.asarray(value, dtype=np.float64)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("State must be numeric.") from exc
+        self.check_state(normalized)
+        self._state = normalized.copy()
 
     @property
     def position(self) -> np.ndarray:
@@ -44,13 +51,15 @@ class Dynamics(ABC):
             control: Control input force array of shape (3,) as [fx, fy, fz]
                 in Newtons (kg·m/s^2).
         """
-        pass
+        raise NotImplementedError
 
     def check_state(self, state: np.ndarray) -> None:
         if not isinstance(state, np.ndarray):
             raise ValueError("State must be a numpy array.")
         if state.shape != self.state_shape:
             raise ValueError(f"State must have shape {self.state_shape}.")
+        if not np.isfinite(state).all():
+            raise ValueError("State must contain only finite values.")
 
     def check_input(self, control: np.ndarray) -> None:
         if not isinstance(control, np.ndarray):

@@ -1,13 +1,17 @@
-from typing import Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ..environment.environment import Environment
 from ..mobility.position_controller import ControllerContext, PositionController
-from ..network.swarm_link import SwarmLink
 from .agent import Agent
 from .dynamics import PointMassDynamics
-from .neighbor_provider import NeighborProvider
+
+if TYPE_CHECKING:
+    from ..environment.environment import Environment
+    from ..network.swarm_link import SwarmLink
+    from .neighbor_provider import NeighborProvider
 
 
 class Drone(Agent):
@@ -18,8 +22,8 @@ class Drone(Agent):
         agent_id: int,
         env: Environment,
         controller: PositionController,
-        provider: Optional[NeighborProvider] = None,
-        swarm_link: Optional[SwarmLink] = None,
+        provider: NeighborProvider | None = None,
+        swarm_link: SwarmLink | None = None,
     ):
         self.dynamics = PointMassDynamics(
             mass=1.0,  # 1 kg for simplified equivalence force = acceleration
@@ -53,26 +57,28 @@ class Drone(Agent):
             time: Current simulation time.
         """
         super().initialize(state, time)
+        if self.swarm_link is not None:
+            self.swarm_link.reset()
+        self._update_neighbors()
 
         context = ControllerContext(
             time=self.time,
             agent_state=self.dynamics.state,
             target_position=None,
-            drone_positions=None,
-            user_positions=None,
+            drone_positions=self.drone_positions,
+            user_positions=self.user_positions,
         )
         self.position_controller.initialize(context)
 
-    def update(self, dt: float = 0.01) -> None:
-        """Updates the drone's state based on the control forces and dynamics.
+    def prepare_step(self, dt: float) -> None:
+        """Freeze network and neighbor observations before any agent moves."""
 
-        Args:
-            dt: Time step in seconds.
-        """
         if self.swarm_link is not None:
             self.swarm_link.update(time=self.time, position=self.dynamics.state[0:3])
-
         self._update_neighbors()
+
+    def update(self, dt: float = 0.01) -> None:
+        """Updates the drone's state based on the prepared observations."""
 
         context = ControllerContext(
             time=self.time,
@@ -83,7 +89,6 @@ class Drone(Agent):
         )
         force = self.position_controller.update(context)
 
-        # super().update(dt, control=force)
         self.dynamics.step(dt, control=force)
         self.time += float(dt)
 

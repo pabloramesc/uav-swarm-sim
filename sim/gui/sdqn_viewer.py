@@ -1,46 +1,46 @@
+from typing import Any, Protocol
+
 import numpy as np
-from numpy.typing import NDArray
 from matplotlib.axes import Axes
 from matplotlib.image import AxesImage
-from mpl_toolkits.axes_grid1 import ImageGrid
+from numpy.typing import NDArray
 
-from ..simulators import MultiAgentSimulator
-from ..simulators.sdqn_simulator import SDQNSimulator
-from .simple_viewer import BackgroundType, SimpleViewer
 from ..sdqn.frames import FrameGenerator, FrameLayer
-from typing import Protocol
+from .plotters import BackgroundType
+from .simple_viewer import SimpleViewer
 
 
-class SDQNSimEnv(Protocol):
-
-    @property
-    def sim(self) -> MultiAgentSimulator: ...
-
-    @property
-    def last_frames(self) -> NDArray[np.uint8] | None: ...
-
-    @property
-    def frame_generators(self) -> list[FrameGenerator]: ...
+class SDQNViewEnvironment(Protocol):
+    clock: Any
+    environment: Any
+    drone_states: NDArray[np.float64]
+    user_states: NDArray[np.float64]
+    gcs_states: NDArray[np.float64]
+    last_frames: NDArray[np.uint8] | None
+    frame_generators: list[FrameGenerator]
 
 
 class SDQNViewer(SimpleViewer):
-
     def __init__(
         self,
-        sdqn: SDQNSimEnv,
+        environment: SDQNViewEnvironment,
         fps: float = 10.0,
         background_type: BackgroundType = "rssi",
     ):
         super().__init__(
-            sim=sdqn.sim, min_fps=fps, max_fps=fps, background_type=background_type
+            sim=environment,  # type: ignore[arg-type]
+            min_fps=fps,
+            max_fps=fps,
+            background_type=background_type,
         )
-        self.sdqn = sdqn
+        self.sdqn_environment = environment
 
         self.frame_axes: list[Axes] = []
         self.frame_images: list[AxesImage] = []
 
         self._create_axes()
         self._init_frame_images()
+        SimpleViewer.reset(self)
         self.fig.tight_layout()
 
     def reset(self) -> None:
@@ -102,12 +102,12 @@ class SDQNViewer(SimpleViewer):
             im.set_data(frames[..., i] / 255.0)
 
     def _get_drone_frames(self, drone_idx: int = 0) -> np.ndarray:
-        if self.sdqn.last_frames is None:
+        if self.sdqn_environment.last_frames is None:
             raise RuntimeError("SDQN frames not initialized.")
-        return self.sdqn.last_frames[drone_idx]
+        return self.sdqn_environment.last_frames[drone_idx]
 
     def _get_frame_generator(self, drone_idx: int = 0) -> FrameGenerator:
-        return self.sdqn.frame_generators[drone_idx]
+        return self.sdqn_environment.frame_generators[drone_idx]
 
     def _init_frame(
         self,

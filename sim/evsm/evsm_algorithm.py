@@ -9,15 +9,15 @@ import numpy as np
 
 from ..environment.environment import Environment
 from ..math.angles import SweepAngle
+from ..utils.logger import create_logger
 from .numba_helpers import (
-    obstacles_force,
     control_force,
     damping_force,
     exploration_force,
+    obstacles_force,
     springs_matrix,
     sweep_angle,
 )
-from ..utils.logger import create_logger
 
 logger = create_logger("EVSM Algorithm", level="NOTSET")
 
@@ -61,8 +61,7 @@ class EVSMAlgorithm:
         self.state = np.zeros(4)  # [px, py, vx, vy]
         self.neighbors = np.zeros((0, 2))  # [px, py] of neighbors
         self.springs_mask = np.zeros((0,), dtype=bool)
-        self.sweep_angle: SweepAngle = None
-        self.exploration_force: np.ndarray = None
+        self.sweep_angle: SweepAngle | None = None
 
     @property
     def position(self) -> np.ndarray:
@@ -79,7 +78,6 @@ class EVSMAlgorithm:
         position: np.ndarray,
         velocity: np.ndarray,
         neighbors: np.ndarray,
-        time: float = None,
         update_springs: bool = True,
     ) -> np.ndarray:
         """
@@ -149,6 +147,7 @@ class EVSMAlgorithm:
     def _calculate_exploration_force(self) -> np.ndarray:
         if not self.is_edge_robot():
             return np.zeros(2)
+        assert self.sweep_angle is not None
         region_distances, region_directions = (
             self._get_avoidance_distances_and_directions()
         )
@@ -182,7 +181,7 @@ class EVSMAlgorithm:
         distances = np.zeros((num_obstacles,))
         directions = np.zeros((num_obstacles, 2))
         for i, obs in enumerate(obstacles):
-            distances[i] = obs.distance(self.position)
+            distances[i] = obs.distance(self.position).item()
             directions[i, :] = obs.direction(self.position)
         return distances, directions
 
@@ -195,7 +194,7 @@ class EVSMAlgorithm:
         bool
             True if the robot is at the edge, False otherwise.
         """
-        return self.sweep_angle.sweep > np.pi / 2
+        return self.sweep_angle is not None and self.sweep_angle.sweep > np.pi / 2
 
     def is_near_obstacle(self) -> bool:
         """
@@ -207,7 +206,7 @@ class EVSMAlgorithm:
             True if the robot is near an obstacle, False otherwise.
         """
         for region in self.env.boundary_and_obstacles:
-            if region.distance(self.position) < self.d_obs:
+            if region.distance(self.position).item() < self.d_obs:
                 return True
         return False
 
@@ -225,6 +224,6 @@ class EVSMAlgorithm:
         ValueError
             If the natural length is not greater than 0.
         """
-        if ln <= 0.0:
-            raise ValueError("Natural length must be greater than 0.0")
-        self.ln = ln
+        if not np.isfinite(ln) or ln <= 0.0:
+            raise ValueError("Natural length must be positive and finite.")
+        self.ln = float(ln)

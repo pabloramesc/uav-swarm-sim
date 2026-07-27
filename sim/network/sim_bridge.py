@@ -6,15 +6,14 @@ https://opensource.org/licenses/MIT
 """
 
 import time
-from dataclasses import dataclass
 from collections import deque
-
+from dataclasses import dataclass
 from enum import IntEnum, unique
+
 import numpy as np
 
+from ..utils.logger import LogLevel, create_logger
 from .ipc_socket import IpcMessage, IpcSocket
-
-from ..utils.logger import create_logger, LogLevel
 
 
 @unique
@@ -54,12 +53,11 @@ class SimPacket:
     src_addr: str
     dst_addr: str
     data: bytes = b""
-    ingress_time: float = None
-    egress_time: float = None
+    ingress_time: float | None = None
+    egress_time: float | None = None
 
 
 class SimBridge:
-
     def __init__(self, loglevel: LogLevel = "INFO"):
         self.sock = IpcSocket(addr="127.0.0.1", port=9001, ns3_port=9000, max_size=1000)
         self.sock.start_reading()
@@ -67,13 +65,24 @@ class SimBridge:
         # Attributes to store last received values
         self.last_positions: dict[int, np.ndarray] = {}
         self.last_addresses: dict[int, str] = {}
-        self.last_ns3_time: float = None
+        self.last_ns3_time: float | None = None
         self.packets_rtt: deque[float] = deque(maxlen=100)
 
         self.packets: deque[SimPacket] = deque(maxlen=1024)
         self.replies: deque[SimMessage] = deque(maxlen=16)
 
         self.logger = create_logger(name="SimBridge", level=loglevel)
+
+    def reset(self) -> None:
+        """Discard all replies and packets from a previous simulation episode."""
+
+        self.last_positions.clear()
+        self.last_addresses.clear()
+        self.last_ns3_time = None
+        self.packets_rtt.clear()
+        self.packets.clear()
+        self.replies.clear()
+        self.sock.clear_buffer()
 
     @property
     def mean_rtt(self) -> float:
@@ -85,7 +94,7 @@ class SimBridge:
         """Send heartbeat and expect DO_NOTHING reply."""
         self.logger.debug("Checking NS-3 heartbeat...")
         try:
-            reply = self._send_and_receive(
+            self._send_and_receive(
                 SimCommandCode.DO_NOTHING,
                 expected_reply=SimCommandCode.DO_NOTHING,
                 timeout=timeout,
@@ -102,7 +111,7 @@ class SimBridge:
         """Send new positions for multiple nodes."""
         if node_positions is None or len(node_positions) == 0:
             raise ValueError("Node positions cannot be empty.")
-        
+
         self.logger.debug("Setting node positions...")
 
         msg = SimMessage(command=SimCommandCode.SET_POSITIONS)
@@ -154,6 +163,8 @@ class SimBridge:
             expected_reply=SimCommandCode.REPLY_SIM_TIME,
             timeout=timeout,
         )
+        if len(reply.payload) != 8:
+            raise ValueError("NS-3 time reply must contain one float64 value.")
         sim_time = float(np.frombuffer(reply.payload, dtype=np.float64)[0])
         self.last_ns3_time = sim_time
         self.logger.debug(f"Received simulation time: {sim_time}.")
@@ -218,14 +229,14 @@ class SimBridge:
     ) -> SimMessage:
         """Generic request/receive pattern with validation."""
         self.sock.send_to_ns3(SimMessage(command=request).to_bytes())
-        deadline = time.time() + timeout
+        deadline = time.monotonic() + timeout
 
-        while time.time() < deadline:
+        while time.monotonic() < deadline:
             self._process_incoming_messages()
 
-            for idx, sim_msg in enumerate(self.replies):
-                if sim_msg and sim_msg.command == expected_reply:
-                    self.replies[idx] = None
+            for sim_msg in tuple(self.replies):
+                if sim_msg.command == expected_reply:
+                    self.replies.remove(sim_msg)
                     return sim_msg
 
             time.sleep(1e-3)
@@ -237,6 +248,8 @@ class SimBridge:
         positions = {}
         offset = 0
         entry_size = 1 + 3 * 4  # id + 3 floats
+        if len(payload) % entry_size:
+            raise ValueError("Invalid node-positions payload size.")
         while offset + entry_size <= len(payload):
             chunk = payload[offset : offset + entry_size]
             node_id = chunk[0]
@@ -250,6 +263,8 @@ class SimBridge:
         addresses = {}
         offset = 0
         entry_size = 1 + 4
+        if len(payload) % entry_size:
+            raise ValueError("Invalid node-addresses payload size.")
         while offset + entry_size <= len(payload):
             chunk = payload[offset : offset + entry_size]
             node_id = chunk[0]
@@ -308,11 +323,14 @@ class SimBridge:
     def _ipv4_str_to_bytes(self, addr: str) -> bytes:
         """Validate and convert an IPv4 address string to 4-byte representation."""
         try:
-            return bytes([int(octet) for octet in addr.split(".")])
-        except ValueError:
+            octets = [int(octet) for octet in addr.split(".")]
+            if len(octets) != 4 or any(not 0 <= octet <= 255 for octet in octets):
+                raise ValueError
+            return bytes(octets)
+        except (AttributeError, ValueError) as exc:
             raise ValueError(
                 f"Invalid IPv4 address format: {addr}. Use 'x.x.x.x' format."
-            )
+            ) from exc
 
     def _ipv4_bytes_to_str(self, addr_bytes: bytes) -> str:
         """Convert 4-byte representation of an IPv4 address to a string."""

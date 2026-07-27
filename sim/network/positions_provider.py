@@ -1,8 +1,9 @@
-import numpy as np
+import math
 from dataclasses import dataclass
-from typing import Optional
 
-from .network_simulator import NetworkSimulator, SimNode, NodeType
+import numpy as np
+
+from .network_simulator import NetworkSimulator, NodeType, SimNode
 from .swarm_packets import PositionPacket
 
 
@@ -20,10 +21,15 @@ class PositionsProvider:
     """
 
     def __init__(self, agent_id: int, network: NetworkSimulator, timeout: float):
+        if not math.isfinite(timeout) or timeout <= 0.0:
+            raise ValueError("Position timeout must be positive and finite.")
         self.agent_id = agent_id
         self.network = network
         self.timeout = timeout
         self.neighbors: dict[int, NeighborInfo] = {}
+
+    def reset(self) -> None:
+        self.neighbors.clear()
 
     def process(self, packet: PositionPacket, now: float) -> None:
         """
@@ -46,7 +52,7 @@ class PositionsProvider:
             if info.valid and now - info.time > self.timeout:
                 info.valid = False
 
-    def get_positions(self, node_type: Optional[NodeType] = None) -> dict[int, np.ndarray]:
+    def get_positions(self, node_type: NodeType | None = None) -> dict[int, np.ndarray]:
         """
         Return a dict of {node_id: position} for all valid neighbors,
         optionally filtered by node type.
@@ -57,13 +63,14 @@ class PositionsProvider:
                 continue
             if node_type is not None and info.node.node_type != node_type:
                 continue
-            result[node_id] = info.position
+            result[node_id] = info.position.copy()
         return result
 
-    def is_connected(self, node_id: Optional[int] = None) -> bool:
+    def is_connected(self, node_id: int | None = None) -> bool:
         """
         Simple connectivity check: any valid neighbor exists.
         """
         if node_id is None:
             return any(info.valid for info in self.neighbors.values())
-        return self.neighbors[node_id].valid
+        info = self.neighbors.get(node_id)
+        return info is not None and info.valid

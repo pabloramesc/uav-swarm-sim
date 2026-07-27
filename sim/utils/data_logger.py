@@ -1,6 +1,8 @@
-import numpy as np
 import datetime
 import os
+from typing import Self
+
+import numpy as np
 
 
 def get_unique_log_path(log_folder: str, log_file: str) -> str:
@@ -20,7 +22,7 @@ class DataLogger:
     def __init__(
         self,
         columns: list[str],
-        log_file: str = None,
+        log_file: str | None = None,
         log_folder: str = "log",
         dump_every: int = 100,
     ):
@@ -48,13 +50,26 @@ class DataLogger:
         if self._step % self.dump_every == 0:
             self.dump()
 
-    def dump(self):
+    def dump(self) -> None:
+        if not self._data:
+            return
         arr = np.array(self._data)
         np.savez_compressed(self.log_file, columns=self.columns, data=arr)
 
-    def clear(self):
+    def close(self) -> None:
+        """Persist the final partial batch."""
+
+        self.dump()
+
+    def clear(self) -> None:
         self._data = []
         self._step = 0
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.close()
 
 
 def load_log_file(log_file: str) -> dict[str, np.ndarray]:

@@ -5,35 +5,32 @@ This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
 
-from abc import ABC
-
 import numpy as np
 from numpy.typing import ArrayLike
-from shapely import Point, Polygon, shortest_line, box
+from shapely import Point, Polygon, box, shortest_line
 
+from .bounding_box import BoundingBox
 from .numba_helpers import (
-    center_distances_numba,
     center_distances_and_directions_numba,
+    center_distances_numba,
     circle_closest_point_numba,
     is_inside_rectangle_numba,
     rectangle_closest_point_numba,
     rectangle_distances_and_directions_numba,
     rectangle_external_distances_numba,
 )
-from .bounding_box import BoundingBox
 
 
-class Obstacle(ABC):
-
+class Obstacle:
     def __init__(self, shape: Polygon) -> None:
         self.shape = shape
         self.bounds = BoundingBox(*self.shape.bounds)
         self.centroid = np.array(self.shape.centroid.coords[0])
 
     def is_inside(self, pos: ArrayLike) -> np.ndarray:
-        pos = np.asarray(pos)
+        pos = np.atleast_2d(np.asarray(pos))
         points = [Point(p) for p in pos]
-        is_inside = np.array([self.shape.contains(p) for p in points])
+        is_inside = np.array([self.shape.covers(p) for p in points])
         return is_inside
 
     def distance(self, pos: ArrayLike) -> np.ndarray:
@@ -77,7 +74,6 @@ class Obstacle(ABC):
 
 
 class CircularObstacle(Obstacle):
-
     def __init__(self, center: ArrayLike, radius: float, quad_segs: int = 4) -> None:
         self.center = np.array(center)
         self.radius = float(radius)
@@ -107,7 +103,6 @@ class CircularObstacle(Obstacle):
 
 
 class RectangularObstacle(Obstacle):
-
     def __init__(self, bottom_left: ArrayLike, top_right: ArrayLike) -> None:
         self.bottom_left = np.array(bottom_left)
         self.top_right = np.array(top_right)
@@ -147,7 +142,6 @@ class RectangularObstacle(Obstacle):
 
 
 class PolygonalObstacle(Obstacle):
-
     def __init__(self, vertices: ArrayLike):
         self.vertices = np.array(vertices)
         super().__init__(Polygon(self.vertices))

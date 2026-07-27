@@ -11,7 +11,10 @@
 using namespace std;
 
 IpcSocket::IpcSocket(const string &addr, uint16_t port)
-    : m_addr(addr), m_port(port), m_sock(-1) {
+    : m_addr(addr),
+      m_port(port),
+      m_sock(-1),
+      m_remoteLen(sizeof(m_remoteAddr)) {
     is_remote = false;
     SetupSocket();
 }

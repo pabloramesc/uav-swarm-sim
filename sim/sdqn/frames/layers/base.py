@@ -3,13 +3,11 @@ Base abstract class for frame layers single-channel generators.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional
 from collections import deque
 
 import numpy as np
 
-from sim.environment import Environment
-
+from ....environment import Environment
 from ..geometry.base import FrameGeometry
 from ..state import ScenarioState
 
@@ -18,7 +16,7 @@ class FrameLayer(ABC):
     def __init__(
         self,
         geometry: FrameGeometry,
-        environment: Optional[Environment] = None,
+        environment: Environment | None = None,
         label: str = "layer",
         plot_center: bool = True,
     ):
@@ -28,12 +26,19 @@ class FrameLayer(ABC):
         self.plot_center = plot_center
         self.position_history = deque(maxlen=10)
 
-    @property
-    def cell_ground_positions(self):
-        ground_positions = np.zeros((self.geometry.num_cells, 3))
-        ground_positions[:, 0:2] = self.geometry.flat_cell_positions
-        # TODO: Add ground elevation values from environment
-        return ground_positions
+    def absolute_cell_ground_positions(self, state: ScenarioState) -> np.ndarray:
+        """Return every frame cell as an absolute ground position."""
+
+        positions = np.zeros((self.geometry.num_cells, 3))
+        positions[:, :2] = self.geometry.flat_cell_positions + state.agent_position[:2]
+        if self.environment is not None:
+            positions[:, 2] = self.environment.get_elevation(positions[:, :2])
+        return positions
+
+    def relative_cell_ground_positions(self, state: ScenarioState) -> np.ndarray:
+        """Return every ground cell relative to the observing agent."""
+
+        return self.absolute_cell_ground_positions(state) - state.agent_position
 
     @abstractmethod
     def build_frame(self, state: ScenarioState) -> np.ndarray:
@@ -63,8 +68,6 @@ class FrameLayerFactory(ABC):
     """Abstract factory for frame layers."""
 
     @abstractmethod
-    def create(
-        self, geo: FrameGeometry, env: Optional[Environment] = None
-    ) -> FrameLayer:
+    def create(self, geo: FrameGeometry, env: Environment | None = None) -> FrameLayer:
         """Return a configured FrameLayer instance."""
         pass

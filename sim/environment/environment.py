@@ -5,12 +5,9 @@ This software is released under the MIT License.
 https://opensource.org/licenses/MIT
 """
 
-from typing import Optional
-
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from .elevation_map import ElevationMap
 from ..math.geo import enu2geo, geo2enu
 from .obstacles.boundaries import Boundary, PolygonalBoundary, RectangularBoundary
 from .obstacles.obstacles import CircularObstacle, Obstacle, RectangularObstacle
@@ -22,9 +19,11 @@ class Environment:
 
     def __init__(
         self,
-        dem_path: Optional[str] = None,
-        boundary: Optional[Boundary] = None,
-        obstacles: list[Obstacle] = [],
+        dem_path: str | None = None,
+        boundary: Boundary | None = None,
+        obstacles: list[Obstacle] | None = None,
+        *,
+        fetch_satellite: bool = False,
     ) -> None:
         """Initializes the environment with elevation data, calculates the home
         reference point, and initializes empty boundary/obstacle lists.
@@ -32,11 +31,22 @@ class Environment:
         Args:
             dem_path: Path to the DEM (Digital Elevation Model) file.
             boundary: A boundary object defining the limits of the environment.
-            obstacle: A list with obstacle objects to add to the environment.
+            obstacles: Obstacle objects to add to the environment.
+            fetch_satellite: Download terrain background tiles when true.
         """
-        self.elevation_map = ElevationMap(dem_path) if dem_path is not None else None
+        if dem_path is not None:
+            # Terrain support is optional and relatively heavy.  Keep it out of
+            # flat-world imports and load it only when a DEM is requested.
+            from .elevation_map import ElevationMap
+
+            self.elevation_map: ElevationMap | None = ElevationMap(
+                dem_path,
+                fetch_satellite=fetch_satellite,
+            )
+        else:
+            self.elevation_map = None
         self._boundary = boundary
-        self._obstacles = obstacles
+        self._obstacles = list(obstacles) if obstacles is not None else []
 
         # Calculate the home reference point (bottom-left corner of the elevation map)
         self.home = (
@@ -52,19 +62,27 @@ class Environment:
         )
 
     @property
-    def boundary(self) -> Boundary:
+    def boundary(self) -> Boundary | None:
+        return self._boundary
+
+    def require_boundary(self) -> Boundary:
+        """Return the configured boundary or raise a useful lifecycle error."""
+
         if self._boundary is None:
-            raise RuntimeError("Boundary is required.")
+            raise RuntimeError("Environment boundary is not configured.")
         return self._boundary
 
     @property
-    def obstacles(self) -> list[Obstacle]:
-        return self._obstacles
+    def obstacles(self) -> tuple[Obstacle, ...]:
+        """Read-only structural view of configured obstacles."""
+
+        return tuple(self._obstacles)
 
     @property
-    def boundary_and_obstacles(self) -> list[Obstacle]:
-        """A list of all obstacles, including the boundary as first element."""
-        return [self.boundary] + self.obstacles
+    def boundary_and_obstacles(self) -> tuple[Obstacle, ...]:
+        """All avoidance regions, with the boundary first."""
+
+        return (self.require_boundary(), *self.obstacles)
 
     def set_boundary(self, boundary: Boundary) -> None:
         """Sets the boundary of the environment.
@@ -141,9 +159,7 @@ class Environment:
                 inside the boundary.
         """
         pos = np.atleast_2d(pos)  # Ensure pos is (N, 3)
-        if self.boundary is None:
-            raise ValueError("Boundary is not defined.")
-        return self.boundary.is_inside(pos[:, 0:2])
+        return self.require_boundary().is_inside(pos[:, 0:2])
 
     def is_collision(
         self,
@@ -196,10 +212,10 @@ class Environment:
             A (N,) array with elevation values in meters.
         """
         pos = np.atleast_2d(pos)
-        
+
         if self.elevation_map is None:
             return np.zeros(pos.shape[0])
-        
+
         # Convert local Cartesian coordinates to geographic coordinates
         enu = np.zeros((pos.shape[0], 3))
         enu[:, 0:2] = pos[:, 0:2]
@@ -231,34 +247,3 @@ class Environment:
             Local ENU coordinates [e, n, u] in meters.
         """
         return geo2enu(geo, self.home)
-
-    def plot_environment(self) -> None:
-        """Visualizes the environment, including the boundary, obstacles, and
-        elevation map.
-        """
-        raise NotImplementedError
-
-        import matplotlib.pyplot as plt
-
-        # Plot the elevation map
-        self.elevation_map.plot()  # TODO: Review elevation map plot
-
-        # Create a new figure for boundaries and obstacles
-        fig, ax = plt.subplots(figsize=(10, 8))
-
-        # Plot the boundary
-        if self.boundary:
-            x, y = self.boundary.shape.exterior.xy
-            ax.plot(x, y, color="blue", label="Boundary")
-
-        # Plot the obstacles
-        for obstacle in self._obstacles:
-            x, y = obstacle.shape.exterior.xy
-            ax.plot(x, y, color="red", label="Obstacle")
-
-        # Configure the plot
-        ax.set_title("Environment")
-        ax.set_xlabel("Longitude (deg)")
-        ax.set_ylabel("Latitude (deg)")
-        ax.legend()
-        plt.show()

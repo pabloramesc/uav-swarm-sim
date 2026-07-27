@@ -3,6 +3,7 @@ Log-polar grid (log radial + polar coordinates) frame geometry.
 """
 
 from dataclasses import dataclass
+from numbers import Integral
 
 import numpy as np
 
@@ -13,6 +14,25 @@ class LogPolarGeometry(FrameGeometry):
     def __init__(
         self, num_radial: int, num_angular: int, min_radius: float, max_radius: float
     ):
+        if (
+            isinstance(num_radial, bool)
+            or not isinstance(num_radial, Integral)
+            or isinstance(num_angular, bool)
+            or not isinstance(num_angular, Integral)
+        ):
+            raise TypeError("Log-polar dimensions must be integers.")
+        if num_radial <= 0 or num_angular <= 0:
+            raise ValueError("Log-polar dimensions must be positive.")
+        if (
+            not np.isfinite(min_radius)
+            or not np.isfinite(max_radius)
+            or min_radius <= 0.0
+            or max_radius <= min_radius
+        ):
+            raise ValueError(
+                "Log-polar radii must be finite and satisfy "
+                "0 < min_radius < max_radius."
+            )
         self.num_radial = num_radial
         self.num_angular = num_angular
         self.min_radius = min_radius
@@ -61,11 +81,18 @@ class LogPolarGeometry(FrameGeometry):
     def positions_to_cell_indices(
         self, positions: np.ndarray, clip: bool = False
     ) -> np.ndarray:
-        pos = np.atleast_2d(positions)
+        pos = np.atleast_2d(np.asarray(positions, dtype=float))
+        if pos.ndim != 2 or pos.shape[1] != 2:
+            raise ValueError("positions must have shape (N, 2).")
+        finite = np.isfinite(pos).all(axis=1)
+        if clip and not finite.all():
+            raise ValueError("positions must be finite when clip=True.")
         r = np.linalg.norm(pos, axis=1)
         theta = np.arctan2(pos[:, 1], pos[:, 0])
 
-        log_r = np.log(np.clip(r, self.min_radius, self.max_radius))
+        valid_mask = finite & (r >= self.min_radius) & (r <= self.max_radius)
+        safe_r = np.where(finite, r, self.min_radius)
+        log_r = np.log(np.clip(safe_r, self.min_radius, self.max_radius))
         log_r_min = np.log(self.min_radius)
         log_r_max = np.log(self.max_radius)
 
@@ -79,7 +106,6 @@ class LogPolarGeometry(FrameGeometry):
 
         # Filter positions out of radial bounds
         if not clip:
-            valid_mask = (radial_norm >= 0.0) & (radial_norm <= 1.0)
             radial_indices = radial_indices[valid_mask]
             angular_indices = angular_indices[valid_mask]
 

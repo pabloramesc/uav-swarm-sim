@@ -40,11 +40,16 @@ def pairwise_connectivity_matrix(
     np.ndarray
         A (N, N) boolean matrix where entry [i, j] is True if node i can reach node j.
     """
-    positions = np.atleast_2d(positions)
-    N = positions.shape[0]
-    matrix = np.zeros((N, N), dtype=bool)
+    positions = np.asarray(positions, dtype=float)
+    if positions.size == 0:
+        return np.zeros((0, 0), dtype=bool)
+    if positions.ndim != 2 or positions.shape[1] != 3:
+        raise ValueError("Positions must have shape (N, 3).")
 
-    for i in range(N):
+    num_positions = positions.shape[0]
+    matrix = np.zeros((num_positions, num_positions), dtype=bool)
+
+    for i in range(num_positions):
         tx = positions[i, :]
         rx = positions[:, :]
         rssi = signal_strength(
@@ -85,21 +90,14 @@ def directly_connected(
     np.ndarray
         Array of node indices that are directly connected to at least one other node.
     """
-    N = positions.shape[0]
-    if N == 0:
-        return np.array([], dtype=int)
-
-    connected = []
-    for i in range(N):
-        tx = np.delete(positions, i, axis=0)
-        rx = positions[i, :]
-        rssi = signal_strength(
-            tx, rx, f=freq_mhz, n=path_loss_exp, tx_power=tx_power, mode="max"
-        )
-        if np.any(rssi > min_rssi):
-            connected.append(i)
-
-    return np.array(connected, dtype=int)
+    matrix = pairwise_connectivity_matrix(
+        positions=positions,
+        tx_power=tx_power,
+        min_rssi=min_rssi,
+        freq_mhz=freq_mhz,
+        path_loss_exp=path_loss_exp,
+    )
+    return np.flatnonzero(matrix.any(axis=1))
 
 
 def connected_clusters(conn: np.ndarray) -> list[NDArray[np.intp]]:
@@ -116,6 +114,12 @@ def connected_clusters(conn: np.ndarray) -> list[NDArray[np.intp]]:
     list of np.ndarray
         List of arrays, where each array contains the indices of one connected cluster.
     """
+    conn = np.asarray(conn, dtype=bool)
+    if conn.ndim != 2 or conn.shape[0] != conn.shape[1]:
+        raise ValueError("Connectivity matrix must be square.")
+    if conn.shape[0] == 0:
+        return []
+
     n_components, labels = connected_components(
         conn, directed=False, return_labels=True
     )
@@ -155,5 +159,8 @@ def globally_connected(
         positions, tx_power, min_rssi, freq_mhz, path_loss_exp
     )
     clusters = connected_clusters(conn)
-    largest_cluster = np.argmax(len(cluster) for cluster in clusters)
-    return clusters[largest_cluster]
+    if not clusters:
+        return np.array([], dtype=np.intp)
+
+    # ``max`` keeps the first cluster when sizes tie, making the result stable.
+    return max(clusters, key=len)

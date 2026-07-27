@@ -4,14 +4,13 @@ Each layer transforms ScenarioState into a 2D frame given a geometry.
 """
 
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal
 
 import numpy as np
 
-from sim.environment import Environment
-from sim.math.coverage import covered_positions
-from sim.math.path_loss_model import rssi_to_signal_quality, signal_strength
-
+from ....environment import Environment
+from ....math.coverage import covered_positions
+from ....math.path_loss_model import rssi_to_signal_quality, signal_strength
 from ..geometry import FrameGeometry
 from ..state import PositionsGetter, ScenarioState, get_dummy_position
 from .base import FrameLayer, FrameLayerFactory
@@ -35,9 +34,10 @@ class SignalLayer(FrameLayer):
     def __init__(
         self,
         geometry: FrameGeometry,
-        tx_positions_getter: Optional[PositionsGetter] = None,
-        rx_positions_getter: Optional[PositionsGetter] = None,
-        config: Optional[SignalLayerConfig] = None,
+        environment: Environment | None = None,
+        tx_positions_getter: PositionsGetter | None = None,
+        rx_positions_getter: PositionsGetter | None = None,
+        config: SignalLayerConfig | None = None,
         label: str = "signal layer",
         **kwargs,
     ):
@@ -45,7 +45,10 @@ class SignalLayer(FrameLayer):
         self.rx_positions_getter = rx_positions_getter or get_dummy_position
         self.config = config or SignalLayerConfig(**kwargs)
         super().__init__(
-            geometry, environment=None, label=label, plot_center=self.config.plot_center
+            geometry,
+            environment=environment,
+            label=label,
+            plot_center=self.config.plot_center,
         )
 
     def build_frame(self, state: ScenarioState) -> np.ndarray:
@@ -63,7 +66,7 @@ class SignalLayer(FrameLayer):
         elif self.config.coverage_mode == "rssi":
             rssi = signal_strength(
                 tx_positions=tx_positions,
-                rx_positions=self.cell_ground_positions,
+                rx_positions=self.relative_cell_ground_positions(state),
                 f=self.config.freq_mhz,
                 n=self.config.path_loss_exp,
                 tx_power=self.config.tx_power,
@@ -75,7 +78,7 @@ class SignalLayer(FrameLayer):
         elif self.config.coverage_mode == "binary":
             covered_mask = covered_positions(
                 tx_positions=tx_positions,
-                rx_positions=self.cell_ground_positions,
+                rx_positions=self.relative_cell_ground_positions(state),
                 tx_power=self.config.tx_power,
                 min_rssi=self.config.rssi_min,
                 freq_mhz=self.config.freq_mhz,
@@ -84,14 +87,14 @@ class SignalLayer(FrameLayer):
             frame[covered_mask] = 0.5
 
         else:
-            raise ValueError(f"Invalid converage mode '{self.config.coverage_mode}'")
+            raise ValueError(f"Invalid coverage mode '{self.config.coverage_mode}'")
 
         if self.config.plot_tx_points:
             self.set_frame_cells(
                 frame, positions=tx_positions[:, 0:2], value=1.0, clip=True
             )
 
-        if self.config.plot_rx_points:            
+        if self.config.plot_rx_points:
             covered_mask = covered_positions(
                 tx_positions=np.vstack([tx_positions, np.zeros(3)]),
                 rx_positions=rx_positions,
@@ -112,8 +115,8 @@ class SignalLayer(FrameLayer):
 
 @dataclass
 class SignalLayerFactory(FrameLayerFactory):
-    tx_positions_getter: Optional[PositionsGetter] = None
-    rx_positions_getter: Optional[PositionsGetter] = None
+    tx_positions_getter: PositionsGetter | None = None
+    rx_positions_getter: PositionsGetter | None = None
 
     coverage_mode: Literal["none", "rssi", "binary"] = "none"
     plot_tx_points: bool = True
@@ -122,9 +125,7 @@ class SignalLayerFactory(FrameLayerFactory):
     label: str = "signal layer"
     plot_center: bool = True
 
-    def create(
-        self, geo: FrameGeometry, env: Optional[Environment] = None
-    ) -> FrameLayer:
+    def create(self, geo: FrameGeometry, env: Environment | None = None) -> FrameLayer:
         config = SignalLayerConfig(
             coverage_mode=self.coverage_mode,
             plot_tx_points=self.plot_tx_points,
@@ -133,6 +134,7 @@ class SignalLayerFactory(FrameLayerFactory):
         )
         return SignalLayer(
             geometry=geo,
+            environment=env,
             tx_positions_getter=self.tx_positions_getter,
             rx_positions_getter=self.rx_positions_getter,
             config=config,

@@ -20,7 +20,7 @@ def distances_from_point(reference: np.ndarray, positions: np.ndarray) -> np.nda
         An array of shape (N,) with distances from the reference to each point.
     """
     distances = pairwise_cross_distances(reference[None, :], positions)
-    return np.squeeze(distances)
+    return distances.reshape(-1)
 
 
 def pairwise_self_distances(positions: np.ndarray) -> np.ndarray:
@@ -63,45 +63,3 @@ def pairwise_cross_distances(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     deltas = a[:, None, :] - b[None, :, :]
     distances = np.sqrt(np.sum(deltas**2, axis=-1))
     return distances
-
-
-if __name__ == "__main__":
-    ref = np.array([0.0, 0.0])
-    points = np.array(
-        [
-            [1.0, 0.0],
-            [0.0, 1.0],
-            [1.0, 1.0],
-            [2.0, 0.0],
-            [0.0, 2.0],
-            [2.0, 2.0],
-        ]
-    )
-
-    print("Reference point:", ref)
-    print("Points:\n", points)
-
-    # Test distances_from_point
-    rel_dists = distances_from_point(ref, points)
-    print("\nDistances from reference to each point:")
-    for i, p in enumerate(points):
-        print(f"Distance to {p}: {rel_dists[i]:.4f}")
-
-    # Test pairwise_self_distances
-    pair_dists = pairwise_self_distances(points)
-    print("\nPairwise distances between all points:")
-    print(pair_dists)
-
-    # Manual check: distance between [1.0, 0.0] and [0.0, 1.0]
-    expected = np.linalg.norm(points[0] - points[1])
-    print(f"\nCheck: distance between {points[0]} and {points[1]}:")
-    print(f"Computed: {pair_dists[0, 1]:.4f}, Expected: {expected:.4f}")
-
-    # Test pairwise_cross_distances with different sets
-    a = np.array([[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]])
-    b = np.array([[1.0, 0.0], [0.0, 1.0]])
-    cross_dists = pairwise_cross_distances(a, b)
-    print("\nPairwise distances between two sets:")
-    print("Set A:\n", a)
-    print("Set B:\n", b)
-    print("Distances:\n", cross_dists)

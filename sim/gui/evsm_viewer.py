@@ -1,22 +1,15 @@
-"""
-Copyright (c) 2025 Pablo Ramirez Escudero
-
-This software is released under the MIT License.
-https://opensource.org/licenses/MIT
-"""
+"""Matplotlib viewer with the EVSM virtual-spring mesh overlay."""
 
 import numpy as np
-from numpy.typing import ArrayLike
 
-from ..simulators.evsm_simulator import EVSMSimulator
+from ..evsm.simulator import EVSMSimulator
 from .simple_viewer import BackgroundType, SimpleViewer
 
 
 class EVSMViewer(SimpleViewer):
-
     def __init__(
         self,
-        evsm: EVSMSimulator,
+        simulator: EVSMSimulator,
         xlim: tuple[float, float] | None = None,
         ylim: tuple[float, float] | None = None,
         fig_size: tuple[float, float] | None = None,
@@ -26,34 +19,56 @@ class EVSMViewer(SimpleViewer):
         show_legend: bool = False,
     ) -> None:
         super().__init__(
-            sim=evsm.sim,
+            sim=simulator,
             limits=xlim + ylim if xlim and ylim else None,
             figsize=fig_size,
             min_fps=min_fps,
             max_fps=max_fps,
             background_type=background_type,
-            show_legend=show_legend,
+            # SimpleViewer configures axes before creating artists.  Defer the
+            # legend until the EVSM spring artist also exists.
+            show_legend=False,
         )
-        self.evsm = evsm
+        self.show_legend = show_legend
+        self.simulator = simulator
+        (self.spring_lines,) = self.ax.plot(
+            [],
+            [],
+            color="tab:blue",
+            linewidth=0.8,
+            alpha=0.55,
+            label="EVSM springs",
+            zorder=1,
+        )
+        if show_legend:
+            self.ax.legend(loc="upper right")
+        self._update_springs()
 
-    def _update_links_lines(self) -> None:
-        links_x, links_y = self._get_links_coords()
-        self.spring_lines.set_data(links_x, links_y)
+    def reset(self) -> None:
+        super().reset()
+        self._update_springs()
 
-    def _get_links_coords(self) -> tuple[ArrayLike, ArrayLike]:
-        links_x, links_y = [], []
-        for drone1_idx in range(self.evsm.num_drones):
+    def render(self, force: bool = False) -> None:
+        self._update_springs()
+        return super().render(force=force)
 
-            drone1_pos = self.evsm.drone_states[drone1_idx, 0:3]
-            for drone2_idx in range(self.evsm.num_drones):
-                if not self.evsm.evsm_monitor.springs_matrix[drone1_idx, drone2_idx]:
-                    continue
+    def _update_springs(self) -> None:
+        x_coordinates, y_coordinates = self._spring_coordinates()
+        self.spring_lines.set_data(x_coordinates, y_coordinates)
 
-                drone2_pos = self.evsm.drone_states[drone2_idx, 0:3]
-                links_x.extend([drone1_pos[0], drone2_pos[0], None])
-                links_y.extend([drone1_pos[1], drone2_pos[1], None])
+    def _spring_coordinates(self) -> tuple[list[float], list[float]]:
+        states = self.simulator.drone_states
+        directed = self.simulator.evsm_monitor.springs_matrix
+        undirected = np.logical_or(directed, directed.T)
+        starts, ends = np.nonzero(np.triu(undirected, k=1))
 
-            if not np.any(self.evsm.evsm_monitor.springs_matrix[drone1_idx]):
-                self.logger.info(f"Drone {drone1_idx} has no links.")
-
-        return links_x, links_y
+        x_coordinates: list[float] = []
+        y_coordinates: list[float] = []
+        for start, end in zip(starts, ends, strict=True):
+            x_coordinates.extend(
+                [float(states[start, 0]), float(states[end, 0]), np.nan]
+            )
+            y_coordinates.extend(
+                [float(states[start, 1]), float(states[end, 1]), np.nan]
+            )
+        return x_coordinates, y_coordinates

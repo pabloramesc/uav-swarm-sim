@@ -46,19 +46,18 @@ class FrameGeometry(ABC):
     @property
     def xticks(self) -> list[float] | None:
         return None
-    
+
     @property
     def yticks(self) -> list[float] | None:
         return None
-    
+
     @property
     def xtick_labels(self) -> list[str] | None:
         return None
-    
+
     @property
     def ytick_labels(self) -> list[str] | None:
         return None
-    
 
     @abstractmethod
     def calculate_cell_positions(self) -> np.ndarray:

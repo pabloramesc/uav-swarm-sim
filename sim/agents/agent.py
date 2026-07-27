@@ -1,18 +1,21 @@
-from typing import Literal
+from __future__ import annotations
+
+from numbers import Integral
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
-from ..environment.environment import Environment
-from ..utils.logger import create_logger
 from .dynamics import Dynamics
 
+if TYPE_CHECKING:
+    from ..environment.environment import Environment
+
 AgentType = Literal["drone", "user", "gcs"]
+_AGENT_TYPES = frozenset(("drone", "user", "gcs"))
 
 
 class Agent:
     """Base class for all agents in the simulation."""
-
-    _agent_ids: set[int] = set()
 
     def __init__(
         self,
@@ -29,10 +32,11 @@ class Agent:
             dynamics:
             environment:
         """
-        if agent_id in self._agent_ids:
-            raise ValueError(f"Agent ID {agent_id} is already taken.")
-
-        if agent_type not in AgentType.__args__:
+        if isinstance(agent_id, bool) or not isinstance(agent_id, Integral):
+            raise TypeError("agent_id must be an integer.")
+        if agent_id < 0:
+            raise ValueError("agent_id cannot be negative.")
+        if agent_type not in _AGENT_TYPES:
             raise ValueError(f"Invalid agent type descriptor '{agent_type}'.")
 
         self.agent_id = int(agent_id)
@@ -42,20 +46,16 @@ class Agent:
 
         self.time = 0.0
 
-    @classmethod
-    def reset_ids(cls):
-        cls._agent_ids.clear()
-        
     @property
-    def state(self):
+    def state(self) -> np.ndarray:
         return self.dynamics.state
-    
+
     @property
-    def position(self):
+    def position(self) -> np.ndarray:
         return self.dynamics.position
-    
+
     @property
-    def velocity(self):
+    def velocity(self) -> np.ndarray:
         return self.dynamics.velocity
 
     def initialize(self, state: np.ndarray, time: float = 0.0) -> None:
@@ -68,6 +68,9 @@ class Agent:
         self.dynamics.state = state
         self.time = float(time)
 
+    def prepare_step(self, dt: float) -> None:
+        """Capture inputs that must be shared by every agent in this tick."""
+
     def update(self, dt: float = 0.01) -> None:
         """
         Updates the simulation time for the agent.
@@ -75,7 +78,7 @@ class Agent:
         Args:
             dt: Simulation time step in seconds.
         """
-        self.dynamics.step(dt, control=np.zeros(3))
+        self.dynamics.step(dt, control=np.zeros(self.dynamics.input_shape))
         self.time += float(dt)
 
     def is_collision(self, check_altitude: bool = True) -> bool:
@@ -101,4 +104,7 @@ class Agent:
         vel = self.dynamics.velocity
         pos_str = f"[{pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f}] m"
         vel_str = f"[{vel[0]:.2f}, {vel[1]:.2f}, {vel[2]:.2f}] m/s"
-        return f"Agent(id={self.agent_id}, type='{self.agent_type}', position={pos_str}, velocity={vel_str})"
+        return (
+            f"Agent(id={self.agent_id}, type='{self.agent_type}', "
+            f"position={pos_str}, velocity={vel_str})"
+        )

@@ -1,23 +1,38 @@
+from __future__ import annotations
+
 import logging
-from typing import Optional
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ..environment import Environment
-from ..network.swarm_link import SwarmLink
 from .agent import Agent
 from .dynamics.random_walker import RandomWalkerDynamics
 
+if TYPE_CHECKING:
+    from ..environment import Environment
+    from ..network.swarm_link import SwarmLink
+
 logger = logging.getLogger(__name__)
+
 
 class User(Agent):
     """Represents a user agent in the simulation environment."""
 
     def __init__(
-        self, agent_id: int, env: Environment, swarm_link: Optional[SwarmLink] = None
+        self,
+        agent_id: int,
+        env: Environment,
+        swarm_link: SwarmLink | None = None,
+        rng: np.random.Generator | None = None,
     ):
+        self.rng = rng if rng is not None else np.random.default_rng()
         self.dynamics = RandomWalkerDynamics(
-            env=env, min_speed=1.0, max_speed=3.0, climb_rate=0.2, turning_rate=0.3
+            env=env,
+            min_speed=1.0,
+            max_speed=3.0,
+            climb_rate=0.2,
+            turning_rate=0.3,
+            rng=self.rng,
         )
         super().__init__(
             agent_id=agent_id,
@@ -30,7 +45,10 @@ class User(Agent):
 
     def initialize(self, state: np.ndarray, time: float = 0.0) -> None:
         super().initialize(state, time)
+        if self.swarm_link is not None:
+            self.swarm_link.reset()
         self.next_tx_msg: float = 0.0
+        self.last_msg_id: int | None = None
 
     def update(self, dt: float = 0.01) -> None:
         """Updates the state of the user agent by performing a random walk.
@@ -38,25 +56,24 @@ class User(Agent):
         Args:
             dt: The time step in seconds.
         """
-        self._update_swarm_link()
-
         super().update(dt)
-        # self.dynamics.step(dt, control=np.zeros(3))
-        # self.time += dt
+
+    def prepare_step(self, dt: float) -> None:
+        self._update_swarm_link()
 
     def _update_swarm_link(self) -> None:
         if self.swarm_link is None:
             return
-        
+
         self.swarm_link.update(self.time, position=self.dynamics.position)
-        
+
         # Send broadcast message and schedule next message if needed
-        if self.time >= self.next_tx_msg:        
+        if self.time >= self.next_tx_msg:
             self.send_broadcast_message()
-            self.next_tx_msg = self.time + np.random.uniform(1.0, 10.0)
-            
+            self.next_tx_msg = self.time + float(self.rng.uniform(1.0, 10.0))
+
         self.print_received_messages(clear=True)
-        
+
     def send_broadcast_message(self) -> None:
         if self.swarm_link is None:
             raise RuntimeError("No swarm link was provided.")

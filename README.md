@@ -1,114 +1,258 @@
 # UAV Swarm Network Simulator
 
-A **UAV swarm network simulator** for emergency communications, developed using **Python** and **NS-3 (C++)**.
+A Python simulator for autonomous UAV swarms restoring wireless coverage in
+emergency scenarios. It combines multi-agent dynamics, obstacles and terrain,
+Matplotlib visualization, optional ns-3 networking, and two decentralized
+deployment algorithms:
 
-This repository contains the code developed for the Master’s Final Project: **UAV Swarm Network Simulator for Emergency Communications**  
- 📄 [Read the Master's Thesis (PDF)](docs/UAV_Swarm_Network_Simulator_for_Emergency_Communications.pdf)
+- **EVSM** — Extended Virtual Spring Mesh control.
+- **SDQN** — multi-agent deep Q-learning with centralized training and
+  decentralized execution.
 
-> ⚠️ **Important Notice**
-> This code is currently being refactored and is not functional.  
-> For a fully working version, check the lastest stable release: [MSc thesis 2025](https://github.com/pabloramesc/uav-swarm-sim/releases/tag/thesis-2025)
+This repository accompanies the master's thesis
+[UAV Swarm Network Simulator for Emergency Communications](docs/UAV_Swarm_Network_Simulator_for_Emergency_Communications.pdf).
 
+## Architecture
 
-## Overview
+There is one simulation lifecycle. `sim.core.Simulator` owns the clock and
+advances every agent once per step; algorithm packages configure or extend that
+core instead of wrapping another simulator.
 
-This project provides a UAV swarm simulator to demonstrate how autonomous multi-copters can form a decentralized ad-hoc network to restore mobile communications in emergency scenarios. To optimize UAV placement, this work develops and evaluates two decentralized swarming algorithms that enable drones to self-organize and efficiently provide users coverage.
+```text
+sim/
+├── core/          clock, lifecycle, snapshots, network-backend protocol
+├── agents/        agents, registries, and dynamics
+├── environment/   boundaries, obstacles, terrain, generation, placement
+├── mobility/      generic controller and PID primitives
+├── math/          stateless geometry and radio calculations
+├── metrics.py     on-demand coverage and connectivity metrics
+├── evsm/          EVSM controller, monitor, and simulator
+├── sdqn/          actions, frames, rewards, environment, policy, trainer
+├── network/       optional ns-3 integration
+├── gui/           Matplotlib viewers
+└── utils/         logging helpers
+```
 
-The simulator is implemented in Python and includes multi-agent dynamics, 3D environment with obstacles, and visualization tools. The application is integrated with [NS-3 network simulator](https://www.nsnam.org/) to enable realistic wireless communication modeling and full protocol-stack simulation.
+The important contracts are:
 
-## Swarming Algorithms
+- `Simulator.reset(...)` returns an immutable state snapshot.
+- `Simulator.step()` freezes shared observations, advances every agent once,
+  and returns the matching snapshot.
+- `EVSMSimulator` is a configured core simulator.
+- `SDQNEnvironment` is the single transition path shared by training and
+  inference.
+- Metrics, rendering, TensorFlow, and ns-3 remain outside the generic core.
 
-This project focuses on two swarming algorithms: **Extended Virtual Spring Mesh (EVSM)**
-and **Swarming Deep Q-Network (SDQN)**.
+See [docs/architecture.md](docs/architecture.md) for dependency and lifecycle
+details.
 
-### EVSM (Extended Virtual Sping Mesh)
+## Swarming algorithms
 
-EVSM is a modified version of the original algorithm ([Derr et al., 2011](https://doi.org/10.1109/TIE.2011.2130492)) with improved collision avoidance. It is virtual forces algorithm that simulate springs between UAVs to maintain uniform spacing. The spring mesh is constructed using the acute angle test, forming a fully connected planar graph that converges into a hexagonal uniform pattern. Damping and exploration forces help stabilize the swarm and enable rapid deployment.
+The project implements two decentralized deployment strategies. Both operate
+on the same agents, environment, dynamics, and metrics, so their behavior can
+be compared without changing the underlying simulation model.
 
-<table style="width:100%; table-layout:fixed;">
-  <tr>
-    <th style="width:50%;">EVSM with ideal communications</th>
-    <th style="width:50%;">EVSM with network simulation</th>
-  </tr>
-  <tr>
-    <td style="width:50%; text-align:center;">
-      <img src="videos/evsm_sim_ideal.gif" style="max-width:100%; height:auto;">
-    </td>
-    <td style="width:50%; text-align:center;">
-      <img src="videos/evsm_sim_network.gif" style="max-width:100%; height:auto;">
-    </td>
-  </tr>
-</table>
+### EVSM — Extended Virtual Spring Mesh
 
-These videos compare drone swarm behavior using ideal instantaneous neighbor positions versus positions reported through an ad-hoc network simulated with NS-3. In the realistic scenario, intermittent communication link failures cause temporary drone disconnections from the swarm.
+EVSM extends the virtual-spring approach proposed by
+[Derr et al. (2011)](https://doi.org/10.1109/TIE.2011.2130492) with explicit
+boundary and obstacle avoidance. Each drone treats selected neighbors as
+virtual springs. The acute-angle test selects a sparse planar spring mesh,
+while the springs' natural length grows toward the configured separation to
+deploy the swarm progressively.
 
-### SDQN (Swarm Deep Q-Network)
+Damping stabilizes the formation, and drones on the edge of the mesh receive
+an exploration force toward uncovered space. Nearby boundaries and obstacles
+override that expansion with a repulsive force. Horizontal EVSM forces are
+combined with a PID altitude controller that follows the requested height
+above local terrain.
 
-SDQN uses the Deep Q-Network (DQN) algorithm in a Centralized Training with Decentralized Execution (CTDE) setup. It learns optimal UAV deployment strategies to adapt to complex environments. Each UAV encodes its near environment into a 3-channel image, and a difference reward scheme is used to promote users coverage, mantain network connectivity, and avoid obstacles.
+The controller is independent of how neighbor positions arrive:
 
-Two frame representations are used: a **cartesian grid frame** and a **log-polar frame**. The log-polar representation provides high resolution for near details while still capturing distant features.
+- **Ideal communication** reads the current positions directly from the agent
+  registry.
+- **Network communication** uses positions received through `SwarmLink` over
+  the ns-3 ad-hoc network. Delayed or expired broadcasts can temporarily alter
+  the spring topology.
 
-| Cartesian grid frame            |
-| ------------------------------- |
-| ![](videos/sdqn_grid_frame.gif) |
+| Ideal communication | ns-3 communication |
+| --- | --- |
+| ![EVSM with ideal communication](videos/evsm_sim_ideal.gif) | ![EVSM with network communication](videos/evsm_sim_network.gif) |
 
-| Log-polar frame                     |
-| ----------------------------------- |
-| ![](videos/sdqn_logpolar_frame.gif) |
+These GIFs were generated from the same seeded 120-second scenario using the
+current `examples.evsm_video` entry point. The network capture runs Python and
+ns-3 in synchronized real time; both are displayed as a 10× time-lapse.
 
-The Deep Q-Network algorithm is implemented from scratch using TensorFlow and Keras. The implementation is publicly available at [dqn-lab](https://github.com/pabloramesc/dqn-lab)
+### SDQN — Swarming Deep Q-Network
 
+SDQN applies Deep Q-Learning using Centralized Training with Decentralized
+Execution (CTDE). During training, every drone contributes experience to one
+shared policy. During execution, each drone selects an action from its own
+local observation, without requiring a centralized controller.
 
-## NS-3 Integration
+The maintained observation is a two-channel log-polar image:
 
-The simulator combines a Python-based multi-agent environment with the NS-3 network simulator (C++).
-The two components communicate via IPC sockets using the **SimBridge** protocol, a simple client-server protocol developed for this project, with NS-3 acting as UDP server (port 9000) and Python as client (port 9001).
+- obstacle occupancy around the observing drone;
+- nearby users and whether the current swarm covers them.
 
-<div align="center">
-    <img src="images/simbridge-diagram.png" width="50%">
-</div>
+Log-polar geometry dedicates more cells to nearby detail while retaining a
+wide view of distant features. The frame system also supports Cartesian grids,
+but the maintained model and examples use the log-polar representation. Each
+step selects one of five horizontal actions: hold, up, down, left, or right.
 
-**SimBridge** connects NS-3 to Python by scheduling events (e.g. updating drone positions) and registering callbacks (e.g. data packet reception). **SimBridgeManager** processes commands to execute node actions and control the NS-3 simulation. Packet reception is handled using callbacks to forward data to the Python simulator. The simulation runs in real-time best-effort mode, though high event loads can cause NS-3 to lag.
+Coverage rewards can be global, fractional, or based on each drone's marginal
+contribution. Boundary, obstacle, and inter-drone collisions are penalized and
+terminate the shared episode. The TensorFlow/Keras DQN implementation is
+provided by the bundled [dqn-lab](https://github.com/pabloramesc/dqn-lab)
+submodule.
 
+![SDQN log-polar observation](videos/sdqn_logpolar_frame.gif)
+
+The GIF above is a policy-driven inference run generated by the current
+`examples.sdqn_video` entry point. The main simulation and both observation
+channels come from the same transition snapshots.
 
 ## Installation
 
-1. Clone the main repository:
+Python 3.12 is the supported version.
 
-    ```bash
-    git clone https://github.com/pabloramesc/uav-swarm-sim.git
-    cd uav-swarm-sim
-    ```
+For the core library:
 
-2. **Optional:** create a virtual environment for Python 3.12 (recommended version)
-    ```bash
-    python -m venv .venv
-    source .venv/bin/activate
-    ```
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+```
 
-3. Install requirements:
-    ```bash
-    pip install -r requirements.txt
-    ```
+For all examples, including visualization, terrain, and SDQN:
 
-4. Install dqn-lab:
-    ```bash
-    git submodule update --init --recursive libs/dqn-lab
-    pip install -e libs/dqn-lab
-    pip install -r libs/dqn-lab/requirements.txt
-    ```
+```bash
+git submodule update --init --recursive libs/dqn-lab
+python -m pip install -r requirements.txt
+python -m pip install -e libs/dqn-lab
+python -m pip install -e .
+```
 
-5. **Optional:** Install NS-3 (required for network simulation)
+The simulator and EVSM do not import TensorFlow. Machine-learning dependencies
+are loaded only when an SDQN model is constructed.
 
-    Run NS-3 setup bash script to install dependencies, clone repository, and build NS-3:
-    ```bash
-    cd ns3
-    sh setup.sh
-    ```
-    If errors occur during installation run `setup.sh` commands step by step
-    and check the [installation guide](https://www.nsnam.org/docs/installation/html/index.html) for more details.
+## Examples
 
+Every maintained example is finite and safe to import.
+
+```bash
+# Interactive EVSM deployment
+python -m examples.evsm_demo
+
+# EVSM over the included Barcelona elevation map
+python -m examples.evsm_terrain
+
+# Add an online satellite-tile background
+python -m examples.evsm_terrain --satellite
+
+# Render EVSM to MP4
+python -m examples.evsm_video --duration 120 --speedup 10
+
+# Train SDQN
+python -m examples.train_sdqn --episodes 10 --episode-steps 500
+
+# Evaluate an existing SDQN model
+python -m examples.sdqn_demo \
+  --model data/models/sdqn_model_v22.keras \
+  --steps 300
+
+# Render SDQN inference to MP4
+python -m examples.sdqn_video \
+  --model data/models/sdqn_model_v22.keras
+```
+
+The scripts expose their configurable options through `--help`.
+
+## Using EVSM
+
+```python
+from sim.environment import Environment
+from sim.evsm import EVSMConfig, EVSMSimulator
+
+environment = Environment()
+environment.set_rectangular_boundary((0.0, 0.0), (1_000.0, 1_000.0))
+
+simulator = EVSMSimulator(
+    environment,
+    num_drones=9,
+    num_users=20,
+    config=EVSMConfig(),
+    seed=7,
+)
+snapshot = simulator.reset(home=(100.0, 100.0), spacing=10.0)
+snapshot = simulator.step()
+simulator.close()
+```
+
+## Tests
+
+The test suite is intentionally lightweight and does not require launching
+ns-3 or loading TensorFlow:
+
+```bash
+python -m unittest discover -s tests -t . -v
+```
+
+## ns-3 integration
+
+The simulator combines the Python multi-agent model with the
+[ns-3 network simulator](https://www.nsnam.org/) in C++. Python remains
+authoritative for motion, obstacles, controllers, and metrics; ns-3 models the
+802.11 ad-hoc channel, IP stack, routing, packet delivery, and network timing.
+
+The two processes communicate through the project-specific **SimBridge**
+protocol over local UDP sockets. The C++ bridge listens on port `9000`, while
+the Python client listens for replies and delivered packets on port `9001`.
+
+<div align="center">
+  <img src="images/simbridge-diagram.png" width="55%" alt="SimBridge architecture">
+</div>
+
+At runtime:
+
+1. `NetworkManager` sends agent positions and ingress packets from Python.
+2. The C++ `SimBridge` polls commands, updates ns-3 mobility models, and injects
+   packets into the appropriate node.
+3. ns-3 receive callbacks return delivered packets to Python, while request
+   replies expose node addresses, positions, and simulation time.
+4. Each `SwarmLink` processes the resulting packets and maintains its local,
+   timeout-aware view of neighboring drones and users.
+
+ns-3 uses its real-time best-effort scheduler. Synchronized simulator steps
+wait for both wall time and ns-3 time; if the network process cannot catch up
+within the configured tolerance, the Python side raises a timeout instead of
+silently consuming stale network state. The current single-datagram position
+protocol supports at most 78 nodes.
+
+To prepare the bundled pinned ns-3 checkout:
+
+```bash
+cd ns3
+bash setup.sh
+```
+
+The script initializes the pinned ns-3 submodule, copies the bridge source into
+its scratch tree, and builds it. Install the platform build prerequisites from
+the [ns-3 installation guide](https://www.nsnam.org/docs/installation/html/index.html)
+first. Then construct `EVSMSimulator(..., use_network=True)`.
+
+To reproduce the source video used for the network GIF:
+
+```bash
+python -m examples.evsm_video \
+  --network \
+  --duration 120 \
+  --fps 10 \
+  --speedup 10 \
+  --output outputs/evsm_network.mp4
+```
 
 ## License
 
-This project is licensed under the MIT - see the [LICENSE](LICENSE) file for details.
+Licensed under the [MIT License](LICENSE).

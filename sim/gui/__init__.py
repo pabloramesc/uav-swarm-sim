@@ -1,2 +1,5 @@
-# from .evsm_viewer import EVSMViewer
-from .sdqn_viewer import SDQNViewer
+"""Visualization helpers.
+
+Import viewers from their concrete modules so importing the simulation model
+never pulls in Matplotlib.
+"""

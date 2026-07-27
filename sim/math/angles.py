@@ -1,11 +1,10 @@
-import numpy as np
-from numpy.typing import ArrayLike
-from typing import Union
-
 from dataclasses import dataclass
 
+import numpy as np
+from numpy.typing import ArrayLike
 
-def vector_angle(v: ArrayLike) -> Union[float, np.ndarray]:
+
+def vector_angle(v: ArrayLike) -> float | np.ndarray:
     """
     Compute the angle(s) of 2D vector(s) with respect to the x-axis.
 
@@ -33,7 +32,7 @@ def vector_angle(v: ArrayLike) -> Union[float, np.ndarray]:
         raise ValueError("Input must have shape (2,) or (N, 2)")
 
 
-def normalize_angle_pi(angle: ArrayLike) -> Union[float, np.ndarray]:
+def normalize_angle_pi(angle: ArrayLike) -> float | np.ndarray:
     """
     Normalize angle(s) to the range [-π, π).
 
@@ -50,7 +49,7 @@ def normalize_angle_pi(angle: ArrayLike) -> Union[float, np.ndarray]:
     return (np.asarray(angle) + np.pi) % (2 * np.pi) - np.pi
 
 
-def normalize_angle_2pi(angle: ArrayLike) -> Union[float, np.ndarray]:
+def normalize_angle_2pi(angle: ArrayLike) -> float | np.ndarray:
     """
     Normalize angle(s) to the range [0, 2π).
 
@@ -67,7 +66,7 @@ def normalize_angle_2pi(angle: ArrayLike) -> Union[float, np.ndarray]:
     return np.asarray(angle) % (2 * np.pi)
 
 
-def diff_angle_pi(angle1: ArrayLike, angle2: ArrayLike) -> Union[float, np.ndarray]:
+def diff_angle_pi(angle1: ArrayLike, angle2: ArrayLike) -> float | np.ndarray:
     """
     Compute the signed minimal difference between two angles, normalized to [-π, π).
 
@@ -86,7 +85,7 @@ def diff_angle_pi(angle1: ArrayLike, angle2: ArrayLike) -> Union[float, np.ndarr
     return normalize_angle_pi(np.asarray(angle1) - np.asarray(angle2))
 
 
-def diff_angle_2pi(angle1: ArrayLike, angle2: ArrayLike) -> Union[float, np.ndarray]:
+def diff_angle_2pi(angle1: ArrayLike, angle2: ArrayLike) -> float | np.ndarray:
     """
     Compute the unsigned difference between two angles, normalized to [0, 2π).
 
@@ -107,7 +106,7 @@ def diff_angle_2pi(angle1: ArrayLike, angle2: ArrayLike) -> Union[float, np.ndar
 
 def is_angle_between(
     angle: ArrayLike, angle1: float, angle2: float
-) -> Union[bool, np.ndarray]:
+) -> bool | np.ndarray:
     """
     Check whether an angle lies between two other angles, in the [0, 2π) range.
 
@@ -139,7 +138,7 @@ def is_angle_between(
 class SweepAngle:
     start: float
     stop: float
-    
+
     def __post_init__(self):
         self.start = normalize_angle_2pi(self.start)
         self.stop = normalize_angle_2pi(self.stop)
@@ -154,51 +153,6 @@ class SweepAngle:
         if self.start == self.stop:
             return angle != self.start
         return is_angle_between(angle, self.start, self.stop)
-    
+
     def to_tuple(self) -> tuple[float, float]:
         return (self.start, self.stop)
-
-
-if __name__ == "__main__":
-    from matplotlib import pyplot as plt
-
-    # Test angle normalization
-    angles = np.linspace(-4 * np.pi, 4 * np.pi, 1000)
-    plt.figure(figsize=(10, 5))
-    plt.plot(angles, normalize_angle_pi(angles), label="Normalize to [-π, π]")
-    plt.plot(angles, normalize_angle_2pi(angles), label="Normalize to [0, 2π]")
-    plt.axhline(0, color="black", lw=0.5, ls="--")
-    plt.axhline(2 * np.pi, color="red", lw=0.5, ls="--", label="2π")
-    plt.axhline(np.pi, color="red", lw=0.5, ls="--", label="π")
-    plt.axhline(-np.pi, color="blue", lw=0.5, ls="--", label="-π")
-    plt.title("Angle Normalization")
-    plt.xlabel("Input Angle (radians)")
-    plt.ylabel("Normalized Angle (radians)")
-    plt.legend()
-    plt.grid()
-    plt.show()
-
-    # Test vector angle and difference calculation
-    vectors = [
-        np.array([1, 0]),
-        np.array([0, 1]),
-        np.array([-1, 0]),
-        np.array([0, -1]),
-    ]
-    print("\nVector Angle Tests:")
-    for v1 in vectors:
-        print(f"Vector {v1} angle: {np.degrees(vector_angle(v1))} degrees")
-        for v2 in vectors:
-            angle1 = vector_angle(v1)
-            angle2 = vector_angle(v2)
-            diff = diff_angle_pi(angle2, angle1)
-            print(f"Angle from {v1} to {v2}: {np.degrees(diff)} degrees")
-
-    # Test angle between
-    print("\nAngle Between Tests:")
-    for angle1 in np.arange(0.0, 360.0, 90.0):
-        for angle2 in np.arange(0.0, 360.0, 90.0):
-            print(f"Angle1: {angle1}, Angle2: {angle2}")
-            for angle in np.arange(0.0, 360.0 + 45.0, 45.0):
-                result = is_angle_between(*np.deg2rad([angle, angle1, angle2]))
-                print(f" - Is {angle} between? {result}")

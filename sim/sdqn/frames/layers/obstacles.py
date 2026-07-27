@@ -3,10 +3,9 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from sim.environment.environment import Environment
-from sim.sdqn.frames.state import ScenarioState
-
+from ....environment.environment import Environment
 from ..geometry.base import FrameGeometry
+from ..state import ScenarioState
 from .base import FrameLayer, FrameLayerFactory
 
 
@@ -25,8 +24,7 @@ class ObstaclesLayer(FrameLayer):
     def build_frame(self, state: ScenarioState) -> NDArray[np.float32]:
         frame = np.zeros(self.geometry.shape, dtype=np.float32)
 
-        absolute_positions = self.cell_ground_positions
-        absolute_positions[:, 0:2] += state.agent_position[0:2]
+        absolute_positions = self.absolute_cell_ground_positions(state)
 
         # Plot environment mask (boundary + obstacles)
         env_mask = self.environment.is_collision(

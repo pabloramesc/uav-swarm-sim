@@ -1,11 +1,11 @@
+import math
 from typing import Literal
 
 import numpy as np
 
 from .network_interface import NetworkInterface
-from .swarm_packets import PositionPacket
 from .sim_bridge import SimPacket
-
+from .swarm_packets import PositionPacket
 
 BroadcastMode = Literal["local", "global"]
 
@@ -17,12 +17,18 @@ class BroadcastService:
         interval: float,
         mode: BroadcastMode,
         jitter: float = 0.1,
+        rng: np.random.Generator | None = None,
     ):
         self.iface = interface
-        self.interval = interval
+        self.interval = float(interval)
         self.mode = mode
-        self.jitter = jitter
-        
+        self.jitter = float(jitter)
+        self.rng = rng if rng is not None else np.random.default_rng()
+        if not math.isfinite(self.interval) or self.interval <= 0.0:
+            raise ValueError("Broadcast interval must be positive and finite.")
+        if not math.isfinite(self.jitter) or self.jitter < 0.0:
+            raise ValueError("Broadcast jitter must be non-negative and finite.")
+
         if self.mode == "global":
             self.bcast_addr = self.iface.broadcast_address
         elif self.mode == "local":
@@ -32,8 +38,11 @@ class BroadcastService:
 
         self.next_time: float = 0.0
 
+    def reset(self) -> None:
+        self.next_time = 0.0
+
     def schedule(self, now: float) -> bool:
-        return self.interval is not None and now >= self.next_time
+        return now >= self.next_time
 
     def broadcast_position(self, position: np.ndarray, now: float) -> None:
         pkt = PositionPacket()
@@ -56,5 +65,5 @@ class BroadcastService:
         if self.schedule(now):
             self.broadcast_position(position, now)
             # add jitter
-            delay = np.random.normal(self.interval, self.interval * self.jitter)
+            delay = self.rng.normal(self.interval, self.interval * self.jitter)
             self.next_time = now + max(delay, 0)

@@ -2,9 +2,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 
-from ..simulators.simulator import MultiAgentSimulator
-from .plotters import BackgroundType, BackgroundPlot, AgentsPlot, ObstaclesPlot
+from ..core import Simulator
 from .fps_control import FPSController
+from .plotters import AgentsPlot, BackgroundPlot, BackgroundType, ObstaclesPlot
 
 
 class SimpleViewer:
@@ -12,7 +12,7 @@ class SimpleViewer:
 
     def __init__(
         self,
-        sim: MultiAgentSimulator,
+        sim: Simulator,
         limits: tuple[float, float, float, float] | None = None,
         figsize: tuple[float, float] | None = None,
         min_fps: float = 10.0,
@@ -32,6 +32,7 @@ class SimpleViewer:
         self._create_plotters()
 
         self.fps_control = FPSController(min_fps=min_fps, max_fps=max_fps)
+        SimpleViewer.reset(self)
 
     @property
     def fps(self) -> float:
@@ -50,12 +51,15 @@ class SimpleViewer:
         self.agents = AgentsPlot(ax=self.ax, sim=self.sim)
 
     def reset(self) -> None:
+        self.fps_control.reset()
         self.background.plot()
         self.obstacles.plot()
         self.agents.update()
+        if self.show_legend:
+            self.ax.legend(loc="upper right")
 
     def render(self, force: bool = False) -> None:
-        if not self.fps_control.need_render(self.sim.clock.sim_time) and not force:
+        if not self.fps_control.need_render(self.sim.time) and not force:
             return
 
         self.agents.update()
@@ -72,6 +76,9 @@ class SimpleViewer:
         buf = self.fig.canvas.buffer_rgba()  # type: ignore
         img = np.frombuffer(buf, dtype=np.uint8).reshape((height, width, 4))
         return img[..., :3].copy()  # Remove alpha channel
+
+    def close(self) -> None:
+        plt.close(self.fig)
 
     def _calculate_axis_limits(
         self,
@@ -118,8 +125,5 @@ class SimpleViewer:
         self.ax.set_ylabel("Y (m)")
         self.ax.set_aspect("equal")
         self.ax.grid(True)
-
-        if self.show_legend:
-            self.ax.legend(loc="upper right")
 
         self.fig.tight_layout()

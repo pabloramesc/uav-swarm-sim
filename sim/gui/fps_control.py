@@ -1,36 +1,34 @@
+import math
 import time
-from typing import Optional
 
 
 class FPSController:
     """Controls rendering timing with optional min/max FPS limit."""
 
-    def __init__(
-        self, min_fps: Optional[float] = None, max_fps: Optional[float] = None
-    ):
-        if min_fps is not None and min_fps <= 0:
-            raise ValueError("min_fps must be positive")
-        
-        if max_fps is not None and max_fps <= 0:
-            raise ValueError("max_fps must be positive")
-        
+    def __init__(self, min_fps: float | None = None, max_fps: float | None = None):
+        if min_fps is not None and (not math.isfinite(min_fps) or min_fps <= 0):
+            raise ValueError("min_fps must be positive and finite")
+
+        if max_fps is not None and (not math.isfinite(max_fps) or max_fps <= 0):
+            raise ValueError("max_fps must be positive and finite")
+
         if min_fps is not None and max_fps is not None and min_fps > max_fps:
             raise ValueError("min_fps cannot be greater than max_fps values")
-        
+
         self._min_fps = min_fps
         self._max_fps = max_fps
         self.reset()
 
     def reset(self):
         """Reset the timer and smooth FPS."""
-        self._start_time = time.time()
+        self._start_time = time.monotonic()
         self._last_render_time = 0.0
         self._smooth_fps = 0.0
 
     @property
     def real_time(self) -> float:
         """Time since controller was reset."""
-        return time.time() - self._start_time
+        return time.monotonic() - self._start_time
 
     @property
     def current_fps(self) -> float:

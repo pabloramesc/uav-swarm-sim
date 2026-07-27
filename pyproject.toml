@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uav-swarm-sim"
+version = "0.1.0"
+description = "Multi-agent UAV swarm simulator with optional ns-3 integration"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [{ name = "Pablo Ramirez Escudero" }]
+dependencies = [
+    "numpy",
+    "scipy",
+    "numba",
+    "shapely",
+]
+
+[project.optional-dependencies]
+visualization = ["matplotlib", "imageio[ffmpeg]"]
+terrain = ["rasterio", "matplotlib"]
+satellite = ["rasterio", "contextily", "matplotlib", "pillow", "pyproj"]
+tensorflow = ["tensorflow"]
+dev = ["matplotlib", "ruff"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sim*"]
+exclude = ["sim.old*", "sim.simulators*"]
+namespaces = false
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]

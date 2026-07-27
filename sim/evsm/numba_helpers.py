@@ -105,9 +105,7 @@ def damping_force(velocity: np.ndarray, kd: float = 1.0) -> np.ndarray:
 
 
 @njit(cache=True)
-def sweep_angle(
-    position: np.ndarray, neighbors: np.ndarray
-) -> tuple[float, float]:
+def sweep_angle(position: np.ndarray, neighbors: np.ndarray) -> tuple[float, float]:
     """
     Calculates the sweep angle for exploration based on neighbors' positions.
 
@@ -128,13 +126,13 @@ def sweep_angle(
     neighbors = neighbors.reshape(-1, 2)
     num_neighbors = neighbors.shape[0]
     if num_neighbors == 0:
-        return (0.0, 2* np.pi)
+        return (0.0, 2 * np.pi)
     vectors = neighbors - position
     angles = np.arctan2(vectors[:, 1], vectors[:, 0])
     angles.sort()
     sweeps = (angles - np.roll(angles, shift=+1)) % (2 * np.pi)
     i = np.argmax(sweeps)
-    return (angles[i-1], angles[i])
+    return (angles[i - 1], angles[i])
     # for i in range(num_neighbors):
     #     angle1 = angles[i - 1]
     #     angle2 = angles[i]
@@ -176,7 +174,9 @@ def obstacles_force(
     obstacle_directions = obstacle_directions.reshape(-1, 2)
     is_near = obstacle_distances < d_min
     obstacle_distances = np.maximum(obstacle_distances, 1e-2)
-    repulsion_forces = (d_min / obstacle_distances) ** 2 * (-obstacle_directions) * is_near
+    repulsion_forces = (
+        (d_min / obstacle_distances) ** 2 * (-obstacle_directions) * is_near
+    )
     avoidance_force = ks * np.sum(repulsion_forces, axis=0)
     return avoidance_force
 

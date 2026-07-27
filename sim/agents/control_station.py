@@ -1,9 +1,15 @@
-from typing import Optional
+from __future__ import annotations
 
-from ..environment import Environment
-from ..network.swarm_link import SwarmLink
+from typing import TYPE_CHECKING
+
+import numpy as np
+
 from .agent import Agent
 from .dynamics import StaticDynamics
+
+if TYPE_CHECKING:
+    from ..environment import Environment
+    from ..network.swarm_link import SwarmLink
 
 
 class ControlStation(Agent):
@@ -23,7 +29,7 @@ class ControlStation(Agent):
         self,
         agent_id: int,
         env: Environment,
-        swarm_link: Optional[SwarmLink] = None,
+        swarm_link: SwarmLink | None = None,
     ):
         super().__init__(
             agent_id=agent_id,
@@ -34,21 +40,16 @@ class ControlStation(Agent):
 
         self.swarm_link = swarm_link
 
-    def initialize(self, state, time=0):
-        return super().initialize(state, time)
+    def initialize(self, state: np.ndarray, time: float = 0.0) -> None:
+        super().initialize(state, time)
+        if self.swarm_link is not None:
+            self.swarm_link.reset()
 
-    def update(self, dt: float = 0.01, **kwargs) -> None:
-        """
-        Updates the internal state of the control station.
-
-        This method can be extended to include additional logic for managing other agents.
-
-        Parameters
-        ----------
-        dt : float, optional
-            The time step in seconds (default is 0.01).
-        """
-        super().update(dt)
-
+    def prepare_step(self, dt: float) -> None:
         if self.swarm_link is not None:
             self.swarm_link.update(time=self.time, position=self.dynamics.position)
+
+    def update(self, dt: float = 0.01) -> None:
+        """Advance the control station's clock without moving it."""
+
+        super().update(dt)

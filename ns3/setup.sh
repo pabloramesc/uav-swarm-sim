@@ -1,22 +1,17 @@
-set -e  # Stop if any command fails
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Install required packages
-sudo apt update
-sudo apt install -y build-essential cmake clang ninja-build cmake-format libgsl-dev libgtk-3-dev libeigen3-dev libc-dev python3-dev python3-pip
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+project_root="$(cd "$script_dir/.." && pwd)"
+ns3_root="$script_dir/ns-3"
+source_dir="$script_dir/swarm-net-sim"
+scratch_dir="$ns3_root/scratch/swarm-net-sim"
 
-# Clone ns-3
-git clone https://gitlab.com/nsnam/ns-3-dev.git ns-3
-cd ns-3
-git checkout -b ns-3.46-release ns-3.46
+git -C "$project_root" submodule update --init ns3/ns-3
 
-# Configure and build ns-3 with additional features
-./ns3 clean
-./ns3 configure --enable-examples --enable-tests
+mkdir -p "$scratch_dir"
+cp -R "$source_dir/." "$scratch_dir/"
+
+cd "$ns3_root"
+./ns3 configure --enable-examples
 ./ns3 build
-
-# Run tests (optional)
-./test.py
-
-# Copy simulation code
-cd ..
-cp -r ./swarm-net-sim ./ns-3/scratch/

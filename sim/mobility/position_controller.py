@@ -3,8 +3,6 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from sim.environment.environment import Environment
-
 
 @dataclass
 class ControllerContext:

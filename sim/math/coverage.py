@@ -11,7 +11,6 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .distances import pairwise_cross_distances
-from .path_loss_model import signal_strength
 
 
 @lru_cache(maxsize=128)

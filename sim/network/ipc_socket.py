@@ -7,10 +7,10 @@ https://opensource.org/licenses/MIT
 
 import logging
 import socket
-import time
-from dataclasses import dataclass
 import threading
+import time
 from collections import deque
+from dataclasses import dataclass
 
 # Create a logger for this module
 logger = logging.getLogger("SIM:IpcSocket")
@@ -30,7 +30,6 @@ class IpcMessage:
 
 
 class IpcSocket:
-
     def __init__(
         self,
         addr: str = "127.0.0.1",
@@ -41,14 +40,14 @@ class IpcSocket:
         self.addr = addr
         self.port = port
         self.ns3_port = ns3_port
-        
+
         self.sock = self._setup_socket()
         self.message_buffer = deque(maxlen=max_size)
-        
+
         self.running = False
         self.thread = None
         self.buffer_lock = threading.Lock()
-        
+
     @property
     def buffer_size(self) -> int:
         """Returns the number of messages currently in the buffer."""
@@ -92,7 +91,7 @@ class IpcSocket:
                         f"Message added to buffer. Buffer size: {len(self.message_buffer)}"
                     )
                 else:
-                    logger.debug(f"Message received from foreign port. Ignoring.")
+                    logger.debug("Message received from foreign port. Ignoring.")
 
             except BlockingIOError:
                 # logger.debug("No message received.")
@@ -101,7 +100,7 @@ class IpcSocket:
     def close(self) -> None:
         self.stop_reading()
         self.sock.close()
-        logger.debug(f"Socket closed.")
+        logger.debug("Socket closed.")
 
     def stop_reading(self) -> None:
         self.running = False

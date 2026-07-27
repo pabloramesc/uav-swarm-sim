@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 import numpy as np
-from abc import ABC
+
 from .agent import Agent
-from typing import Optional
 
 
-class AgentsRegistry(ABC):
+class AgentsRegistry:
     """
     A flexible registry for tracking agent instances and their states.
     Supports lookup by agent ID or index.
@@ -12,7 +13,6 @@ class AgentsRegistry(ABC):
 
     def __init__(self):
         self._agents_dict: dict[int, Agent] = {}
-        self._agents_list: list[Agent] = []
         self._id_to_index: dict[int, int] = {}
         self._index_to_id: dict[int, int] = {}
 
@@ -20,16 +20,20 @@ class AgentsRegistry(ABC):
     def size(self) -> int:
         """Returns the number of registered agents."""
         return len(self._agents_dict)
-    
-    def clear(self) -> None:
+
+    def _clear(self) -> None:
+        """Remove all agents.
+
+        Registry structure is mutated only by :class:`AgentsManager`, which
+        keeps the typed and global views in sync.
+        """
+
         self._agents_dict.clear()
-        self._agents_list.clear()
         self._id_to_index.clear()
         self._index_to_id.clear()
 
     def _rebuild_index_mapping(self) -> None:
         """Rebuilds the ID-to-index mapping whenever the registry changes."""
-        self._agents_list = list(self._agents_dict.values())
         self._id_to_index = {
             agent_id: idx for idx, agent_id in enumerate(self._agents_dict.keys())
         }
@@ -37,14 +41,14 @@ class AgentsRegistry(ABC):
             idx: agent_id for idx, agent_id in enumerate(self._agents_dict.keys())
         }
 
-    def register(self, agent: Agent) -> None:
+    def _register(self, agent: Agent) -> None:
         """Adds a new agent to the registry."""
         if agent.agent_id in self._agents_dict:
             raise ValueError(f"Agent with ID {agent.agent_id} is already registered.")
         self._agents_dict[agent.agent_id] = agent
         self._rebuild_index_mapping()
 
-    def unregister(self, agent_id: int) -> None:
+    def _unregister(self, agent_id: int) -> None:
         """Removes an agent from the registry."""
         if agent_id not in self._agents_dict:
             raise KeyError(f"Agent with ID {agent_id} is not registered.")
@@ -53,7 +57,10 @@ class AgentsRegistry(ABC):
 
     def get_all(self) -> list[Agent]:
         """Returns all registered agents."""
-        return self._agents_list
+        return list(self._agents_dict.values())
+
+    def __contains__(self, agent_id: object) -> bool:
+        return agent_id in self._agents_dict
 
     def get_agent(self, agent_id: int) -> Agent:
         """Returns the agent with the specified global ID."""
@@ -63,7 +70,7 @@ class AgentsRegistry(ABC):
         """Returns the state of the agent with the specified global ID."""
         return self._agents_dict[agent_id].state
 
-    def get_states_array(self, exclude_id: Optional[int] = None) -> np.ndarray:
+    def get_states_array(self, exclude_id: int | None = None) -> np.ndarray:
         """Returns an array of all agent states.
         If `exclude_id` is provided, excludes the agent with that ID.
         """
@@ -76,26 +83,24 @@ class AgentsRegistry(ABC):
         )
         return states if states.shape[0] > 0 else np.zeros((0, 6))
 
-    def get_states_dict(
-        self, exclude_id: Optional[int] = None
-    ) -> dict[int, np.ndarray]:
+    def get_states_dict(self, exclude_id: int | None = None) -> dict[int, np.ndarray]:
         """Returns a dictionary mapping agent IDs to their states.
         If `exclude_id` is provided, that agent will be excluded.
         """
         return {
-            agent_id: agent.state
+            agent_id: agent.state.copy()
             for agent_id, agent in self._agents_dict.items()
             if agent_id != exclude_id
         }
 
     def get_positions_dict(
-        self, exclude_id: Optional[int] = None
+        self, exclude_id: int | None = None
     ) -> dict[int, np.ndarray]:
         """Returns a dictionary mapping agent IDs to their positions.
         If `exclude_id` is provided, that agent will be excluded.
         """
         return {
-            agent_id: agent.position
+            agent_id: agent.position.copy()
             for agent_id, agent in self._agents_dict.items()
             if agent_id != exclude_id
         }
@@ -126,22 +131,14 @@ class AgentsRegistry(ABC):
         """
         try:
             return np.array([self._id_to_index[agent_id] for agent_id in agent_ids])
-        except KeyError as e:
-            raise KeyError(f"Agent ID {e.args[0]} is not registered.")
-
-    def initialize(self, states: np.ndarray, time: float = 0.0) -> None:
-        for i, agent in enumerate(self._agents_dict.values()):
-            agent.initialize(states[i], time)
-
-    def update(self, dt: float = 0.01) -> None:
-        for i, agent in enumerate(self._agents_dict.values()):
-            agent.update(dt)
+        except KeyError as exc:
+            raise KeyError(f"Agent ID {exc.args[0]} is not registered.") from exc
 
     def __iter__(self):
-        return iter(self._agents_list)
+        return iter(self._agents_dict.values())
 
     def __len__(self):
-        return len(self._agents_list)
+        return len(self._agents_dict)
 
     def __getitem__(self, index: int) -> Agent:
-        return self._agents_list[index]
+        return tuple(self._agents_dict.values())[index]

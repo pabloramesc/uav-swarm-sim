@@ -1,5 +1,6 @@
-from enum import Enum
 from abc import ABC, abstractmethod
+from enum import Enum
+
 import numpy as np
 from numpy.typing import ArrayLike
 
@@ -72,14 +73,13 @@ class SwarmPacket(ABC):
 
     def __str__(self) -> str:
         info = self._build_description()
-        return f"SwarmPacket({", ".join(info)})"
+        return f"SwarmPacket({', '.join(info)})"
 
     def __repr__(self) -> str:
         return self.__str__()
 
 
 class DataPacket(SwarmPacket):
-
     def __init__(self):
         super().__init__(PacketType.DATA)
 
@@ -96,7 +96,7 @@ class DataPacket(SwarmPacket):
 
     def __str__(self):
         info = self._build_description()
-        return f"DataPacket({", ".join(info)})"
+        return f"DataPacket({', '.join(info)})"
 
     def __repr__(self):
         return self.__str__()
@@ -133,7 +133,7 @@ class PositionPacket(SwarmPacket):
     def __str__(self):
         info = self._build_description()[:-1]
         info.append("position=" + ", ".join([f"{p:.2f}" for p in self.get_position()]))
-        return f"PositionPacket({", ".join(info)})"
+        return f"PositionPacket({', '.join(info)})"
 
     def __repr__(self):
         return self.__str__()
@@ -157,7 +157,7 @@ class AcknowledgePacket(SwarmPacket):
 
     def __str__(self):
         info = self._build_description()[:-1]
-        return f"AckPacket({", ".join(info)})"
+        return f"AckPacket({', '.join(info)})"
 
     def __repr__(self):
         return self.__str__()
@@ -169,8 +169,10 @@ def parse_packet(data: bytes) -> SwarmPacket:
 
     try:
         packet_type = PacketType(data[0])
-    except ValueError:
-        raise ValueError(f"Invalid packet type code: 0x{data[0]:02x} ({data[0]})")
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid packet type code: 0x{data[0]:02x} ({data[0]})"
+        ) from exc
 
     if packet_type == PacketType.DATA:
         packet = DataPacket()
