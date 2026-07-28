@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "uav-swarm-sim"
 version = "0.1.0"
-description = "Multi-agent UAV swarm simulator with optional ns-3 integration"
+description = "Multi-agent UAV swarm simulator with optional NS-3 integration"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
@@ -33,6 +33,7 @@ namespaces = false
 [tool.ruff]
 target-version = "py312"
 line-length = 88
+exclude = ["drafts", "libs", "ns3/ns-3"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 
 from sim.environment import Environment
+from sim.sdqn.environment import cartesian_frame_factory, default_frame_factory
 from sim.sdqn.frames import FrameLayer, LogPolarGeometry, ScenarioState, SquareGeometry
 
 
@@ -48,6 +49,15 @@ class FrameLayerTests(unittest.TestCase):
             geometry.positions_to_cell_indices(positions, clip=True)[:, 0],
             np.array([0, 1, 3]),
         )
+
+    def test_supported_observation_factories_share_model_shape(self) -> None:
+        cartesian = cartesian_frame_factory()
+        logpolar = default_frame_factory()
+
+        self.assertEqual(cartesian.shape, (84, 84, 2))
+        self.assertEqual(logpolar.shape, (84, 84, 2))
+        self.assertIsInstance(cartesian.geometry_factory.create(), SquareGeometry)
+        self.assertIsInstance(logpolar.geometry_factory.create(), LogPolarGeometry)
 
 
 if __name__ == "__main__":

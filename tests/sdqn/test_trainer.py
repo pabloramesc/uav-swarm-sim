@@ -28,6 +28,16 @@ class FakePolicy:
 
 
 class SDQNTrainerTests(unittest.TestCase):
+    def test_frame_factory_configures_created_environment(self) -> None:
+        trainer = SDQNTrainer(
+            environment_config=SDQNEnvironmentConfig(num_users=0),
+            frame_factory=small_frame_factory(),
+            policy=FakePolicy(),
+        )
+        self.addCleanup(trainer.close)
+
+        self.assertEqual(trainer.environment.frame_shape, (5, 5, 1))
+
     def make_trainer(self) -> SDQNTrainer:
         from sim.sdqn.environment import SDQNEnvironment
 

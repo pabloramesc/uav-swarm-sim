@@ -26,6 +26,7 @@ from .frames import (
     ObstaclesLayerFactory,
     ScenarioState,
     SignalLayerFactory,
+    SquareGeometryFactory,
     get_neighbor_positions,
     get_user_positions,
 )
@@ -70,8 +71,8 @@ class SDQNEnvironmentConfig:
         return self.drones_speed * self.dt
 
 
-def default_frame_factory() -> FrameGeneratorFactory:
-    """Create the maintained two-channel log-polar observation layout."""
+def _observation_layers() -> list[ObstaclesLayerFactory | SignalLayerFactory]:
+    """Create the layers shared by the supported SDQN observations."""
 
     obstacles = ObstaclesLayerFactory(label="Obstacles", plot_center=False)
     users = SignalLayerFactory(
@@ -83,6 +84,22 @@ def default_frame_factory() -> FrameGeneratorFactory:
         plot_center=False,
         label="Users coverage",
     )
+    return [obstacles, users]
+
+
+def cartesian_frame_factory() -> FrameGeneratorFactory:
+    """Create the two-channel Cartesian observation layout."""
+
+    return FrameGeneratorFactory(
+        geometry_factory=SquareGeometryFactory(side_size=84, radius=2_000.0),
+        layer_factories=_observation_layers(),
+        label="SDQN Cartesian observation",
+    )
+
+
+def default_frame_factory() -> FrameGeneratorFactory:
+    """Create the maintained two-channel log-polar observation layout."""
+
     return FrameGeneratorFactory(
         geometry_factory=LogPolarGeometryFactory(
             num_radial=84,
@@ -90,7 +107,7 @@ def default_frame_factory() -> FrameGeneratorFactory:
             min_radius=10.0,
             max_radius=2_000.0,
         ),
-        layer_factories=[obstacles, users],
+        layer_factories=_observation_layers(),
         label="SDQN observation",
     )
 

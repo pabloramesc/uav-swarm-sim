@@ -14,7 +14,7 @@ sim/
 ├── metrics.py     on-demand coverage/connectivity summaries
 ├── evsm/          EVSM algorithm, controller, monitor, and scenario adapter
 ├── sdqn/          actions, observations, rewards, environment, policy, trainer
-├── network/       optional ns-3 process/protocol integration
+├── network/       optional NS-3 process/protocol integration
 ├── gui/           Matplotlib viewers
 └── utils/         file logging and other small utilities
 ```
@@ -22,7 +22,7 @@ sim/
 ## Dependency direction
 
 The core knows how to advance agents and an optional network backend. It does
-not import EVSM, SDQN, TensorFlow, Matplotlib, metrics, or ns-3:
+not import EVSM, SDQN, TensorFlow, Matplotlib, metrics, or NS-3:
 
 ```text
 environment + agents ──> core <── network backend
@@ -77,8 +77,8 @@ Flat simulations do not import terrain, GUI, or machine-learning dependencies.
 Terrain support loads only when a DEM is requested, and online tile dependencies
 load only when a satellite background is requested. DQN/Keras imports happen
 only when a policy wrapper is constructed. The core talks to network backends
-through a small protocol; network-disabled runs never construct or launch ns-3.
-The bundled ns-3 adapter maps contiguous agent IDs directly to node IDs and
+through a small protocol; network-disabled runs never construct or launch NS-3.
+The bundled NS-3 adapter maps contiguous agent IDs directly to node IDs and
 supports at most 78 nodes, which keeps its position messages within the bridge's
 1,024-byte datagram limit.
 

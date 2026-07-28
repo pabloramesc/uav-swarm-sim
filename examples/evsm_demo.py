@@ -130,7 +130,7 @@ def cli(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--network",
         action="store_true",
-        help="use the optional ns-3 network backend",
+        help="use the optional NS-3 network backend",
     )
     args = parser.parse_args(argv)
     main(duration=args.duration, use_network=args.network)

@@ -1,0 +1,19 @@
+build_exec(
+  EXECNAME main
+  SOURCE_FILES
+    main.cc
+    ipc-socket.cc
+    nodes-manager.cc
+    sim-bridge.cc
+  LIBRARIES_TO_LINK
+    ${libaodv}
+    ${libapplications}
+    ${libcore}
+    ${libinternet}
+    ${libmobility}
+    ${libnetwork}
+    ${libolsr}
+    ${libwifi}
+  EXECUTABLE_DIRECTORY_PATH
+    ${CMAKE_OUTPUT_DIRECTORY}/scratch/swarm-net-sim
+)

@@ -13,5 +13,5 @@ mkdir -p "$scratch_dir"
 cp -R "$source_dir/." "$scratch_dir/"
 
 cd "$ns3_root"
-./ns3 configure --enable-examples
-./ns3 build
+./ns3 configure --disable-examples --disable-tests
+./ns3 build main

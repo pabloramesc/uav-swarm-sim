@@ -1,4 +1,4 @@
-"""Optional ns-3 network integration."""
+"""Optional NS-3 network integration."""
 
 from .manager import NetworkManager
 from .network_simulator import NetworkSimulator

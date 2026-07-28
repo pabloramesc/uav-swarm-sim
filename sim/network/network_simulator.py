@@ -111,13 +111,13 @@ class NetworkSimulator:
             try:
                 self.verify_node_positions(timeout=0.1)
             except Exception as err:
-                logger.warning("Error verifying ns-3 positions: %s", err)
+                logger.warning("Error verifying NS-3 positions: %s", err)
 
     def launch_simulator(self, max_attempts: int = 1) -> None:
         attempt = 1
         while attempt <= max_attempts:
             logger.info(
-                "Initializing ns-3 simulator (attempt %d/%d).",
+                "Initializing NS-3 simulator (attempt %d/%d).",
                 attempt,
                 max_attempts,
             )
@@ -129,7 +129,7 @@ class NetworkSimulator:
                 self._verify_ns3_nodes()
 
                 logger.info(
-                    "Launched ns-3 for %d nodes (%d GCS, %d drones, %d users).",
+                    "Launched NS-3 for %d nodes (%d GCS, %d drones, %d users).",
                     self.num_nodes,
                     self.num_gcs,
                     self.num_drones,
@@ -142,14 +142,14 @@ class NetworkSimulator:
                 return
 
             except Exception as err:
-                logger.warning("ns-3 launch attempt %d failed: %s", attempt, err)
+                logger.warning("NS-3 launch attempt %d failed: %s", attempt, err)
                 self._terminate_ns3_simulator()
                 attempt += 1
 
-        raise RuntimeError("All ns-3 simulator launch attempts failed.")
+        raise RuntimeError("All NS-3 simulator launch attempts failed.")
 
     def shutdown_simulator(self, timeout: float = 1.0) -> None:
-        logger.info("Terminating ns-3 simulator...")
+        logger.info("Terminating NS-3 simulator...")
         self.bridge.stop_simulation()
         time.sleep(timeout)
         self._terminate_ns3_simulator(timeout)
@@ -186,7 +186,7 @@ class NetworkSimulator:
             if not np.allclose(local_pos, ns3_pos, atol=1.0):
                 error = np.linalg.norm(local_pos - ns3_pos)
                 raise RuntimeError(
-                    f"Node {node_id} local position does not match ns-3 position. "
+                    f"Node {node_id} local position does not match NS-3 position. "
                     f"Error: {error:.2f} m"
                 )
 
@@ -248,33 +248,33 @@ class NetworkSimulator:
 
     def _terminate_ns3_simulator(self, timeout: float = 1.0) -> None:
         if self.ns3_process and self.ns3_process.poll() is None:
-            logger.info("ns-3 process is still running. Terminating...")
+            logger.info("NS-3 process is still running. Terminating...")
             process_group = os.getpgid(self.ns3_process.pid)
             os.killpg(process_group, signal.SIGTERM)
             try:
                 self.ns3_process.wait(timeout)
             except subprocess.TimeoutExpired:
                 logger.warning(
-                    "ns-3 did not stop gracefully; killing its process group."
+                    "NS-3 did not stop gracefully; killing its process group."
                 )
                 os.killpg(process_group, signal.SIGKILL)
                 self.ns3_process.wait()
         self.ns3_process = None
-        logger.info("ns-3 process terminated.")
+        logger.info("NS-3 process terminated.")
 
     def _verify_ns3_connection(self, max_attempts: int = 2) -> None:
-        logger.info("Verifying ns-3 connection...")
+        logger.info("Verifying NS-3 connection...")
         is_running = False
         for _ in range(max_attempts):
             is_running = self.bridge.is_ns3_running()
             if is_running:
                 break
         if not is_running:
-            raise RuntimeError("ns-3 simulator is not responding.")
-        logger.info("ns-3 connection verified.")
+            raise RuntimeError("NS-3 simulator is not responding.")
+        logger.info("NS-3 connection verified.")
 
     def _verify_ns3_nodes(self) -> None:
-        logger.info("Verifying ns-3 nodes...")
+        logger.info("Verifying NS-3 nodes...")
         addresses = self.bridge.request_node_addresses()
         self._validate_complete_node_set(addresses)
         for node_id, node_addr in addresses.items():
@@ -282,16 +282,16 @@ class NetworkSimulator:
             node = self.nodes[node_id]
             if node.node_id != node_id:
                 raise RuntimeError(
-                    f"ns-3 node id {node_id} does not match local node id "
+                    f"NS-3 node id {node_id} does not match local node id "
                     f"{node.node_id}"
                 )
             if node.addr != node_addr:
                 raise RuntimeError(
-                    f"ns-3 node addr {node_addr} does not match local node addr "
+                    f"NS-3 node addr {node_addr} does not match local node addr "
                     f"{node.addr}"
                 )
             self._validate_node_type_address(node.node_type, node.addr)
-        logger.info("ns-3 nodes verified.")
+        logger.info("NS-3 nodes verified.")
 
     def _validate_node_id(self, node_id: int) -> None:
         if (
@@ -342,6 +342,6 @@ class NetworkSimulator:
             )
         if total > self.MAX_NODES:
             raise ValueError(
-                f"The ns-3 bridge supports at most {self.MAX_NODES} nodes per "
+                f"The NS-3 bridge supports at most {self.MAX_NODES} nodes per "
                 f"simulation; got {total}."
             )

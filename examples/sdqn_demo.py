@@ -6,7 +6,12 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
-from sim.sdqn import SDQNEnvironmentConfig, SDQNSimulator
+from sim.sdqn import (
+    SDQNEnvironmentConfig,
+    SDQNSimulator,
+    cartesian_frame_factory,
+    default_frame_factory,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -21,6 +26,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--boundary-size", type=float, default=2_000.0)
     parser.add_argument("--obstacles", type=int, default=0)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--representation",
+        choices=("logpolar", "cartesian"),
+        default="logpolar",
+        help="observation geometry expected by --model (default: logpolar)",
+    )
     parser.add_argument(
         "--render",
         action=argparse.BooleanOptionalAction,
@@ -45,7 +56,16 @@ def run(args: argparse.Namespace) -> None:
         boundary_size=args.boundary_size,
         num_obstacles=args.obstacles,
     )
-    simulator = SDQNSimulator(config=config, model_path=args.model)
+    frame_factory = (
+        cartesian_frame_factory()
+        if args.representation == "cartesian"
+        else default_frame_factory()
+    )
+    simulator = SDQNSimulator(
+        config=config,
+        model_path=args.model,
+        frame_factory=frame_factory,
+    )
     simulator.reset(seed=args.seed)
 
     viewer = None

@@ -1,4 +1,4 @@
-"""Cadence and lifecycle adapter for the optional ns-3 backend."""
+"""Cadence and lifecycle adapter for the optional NS-3 backend."""
 
 from __future__ import annotations
 
@@ -85,7 +85,7 @@ class NetworkManager:
             remaining = deadline - time.monotonic()
             if remaining <= 0.0:
                 raise TimeoutError(
-                    f"ns-3 did not reach simulation time {target_time:.6f} "
+                    f"NS-3 did not reach simulation time {target_time:.6f} "
                     f"within {timeout:.3f} seconds."
                 )
             current = self.simulator.bridge.request_ns3_time(timeout=remaining)

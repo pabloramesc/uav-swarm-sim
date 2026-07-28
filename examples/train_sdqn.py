@@ -7,7 +7,13 @@ import logging
 from collections.abc import Sequence
 from pathlib import Path
 
-from sim.sdqn import DQNConfig, SDQNEnvironmentConfig, SDQNTrainer
+from sim.sdqn import (
+    DQNConfig,
+    SDQNEnvironmentConfig,
+    SDQNTrainer,
+    cartesian_frame_factory,
+    default_frame_factory,
+)
 from sim.sdqn.rewards import RewardConfig
 
 
@@ -22,6 +28,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--drones", type=int, default=2)
     parser.add_argument("--users", type=int, default=25)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--representation",
+        choices=("logpolar", "cartesian"),
+        default="logpolar",
+        help="observation geometry to train (default: logpolar)",
+    )
     parser.add_argument(
         "--render", action=argparse.BooleanOptionalAction, default=False
     )
@@ -67,6 +79,11 @@ def run(args: argparse.Namespace) -> None:
         model_path=args.model,
         log_path=args.log,
         render=args.render,
+        frame_factory=(
+            cartesian_frame_factory()
+            if args.representation == "cartesian"
+            else default_frame_factory()
+        ),
     )
     try:
         trainer.train(

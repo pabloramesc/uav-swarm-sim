@@ -13,6 +13,7 @@ from ..utils.csv_logger import CSVLogger
 from .actions import NUM_ACTIONS
 from .dqn_wrapper import DQNConfig, DQNWrapper
 from .environment import SDQNEnvironment, SDQNEnvironmentConfig
+from .frames import FrameGeneratorFactory
 
 
 class TrainableBatchPolicy(Protocol):
@@ -55,14 +56,20 @@ class SDQNTrainer:
         *,
         environment: SDQNEnvironment | None = None,
         policy: TrainableBatchPolicy | None = None,
+        frame_factory: FrameGeneratorFactory | None = None,
         model_path: str | Path | None = None,
         log_path: str | Path | None = None,
         render: bool = False,
     ) -> None:
         if environment is not None and environment_config is not None:
             raise ValueError("Pass either environment or environment_config, not both.")
+        if environment is not None and frame_factory is not None:
+            raise ValueError("frame_factory cannot be used with an environment.")
 
-        self.environment = environment or SDQNEnvironment(environment_config)
+        self.environment = environment or SDQNEnvironment(
+            environment_config,
+            frame_factory=frame_factory,
+        )
         self.dqn_config = dqn_config or DQNConfig()
         self.dqn: TrainableBatchPolicy = policy or DQNWrapper(
             frame_shape=self.environment.frame_shape,
